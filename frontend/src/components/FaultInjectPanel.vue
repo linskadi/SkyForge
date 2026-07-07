@@ -84,7 +84,7 @@ const faultConfigs = computed(() => [
     title: "传感器偏置",
     enTitle: "Bias",
     desc: "输入叠加固定偏置值，模拟传感器零点漂移",
-    color: "#1e6fb8",
+    color: "#0EA5E9",
     group: "传感器",
   },
   {
@@ -102,7 +102,7 @@ const faultConfigs = computed(() => [
     title: "高频噪声",
     enTitle: "Noise",
     desc: "输入叠加随机噪声，模拟电磁干扰 (EMI)",
-    color: "#7c3aed",
+    color: "#8B5CF6",
     group: "信号质量",
   },
   {
@@ -440,7 +440,7 @@ const onReset = () => {
 
 <style scoped>
 .fault-panel {
-  border-left: 3px solid #7c3aed;
+  border-left: 3px solid #8B5CF6;
 }
 
 .panel-title {

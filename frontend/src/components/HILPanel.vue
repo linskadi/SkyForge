@@ -64,8 +64,8 @@ const checkpointIconMap: Record<HILCheckpointType, string> = {
 
 /** 检查点颜色映射 */
 const checkpointColorMap: Record<HILCheckpointType, string> = {
-  requirement_review: "#1e6fb8",
-  contract_review: "#7c3aed",
+  requirement_review: "#0EA5E9",
+  contract_review: "#8B5CF6",
   code_review: "#15803d",
   final_review: "#dc2626",
 };

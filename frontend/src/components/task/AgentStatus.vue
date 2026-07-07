@@ -27,7 +27,7 @@ const props = defineProps<{
 
 const agents = computed<AgentInfo[]>(() => {
   const agentDefs = [
-    { key: "REQ-Parser", label: "需求解析", enLabel: "REQ-Parser", color: "#1e6fb8" },
+    { key: "REQ-Parser", label: "需求解析", enLabel: "REQ-Parser", color: "#0EA5E9" },
     { key: "CON-Gen", label: "契约生成", enLabel: "CON-Gen", color: "#7e22ce" },
     { key: "CODE-Gen", label: "代码生成", enLabel: "CODE-Gen", color: "#15803d" },
     { key: "REPAIR", label: "代码修复", enLabel: "REPAIR", color: "#ea580c" },

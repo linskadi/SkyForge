@@ -229,7 +229,7 @@ onMounted(() => {
 
 <style scoped>
 .llm-status-card {
-  border-left: 3px solid #7c3aed;
+  border-left: 3px solid #8B5CF6;
 }
 
 .card-title {
@@ -244,7 +244,7 @@ onMounted(() => {
 .title-icon {
   width: 18px;
   height: 18px;
-  color: #7c3aed;
+  color: #8B5CF6;
 }
 
 .loading-hint {
@@ -355,7 +355,7 @@ onMounted(() => {
 .row-icon {
   width: 14px;
   height: 14px;
-  color: #7c3aed;
+  color: #8B5CF6;
 }
 
 .row-value {
@@ -414,7 +414,7 @@ onMounted(() => {
 }
 
 .model-select:focus {
-  border-color: #7c3aed;
+  border-color: #8B5CF6;
   box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
 }
 
@@ -438,9 +438,9 @@ onMounted(() => {
 }
 
 .model-badge.active {
-  background: #7c3aed;
+  background: #8B5CF6;
   color: #fff;
-  border-color: #7c3aed;
+  border-color: #8B5CF6;
 }
 
 .model-size {

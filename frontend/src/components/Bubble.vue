@@ -191,17 +191,17 @@ watch(
 
 /* CODE-Gen 气泡颜色 */
 .bubble-coder .prose {
-  background: #f1f5f9;
-  /* 浅灰 */
-  color: #0f172a;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
+  background: #0F1623;
+  color: #F0F4F8;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.1);
 }
 
 /* REPAIR 气泡颜色 */
 .bubble-writer .prose {
-  background: #fef9c3;
-  /* 浅黄 */
-  color: #92400e;
-  box-shadow: 0 2px 8px rgba(251, 191, 36, 0.08);
+  background: #1C1917;
+  color: #FED7AA;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.15);
 }
 </style>

@@ -146,7 +146,7 @@ const wsStatusLabel = {
 
 .duration-value {
   font-family: 'Consolas', monospace;
-  color: #3b82f6;
+  color: #0EA5E9;
   font-weight: 600;
 }
 

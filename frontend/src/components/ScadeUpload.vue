@@ -484,7 +484,7 @@ const totalVariables = computed(() => {
 }
 
 .var-block.inputs {
-  border-left-color: #1e6fb8;
+  border-left-color: #0EA5E9;
 }
 
 .var-block.outputs {
@@ -574,7 +574,7 @@ const totalVariables = computed(() => {
 
 .nl-section {
   background: #f0f9ff;
-  border-left: 3px solid #1e6fb8;
+  border-left: 3px solid #0EA5E9;
   border-radius: 6px;
   padding: 12px 14px;
 }

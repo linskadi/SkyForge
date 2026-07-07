@@ -145,8 +145,8 @@ const option = computed(() => {
         name: "输入波形",
         type: "line",
         data: props.inputData,
-        lineStyle: { color: "#3b82f6", width: 2 },
-        itemStyle: { color: "#3b82f6" },
+        lineStyle: { color: "#0EA5E9", width: 2 },
+        itemStyle: { color: "#0EA5E9" },
         showSymbol: false,
         areaStyle: {
           color: {
@@ -327,7 +327,7 @@ const exportPNG = () => {
 }
 
 .legend-line.input {
-  background: #3b82f6;
+  background: #0EA5E9;
 }
 
 .legend-line.output {

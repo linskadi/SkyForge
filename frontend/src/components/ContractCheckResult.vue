@@ -38,7 +38,7 @@ const passPercent = computed(() => {
 
 const sectionColor = (key: string): string => {
   const map: Record<string, string> = {
-    preconditions: "#1e6fb8",
+    preconditions: "#0EA5E9",
     postconditions: "#15803d",
     invariants: "#b45309",
     fault_handling: "#dc2626",
@@ -363,10 +363,11 @@ const sectionIcon = (key: string): string => {
   font-family: 'Consolas', monospace;
   font-size: 11px;
   font-weight: 600;
-  background: #1e293b;
-  color: #f1f5f9;
+  background: #0F1623;
+  color: #F0F4F8;
   padding: 1px 6px;
   border-radius: 3px;
+  border: 1px solid rgba(14, 165, 233, 0.1);
 }
 
 .item-expr {
@@ -377,7 +378,7 @@ const sectionIcon = (key: string): string => {
 }
 
 .con-tag {
-  color: #7c3aed;
+  color: #0EA5E9;
   font-weight: 600;
 }
 
@@ -453,15 +454,15 @@ const sectionIcon = (key: string): string => {
   align-items: center;
   gap: 8px;
   padding: 10px 14px;
-  background: #1e293b;
-  color: #f1f5f9;
+  background: #0F1623;
+  color: #F0F4F8;
   cursor: pointer;
   user-select: none;
   transition: background 0.15s;
 }
 
 .code-header:hover {
-  background: #334155;
+  background: #1E293B;
 }
 
 .code-icon {

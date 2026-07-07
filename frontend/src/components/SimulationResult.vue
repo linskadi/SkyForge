@@ -44,12 +44,12 @@ const contentStyle = (level: LogLevel) => ({
 const statCards = computed(() => {
   const s = props.result.statistics;
   return [
-    { label: "仿真步数", value: s.total_steps.toString(), unit: "steps", color: "#1e6fb8", icon: "📊" },
-    { label: "输入范围", value: `${s.input_range[0]} ~ ${s.input_range[1]}`, unit: "uint16", color: "#3b82f6", icon: "📥" },
+    { label: "仿真步数", value: s.total_steps.toString(), unit: "steps", color: "#0284C7", icon: "📊" },
+    { label: "输入范围", value: `${s.input_range[0]} ~ ${s.input_range[1]}`, unit: "uint16", color: "#0EA5E9", icon: "📥" },
     { label: "输出范围", value: `${s.output_range[0]} ~ ${s.output_range[1]}`, unit: "uint16", color: "#22c55e", icon: "📤" },
     { label: "输出最大值", value: s.output_max.toString(), unit: "max", color: "#dc2626", icon: "📈" },
-    { label: "输出最小值", value: s.output_min.toString(), unit: "min", color: "#0891b2", icon: "📉" },
-    { label: "输出均值", value: s.output_mean.toString(), unit: "mean", color: "#7c3aed", icon: "Σ" },
+    { label: "输出最小值", value: s.output_min.toString(), unit: "min", color: "#06B6D4", icon: "📉" },
+    { label: "输出均值", value: s.output_mean.toString(), unit: "mean", color: "#F97316", icon: "Σ" },
   ];
 });
 
@@ -184,7 +184,7 @@ const faultDisplayName = computed(() => {
 .status-icon { width: 32px; height: 32px; flex-shrink: 0; }
 .status-bar.pass .status-icon { color: #10b981; }
 .status-bar.fail .status-icon { color: #dc2626; }
-.status-icon.spinning { color: #1e6fb8; animation: spin 1s linear infinite; }
+.status-icon.spinning { color: #0EA5E9; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .status-title { font-size: 18px; font-weight: 700; color: #1f2937; }
 .status-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }

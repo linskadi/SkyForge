@@ -249,7 +249,7 @@ onBeforeUnmount(() => {
   border-radius: 9999px;
   font-size: 10px;
   font-weight: 700;
-  background: #3b82f6;
+  background: #0EA5E9;
   color: #fff;
   animation: pulse-badge 2s ease-in-out infinite;
 }
@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
 }
 .panel-handle-v:hover,
 .panel-handle-v[data-resize-handle-active] {
-  background: #3b82f6;
+  background: #0EA5E9;
 }
 
 .panel-handle-h {
@@ -313,7 +313,7 @@ onBeforeUnmount(() => {
 }
 .panel-handle-h:hover,
 .panel-handle-h[data-resize-handle-active] {
-  background: #3b82f6;
+  background: #0EA5E9;
 }
 
 /* ===== Editor Tabs (嵌入标签栏) ===== */

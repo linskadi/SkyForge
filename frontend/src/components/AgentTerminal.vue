@@ -255,8 +255,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #1e1e1e;
+  background: #060A12;
   border-radius: 8px;
+  border: 1px solid rgba(14, 165, 233, 0.08);
   overflow: hidden;
   font-family: 'Consolas', 'Courier New', monospace;
   color: #d4d4d4;
@@ -266,8 +267,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  background: #2d2d2d;
-  border-bottom: 1px solid #3c3c3c;
+  background: #0A1120;
+  border-bottom: 1px solid rgba(14, 165, 233, 0.1);
   user-select: none;
 }
 
@@ -290,9 +291,10 @@ onBeforeUnmount(() => {
 
 .terminal-title {
   font-size: 13px;
-  color: #cccccc;
+  color: #38BDF8;
   font-weight: 500;
   flex: 1;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.3);
 }
 
 .header-actions {
@@ -313,8 +315,8 @@ onBeforeUnmount(() => {
 
 .clear-btn {
   background: transparent;
-  border: 1px solid #555;
-  color: #aaa;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  color: #38BDF8;
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 3px;
@@ -323,8 +325,8 @@ onBeforeUnmount(() => {
 }
 
 .clear-btn:hover {
-  background: #3c3c3c;
-  color: #fff;
+  background: rgba(14, 165, 233, 0.1);
+  color: #7DD3FC;
 }
 
 .terminal-body {
@@ -338,8 +340,8 @@ onBeforeUnmount(() => {
 
 .terminal-body::-webkit-scrollbar { width: 8px; }
 .terminal-body::-webkit-scrollbar-track { background: transparent; }
-.terminal-body::-webkit-scrollbar-thumb { background: #3c3c3c; border-radius: 4px; }
-.terminal-body::-webkit-scrollbar-thumb:hover { background: #505050; }
+.terminal-body::-webkit-scrollbar-thumb { background: rgba(14, 165, 233, 0.15); border-radius: 4px; }
+.terminal-body::-webkit-scrollbar-thumb:hover { background: rgba(14, 165, 233, 0.3); }
 
 .empty-hint {
   color: #6a6a6a;
@@ -355,10 +357,11 @@ onBeforeUnmount(() => {
 }
 
 .log-ts {
-  color: #6a9955;
+  color: #0EA5E9;
   flex-shrink: 0;
   font-size: 12px;
   padding-top: 1px;
+  text-shadow: 0 0 6px rgba(14, 165, 233, 0.2);
 }
 
 .log-badge {
@@ -380,7 +383,8 @@ onBeforeUnmount(() => {
 .cursor {
   display: inline-block;
   margin-left: 1px;
-  color: #d4d4d4;
+  color: #38BDF8;
+  text-shadow: 0 0 6px rgba(56, 189, 248, 0.4);
   animation: blink 1s steps(2, start) infinite;
 }
 

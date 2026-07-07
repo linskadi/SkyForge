@@ -27,7 +27,7 @@ interface Section {
 }
 
 const sections: Section[] = [
-	{ title: "前置条件 Preconditions", key: "preconditions", color: "#1e6fb8", icon: "📥" },
+	{ title: "前置条件 Preconditions", key: "preconditions", color: "#0EA5E9", icon: "📥" },
 	{ title: "后置条件 Postconditions", key: "postconditions", color: "#15803d", icon: "📤" },
 	{ title: "不变式 Invariants", key: "invariants", color: "#b45309", icon: "🔒" },
 	{ title: "故障处理 Fault Handling", key: "fault_handling", color: "#dc2626", icon: "⚠" },

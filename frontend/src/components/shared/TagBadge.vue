@@ -59,7 +59,7 @@ const emit = defineEmits<{
 }
 
 .req-badge {
-  background: #1e6fb8;
+  background: #0EA5E9;
   color: #d6e8ff;
 }
 

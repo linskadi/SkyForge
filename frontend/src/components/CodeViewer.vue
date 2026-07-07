@@ -197,7 +197,7 @@ const hasCode = computed(() => props.code.length > 0);
 
 /* REQ 徽章：蓝色（与 AgentTerminal REQ-Parser 配色对齐） */
 .req-badge {
-  background: #1e6fb8;
+  background: #0EA5E9;
   color: #d6e8ff;
   cursor: pointer;
 }
@@ -281,7 +281,7 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .req-dot {
-  background: #1e6fb8;
+  background: #0EA5E9;
 }
 
 .misra-dot {

@@ -29,7 +29,7 @@ const twinStatusLabel = {
 
 const twinStatusColor = {
   idle: "#9ca3af",
-  running: "#3b82f6",
+  running: "#0EA5E9",
   passed: "#22c55e",
   failed: "#ef4444",
 };

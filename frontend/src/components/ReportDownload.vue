@@ -249,7 +249,7 @@ const passRateColor = computed(() => {
   font-weight: 500;
 }
 
-.status-text.generating { color: #1e6fb8; }
+.status-text.generating { color: #0EA5E9; }
 .status-text.done { color: #15803d; }
 .status-text.error { color: #dc2626; }
 .status-text.muted { color: var(--muted-foreground, #71717a); }
@@ -270,7 +270,7 @@ const passRateColor = computed(() => {
   padding: 14px 16px;
   background: var(--background, #fff);
   border: 1px solid var(--border, #e5e7eb);
-  border-left: 3px solid #1e6fb8;
+  border-left: 3px solid #0EA5E9;
   border-radius: 8px;
 }
 
@@ -327,7 +327,7 @@ const passRateColor = computed(() => {
 .preview-card .icon {
   width: 18px;
   height: 18px;
-  color: #1e6fb8;
+  color: #0EA5E9;
 }
 
 .report-iframe {

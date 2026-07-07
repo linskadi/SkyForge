@@ -54,11 +54,11 @@ export function buildReport(result: GenerateResult): {
   <title>${escapeHtml(summary.title)}</title>
   <style>
     body { font-family: 'Segoe UI', 'PingFang SC', sans-serif; padding: 40px; color: #1f2937; line-height: 1.6; }
-    h1 { color: #1e6fb8; border-bottom: 2px solid #1e6fb8; padding-bottom: 8px; }
-    h2 { color: #1e6fb8; margin-top: 32px; }
-    .summary-card { background: #f0f9ff; border-left: 4px solid #1e6fb8; padding: 16px 20px; margin: 16px 0; border-radius: 4px; }
+    h1 { color: #0284C7; border-bottom: 2px solid #0284C7; padding-bottom: 8px; }
+    h2 { color: #0284C7; margin-top: 32px; }
+    .summary-card { background: #f0f9ff; border-left: 4px solid #0284C7; padding: 16px 20px; margin: 16px 0; border-radius: 4px; }
     .stat { display: inline-block; margin: 8px 24px 8px 0; }
-    .stat-value { font-size: 24px; font-weight: 700; color: #1e6fb8; }
+    .stat-value { font-size: 24px; font-weight: 700; color: #0284C7; }
     .stat-label { font-size: 12px; color: #6b7280; text-transform: uppercase; }
     table { width: 100%; border-collapse: collapse; margin: 12px 0; }
     th, td { padding: 8px 12px; text-align: left; border: 1px solid #e5e7eb; }
