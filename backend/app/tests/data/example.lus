@@ -1,0 +1,4 @@
+node LowPassFilter(input: real) returns (output: real);
+let
+  output = (input -> (0.9 * pre(output) + 0.1 * input));
+tel
