@@ -192,7 +192,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
-  background: #f8fafc;
+  background: var(--background, hsl(220, 14%, 96%));
 }
 
 .task-main {
@@ -218,23 +218,23 @@ onBeforeUnmount(() => {
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #64748b;
-  background: #f1f5f9;
-  border-bottom: 1px solid #e2e8f0;
+  color: var(--muted-foreground, hsl(220, 9%, 46%));
+  background: var(--muted, hsl(220, 14%, 94%));
+  border-bottom: 1px solid var(--border, hsl(220, 13%, 90%));
   user-select: none;
   flex-shrink: 0;
 }
 
 .panel-label-dark {
-  color: #94a3b8;
-  background: #1e293b;
-  border-bottom-color: #334155;
+  color: hsl(220, 10%, 60%);
+  background: hsl(220, 20%, 13%);
+  border-bottom-color: hsl(220, 18%, 18%);
 }
 
 .panel-label-editor {
-  color: #64748b;
-  background: #f8fafc;
-  border-bottom-color: #e2e8f0;
+  color: var(--muted-foreground, hsl(220, 9%, 46%));
+  background: var(--background, hsl(220, 14%, 96%));
+  border-bottom-color: var(--border, hsl(220, 13%, 90%));
 }
 
 .panel-icon {
@@ -249,8 +249,8 @@ onBeforeUnmount(() => {
   border-radius: 9999px;
   font-size: 10px;
   font-weight: 700;
-  background: #0EA5E9;
-  color: #fff;
+  background: var(--primary, hsl(220, 70%, 50%));
+  color: var(--primary-foreground, #fff);
   animation: pulse-badge 2s ease-in-out infinite;
 }
 
@@ -261,11 +261,11 @@ onBeforeUnmount(() => {
 
 /* ===== Panel Inner Styles ===== */
 .panel-chat-inner {
-  background: #fff;
+  background: var(--card, hsl(0, 0%, 100%));
 }
 
 .panel-terminal-inner {
-  background: #0f172a;
+  background: hsl(220, 25%, 7%);
 }
 
 .terminal-body {
@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
 }
 
 .panel-editor-inner {
-  background: #fff;
+  background: var(--card, hsl(0, 0%, 100%));
 }
 
 /* ===== Panel Sizes ===== */
@@ -303,7 +303,7 @@ onBeforeUnmount(() => {
 }
 .panel-handle-v:hover,
 .panel-handle-v[data-resize-handle-active] {
-  background: #0EA5E9;
+  background: var(--primary, hsl(220, 70%, 50%));
 }
 
 .panel-handle-h {
@@ -313,7 +313,7 @@ onBeforeUnmount(() => {
 }
 .panel-handle-h:hover,
 .panel-handle-h[data-resize-handle-active] {
-  background: #0EA5E9;
+  background: var(--primary, hsl(220, 70%, 50%));
 }
 
 /* ===== Editor Tabs (嵌入标签栏) ===== */
@@ -333,7 +333,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 8px;
   height: 100%;
-  color: #94a3b8;
+  color: var(--muted-foreground, hsl(220, 10%, 60%));
   font-size: 13px;
 }
 

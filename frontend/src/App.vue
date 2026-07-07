@@ -32,32 +32,32 @@ const { isDark, toggleTheme } = useTheme();
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border, hsl(220, 13%, 90%));
+  background: var(--card, hsl(0, 0%, 100%));
   backdrop-filter: blur(8px);
-  color: #475569;
+  color: var(--muted-foreground, hsl(220, 9%, 46%));
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .theme-toggle-btn:hover {
-  border-color: #0EA5E9;
-  color: #0EA5E9;
-  box-shadow: 0 0 8px rgba(14, 165, 233, 0.15);
+  border-color: var(--primary, hsl(220, 70%, 50%));
+  color: var(--primary, hsl(220, 70%, 50%));
+  box-shadow: 0 0 8px hsla(220, 70%, 50%, 0.15);
 }
 
 /* 深色模式下的按钮样式 */
 :global(.dark) .theme-toggle-btn,
 :deep(.dark .theme-toggle-btn) {
-  background: rgba(15, 23, 42, 0.85);
-  border-color: rgba(14, 165, 233, 0.15);
-  color: #94A3B8;
+  background: hsla(220, 25%, 7%, 0.85);
+  border-color: hsla(210, 80%, 55%, 0.15);
+  color: hsl(220, 10%, 60%);
 }
 
 :global(.dark) .theme-toggle-btn:hover {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(14, 165, 233, 0.3);
-  color: #38BDF8;
+  background: hsla(210, 80%, 55%, 0.12);
+  border-color: hsla(210, 80%, 55%, 0.3);
+  color: hsl(210, 80%, 55%);
 }
 </style>
