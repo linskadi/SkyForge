@@ -8,7 +8,7 @@
  *
  * 通过 apiSwitcher 调用 searchMisra，支持 mock/真实 API 切换
  */
-import { ref, computed, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick, onBeforeUpdate } from "vue";
 import {
   Search,
   ChevronDown,
@@ -110,12 +110,27 @@ const resultCountText = computed(() => {
 /** 虚拟滚动容器引用 */
 const ruleListRef = ref<HTMLDivElement | null>(null);
 
-/** 虚拟滚动 */
+/** 每个 rule-item 的 DOM ref，用于动态测量高度 */
+const itemRefs = ref<Map<string, HTMLDivElement>>(new Map());
+const setItemRef = (el: HTMLDivElement | null, ruleId: string) => {
+  if (el) itemRefs.value.set(ruleId, el);
+  else itemRefs.value.delete(ruleId);
+};
+
+onBeforeUpdate(() => { itemRefs.value.clear(); });
+
+/** 虚拟滚动（动态高度） */
 const virtualizer = useVirtualizer({
   count: results.value.length,
   getScrollElement: () => ruleListRef.value,
-  estimateSize: () => 120,
+  estimateSize: (i) => {
+    const rule = results.value[i];
+    if (!rule) return 120;
+    // 展开项更高：header + description + detail(代码块)
+    return expandedId.value === rule.rule_id ? 360 : 120;
+  },
   overscan: 5,
+  getItemKey: (i) => results.value[i]?.rule_id ?? String(i),
 });
 
 watch(results, () => {
@@ -124,6 +139,13 @@ watch(results, () => {
       ...virtualizer.value.options,
       count: results.value.length,
     });
+  });
+});
+
+/** 展开/折叠时重新测量并更新 */
+watch(expandedId, () => {
+  nextTick(() => {
+    virtualizer.value.measure();
   });
 });
 </script>
@@ -170,6 +192,7 @@ watch(results, () => {
         <div
           v-for="virtualRow in virtualizer.getVirtualItems()"
           :key="String(virtualRow.key)"
+          :ref="(el) => setItemRef(el as HTMLDivElement, results[virtualRow.index].rule_id)"
           class="rule-item"
           :style="{
             position: 'absolute',

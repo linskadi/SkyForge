@@ -310,7 +310,7 @@ export async function generate(requirement: string, scadeFile?: string): Promise
 export async function repair(code: string): Promise<RepairResult> {
   return withFallback(
     async () => {
-      const raw = await postJSON("/api/repair", {
+      const raw = await postJSON<any>("/api/repair", {
         code,
         contract: "",
         max_iterations: 3,
@@ -385,7 +385,7 @@ export async function simulate(
 export async function getFaultTypes(): Promise<FaultType[]> {
   return withFallback(
     async () => {
-      const raw = await getJSON("/api/fault-types");
+      const raw = await getJSON<any>("/api/fault-types");
       const list = raw.fault_types ?? [];
       return list.map((item: any) => (typeof item === "string" ? item : item.type));
     },
@@ -504,7 +504,7 @@ export async function uploadScade(file: File): Promise<ScadeParseResult> {
 export async function getLLMStatus(): Promise<LLMStatus> {
   return withFallback(
     async () => {
-      const raw = await getJSON("/api/llm/status");
+      const raw = await getJSON<any>("/api/llm/status");
       return transformLLMStatusResponse(raw);
     },
     () => mockGetLLMStatus(),
@@ -538,7 +538,7 @@ export async function switchLLM(useLLM: boolean): Promise<void> {
 export async function getModels(): Promise<LLMModel[]> {
   return withFallback(
     async () => {
-      const raw = await getJSON("/api/models");
+      const raw = await getJSON<any>("/api/models");
       return transformModelsResponse(raw);
     },
     () => mockGetModels(),
@@ -610,7 +610,7 @@ export async function reject(requestId: string, comments: string): Promise<void>
 export async function searchMisra(query: string): Promise<MisraRule[]> {
   return withFallback(
     async () => {
-      const raw = await getJSON(`/api/misra/search?q=${encodeURIComponent(query)}`);
+      const raw = await getJSON<any>(`/api/misra/search?q=${encodeURIComponent(query)}`);
       return raw.rules ?? raw ?? [];
     },
     () => mockSearchMisra(query),

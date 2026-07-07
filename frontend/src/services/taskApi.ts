@@ -66,7 +66,7 @@ export function exampleAPI(
 export function cancelTask(
   task_id: string,
 ): Promise<{ success: boolean; message: string }> {
-  return postJSON(`/pipeline/${task_id}/cancel`);
+  return postJSON(`/pipeline/${task_id}/cancel`, {});
 }
 
 // ---- Files ----

@@ -155,14 +155,18 @@ const onReset = () => {
   terminalRef.value?.clear?.();
 };
 
-/** 故障注入：通过 apiSwitcher 调用 simulate 重新仿真 */
-const onInjectFault = async (faultType: FaultType, params: FaultParams) => {
+/** 故障注入：通过 apiSwitcher 调用 simulate 重新仿真（支持多故障叠加） */
+const onInjectFault = async (faults: { type: FaultType; params: FaultParams }[]) => {
   simulating.value = true;
   try {
     const code = result.value?.code ?? "";
     const contractYaml = result.value ? contractToYaml(result.value.contract) : "";
-    const res = await getApi().simulate(code, contractYaml, faultType, params);
-    simResult.value = res;
+    // 逐个故障依次注入，最后一个的结果作为最终仿真结果
+    let res;
+    for (const f of faults) {
+      res = await getApi().simulate(code, contractYaml, f.type, f.params);
+    }
+    if (res) simResult.value = res;
   } catch (err) {
     console.error("[Generate] 故障仿真失败：", err);
   } finally {
@@ -431,7 +435,7 @@ onMounted(() => {
         <!-- Tab 1: 生成结果（聚焦切换模式） -->
         <TabsContent value="result">
           <div class="focus-layout">
-            <!-- 左侧：非聚焦面板的迷你按钮 -->
+            <!-- 横向子标签栏 -->
             <div class="focus-tabs">
               <button
                 class="focus-tab-btn"
@@ -587,7 +591,7 @@ onMounted(() => {
           </Card>
         </TabsContent>
 
-        <!-- Tab 4: 数字孪生（Day 3 数字孪生沙盒） -->
+        <!-- Tab 4: 数字孪生 -->
         <TabsContent value="simulation">
           <div class="simulation-tab">
             <FaultInjectPanel @inject="onInjectFault" />

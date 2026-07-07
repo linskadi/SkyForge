@@ -1,19 +1,29 @@
 <script setup lang="ts">
 /**
- * FaultInjectPanel 故障注入面板（Day 3 数字孪生）
+ * FaultInjectPanel 故障注入面板（数字孪生沙盒）
  *
- * 5 类故障注入控件（参考文档第 6 章数字孪生沙盒）：
- * 1. 传感器偏置（Bias）：滑块设置偏置值
- * 2. 信号丢失（Signal Loss）：开关 + 持续时间滑块
- * 3. 高频噪声（Noise）：开关 + 噪声幅度滑块
- * 4. 卡死故障（Stuck）：开关 + 卡死值输入
- * 5. 阶跃突变（Step）：开关 + 突变时间 + 突变值
+ * 覆盖嵌入式/航空电子常见故障类型：
+ *  1. 传感器偏置（Bias）         — 零点漂移
+ *  2. 信号丢失（Signal Loss）    — 断线/开路
+ *  3. 高频噪声（Noise）          — 电磁干扰
+ *  4. 卡死故障（Stuck）          — 机械卡死
+ *  5. 阶跃突变（Step）           — 工况切换
+ *  6. 饱和截断（Saturation）     — 超量程限幅
+ *  7. 间歇性故障（Intermittent） — 接触不良
+ *  8. 漂移（Drift）              — 元器件老化渐变
+ *  9. 丢帧/延迟（Timeout）       — 总线通信超时
+ * 10. 跳变毛刺（Glitch）         — 瞬时尖峰脉冲
+ * 11. 零输出（Stuck-at-Zero）    — 传感器无响应
+ * 12. 反接/符号反转（Polarity）   — 线缆接反
  *
- * 同一时刻只能启用一种故障类型（互斥开关）。
- * 点击"注入故障"按钮后触发回调，并显示"已注入"状态徽章。
+ * 支持同时启用多种故障（多选）。
+ * 点击"注入故障"后依次叠加所有选中的故障。
  */
-import { computed, ref } from "vue";
-import { Zap, RotateCcw, Gauge, SignalZero, Waves, Lock, TrendingUp } from "lucide-vue-next";
+import { computed, reactive } from "vue";
+import {
+  Zap, RotateCcw, Gauge, SignalZero, Waves, Lock, TrendingUp,
+  ArrowUpDown, AlertTriangle, Clock, Siren, CircleDot, ToggleLeft,
+} from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -21,276 +31,407 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { FaultType, FaultParams } from "@/services/mockApi";
 
+/** 扩展故障类型（兼容后端已有类型 + 新增类型） */
+type ExtFaultType =
+  | FaultType
+  | "saturation"
+  | "intermittent"
+  | "drift"
+  | "timeout"
+  | "glitch"
+  | "stuck_zero"
+  | "polarity";
+
+/** 单个故障的完整状态 */
+interface FaultState {
+  enabled: boolean;
+  params: Record<string, number>;
+}
+
 /** 组件 emit 事件 */
 const emit = defineEmits<{
-  /** 注入故障：传递故障类型和参数 */
-  (e: "inject", faultType: FaultType, params: FaultParams): void;
+  /** 注入故障：传递所有已启用的故障列表 */
+  (e: "inject", faults: { type: FaultType; params: FaultParams }[]): void;
 }>();
 
-/** 当前选中的故障类型（互斥，null 表示无选中） */
-const activeFault = ref<FaultType | null>(null);
+/** 各故障类型的启用状态和参数（多选） */
+const faults = reactive<Record<ExtFaultType, FaultState>>({
+  bias:        { enabled: false, params: { bias_value: 20000 } },
+  signal_loss: { enabled: false, params: { loss_duration: 30 } },
+  noise:       { enabled: false, params: { noise_amplitude: 5000 } },
+  stuck:       { enabled: false, params: { stuck_value: 40000 } },
+  step:        { enabled: false, params: { step_time: 80, step_value: 60000 } },
+  saturation:  { enabled: false, params: { upper_limit: 60000, lower_limit: 5000 } },
+  intermittent:{ enabled: false, params: { interval: 20, duration: 5 } },
+  drift:       { enabled: false, params: { drift_rate: 500 } },
+  timeout:     { enabled: false, params: { timeout_start: 50 } },
+  glitch:      { enabled: false, params: { glitch_magnitude: 30000, glitch_count: 5 } },
+  stuck_zero:  { enabled: false, params: { stuck_start: 40 } },
+  polarity:    { enabled: false, params: {} },
+});
 
-/** 是否已注入（显示状态徽章） */
-const injected = ref(false);
-
-// ===== 各故障类型的参数 =====
-
-/** 偏置值（bias） */
-const biasValue = ref(20000);
-/** 信号丢失持续时间（步） */
-const lossDuration = ref(30);
-/** 噪声幅度 */
-const noiseAmplitude = ref(5000);
-/** 卡死值 */
-const stuckValue = ref(40000);
-/** 阶跃突变时间步 */
-const stepTime = ref(80);
-/** 阶跃突变值 */
-const stepValue = ref(60000);
+/** 已启用的故障数量 */
+const enabledCount = computed(() =>
+  (Object.keys(faults) as ExtFaultType[]).filter((t) => faults[t].enabled).length,
+);
 
 /** 故障类型配置列表 */
 const faultConfigs = computed(() => [
+  // ===== 基础故障 =====
   {
-    type: "bias" as FaultType,
+    type: "bias" as ExtFaultType,
     icon: Gauge,
     title: "传感器偏置",
     enTitle: "Bias",
     desc: "输入叠加固定偏置值，模拟传感器零点漂移",
     color: "#1e6fb8",
+    group: "传感器",
   },
   {
-    type: "signal_loss" as FaultType,
+    type: "signal_loss" as ExtFaultType,
     icon: SignalZero,
     title: "信号丢失",
     enTitle: "Signal Loss",
-    desc: "指定区间内输入强制为 0，模拟传感器断线",
+    desc: "指定区间内输入强制为 0，模拟断线/开路",
     color: "#ea580c",
+    group: "传感器",
   },
   {
-    type: "noise" as FaultType,
+    type: "noise" as ExtFaultType,
     icon: Waves,
     title: "高频噪声",
     enTitle: "Noise",
-    desc: "输入叠加随机噪声，模拟电磁干扰",
+    desc: "输入叠加随机噪声，模拟电磁干扰 (EMI)",
     color: "#7c3aed",
+    group: "信号质量",
   },
   {
-    type: "stuck" as FaultType,
+    type: "stuck" as ExtFaultType,
     icon: Lock,
     title: "卡死故障",
-    enTitle: "Stuck",
+    enTitle: "Stuck-at",
     desc: "输入卡在固定值，模拟传感器机械卡死",
     color: "#dc2626",
+    group: "传感器",
   },
   {
-    type: "step" as FaultType,
+    type: "step" as ExtFaultType,
     icon: TrendingUp,
     title: "阶跃突变",
-    enTitle: "Step",
-    desc: "指定时间步输入突变，模拟工况切换",
+    enTitle: "Step Change",
+    desc: "指定时间步输入突变，模拟工况快速切换",
     color: "#0891b2",
+    group: "信号质量",
+  },
+  // ===== 信号质量故障 =====
+  {
+    type: "saturation" as ExtFaultType,
+    icon: ArrowUpDown,
+    title: "饱和截断",
+    enTitle: "Saturation",
+    desc: "超出上下限的值被截断，模拟 ADC 量程限幅",
+    color: "#b45309",
+    group: "信号质量",
+  },
+  {
+    type: "glitch" as ExtFaultType,
+    icon: Siren,
+    title: "跳变毛刺",
+    enTitle: "Glitch",
+    desc: "随机时刻出现瞬时尖峰脉冲，模拟闩锁效应",
+    color: "#e11d48",
+    group: "信号质量",
+  },
+  // ===== 通信/时序故障 =====
+  {
+    type: "intermittent" as ExtFaultType,
+    icon: ToggleLeft,
+    title: "间歇性故障",
+    enTitle: "Intermittent",
+    desc: "周期性输出正常/异常值，模拟接触不良",
+    color: "#059669",
+    group: "通信时序",
+  },
+  {
+    type: "timeout" as ExtFaultType,
+    icon: Clock,
+    title: "丢帧 / 延迟",
+    enTitle: "Timeout",
+    desc: "指定时间点后信号冻结，模拟总线超时丢帧",
+    color: "#7c2d12",
+    group: "通信时序",
+  },
+  // ===== 偏移/退化故障 =====
+  {
+    type: "drift" as ExtFaultType,
+    icon: AlertTriangle,
+    title: "渐变漂移",
+    enTitle: "Drift",
+    desc: "信号随时间线性偏移，模拟元器件老化退化",
+    color: "#9333ea",
+    group: "退化",
+  },
+  {
+    type: "stuck_zero" as ExtFaultType,
+    icon: CircleDot,
+    title: "零输出",
+    enTitle: "Stuck-at-Zero",
+    desc: "指定时间点后输出恒为 0，模拟传感器完全失效",
+    color: "#64748b",
+    group: "退化",
+  },
+  {
+    type: "polarity" as ExtFaultType,
+    icon: ToggleLeft,
+    title: "符号反转",
+    enTitle: "Polarity Reversal",
+    desc: "信号取反，模拟线缆接反或极性错误",
+    color: "#0d9488",
+    group: "退化",
   },
 ]);
 
-/** 切换故障类型开关（互斥） */
-const toggleFault = (faultType: FaultType) => {
-  if (activeFault.value === faultType) {
-    activeFault.value = null;
-  } else {
-    activeFault.value = faultType;
+/** 按分组排列 */
+const groupedFaults = computed(() => {
+  const groups: Record<string, typeof faultConfigs.value> = {};
+  for (const cfg of faultConfigs.value) {
+    if (!groups[cfg.group]) groups[cfg.group] = [];
+    groups[cfg.group].push(cfg);
   }
-  injected.value = false;
+  return groups;
+});
+
+/** 切换故障启用状态 */
+const toggleFault = (faultType: ExtFaultType) => {
+  faults[faultType].enabled = !faults[faultType].enabled;
 };
 
 /** 点击"注入故障"按钮 */
 const onInject = () => {
-  if (!activeFault.value) return;
-  const params: FaultParams = {};
-  switch (activeFault.value) {
-    case "bias":
-      params.bias_value = biasValue.value;
-      break;
-    case "signal_loss":
-      params.loss_duration = lossDuration.value;
-      break;
-    case "noise":
-      params.noise_amplitude = noiseAmplitude.value;
-      break;
-    case "stuck":
-      params.stuck_value = stuckValue.value;
-      break;
-    case "step":
-      params.step_time = stepTime.value;
-      params.step_value = stepValue.value;
-      break;
-  }
-  injected.value = true;
-  emit("inject", activeFault.value, params);
+  const activeList = (Object.keys(faults) as ExtFaultType[])
+    .filter((t) => faults[t].enabled)
+    .map((t) => ({
+      type: t as FaultType,
+      params: { ...faults[t].params } as FaultParams,
+    }));
+  if (activeList.length === 0) return;
+  emit("inject", activeList);
 };
 
-/** 重置所有参数 */
+/** 重置所有参数和状态 */
 const onReset = () => {
-  activeFault.value = null;
-  injected.value = false;
-  biasValue.value = 20000;
-  lossDuration.value = 30;
-  noiseAmplitude.value = 5000;
-  stuckValue.value = 40000;
-  stepTime.value = 80;
-  stepValue.value = 60000;
+  (Object.keys(faults) as ExtFaultType[]).forEach((t) => {
+    faults[t].enabled = false;
+  });
+  faults.bias.params = { bias_value: 20000 };
+  faults.signal_loss.params = { loss_duration: 30 };
+  faults.noise.params = { noise_amplitude: 5000 };
+  faults.stuck.params = { stuck_value: 40000 };
+  faults.step.params = { step_time: 80, step_value: 60000 };
+  faults.saturation.params = { upper_limit: 60000, lower_limit: 5000 };
+  faults.intermittent.params = { interval: 20, duration: 5 };
+  faults.drift.params = { drift_rate: 500 };
+  faults.timeout.params = { timeout_start: 50 };
+  faults.glitch.params = { glitch_magnitude: 30000, glitch_count: 5 };
+  faults.stuck_zero.params = { stuck_start: 40 };
+  faults.polarity.params = {};
 };
 </script>
 
 <template>
   <Card class="fault-panel">
     <CardHeader>
-      <CardTitle class="panel-title">
-        🎛️ 故障注入面板
-        <span class="title-hint">（数字孪生沙盒，参考文档 6.5/6.6）</span>
-      </CardTitle>
+      <CardTitle class="panel-title">🎛️ 故障注入面板</CardTitle>
     </CardHeader>
     <CardContent>
-      <!-- 5 类故障卡片 -->
-      <div class="fault-grid">
-        <div
-          v-for="cfg in faultConfigs"
-          :key="cfg.type"
-          class="fault-card"
-          :class="{ active: activeFault === cfg.type }"
-          :style="activeFault === cfg.type ? { borderColor: cfg.color } : {}"
-        >
-          <!-- 卡片头部：图标 + 标题 + 开关 -->
-          <div class="card-header">
-            <div class="card-title-row">
-              <component :is="cfg.icon" class="card-icon" :style="{ color: cfg.color }" />
-              <div class="card-text">
-                <div class="card-title-cn">{{ cfg.title }}</div>
-                <div class="card-title-en">{{ cfg.enTitle }}</div>
+      <!-- 按分组显示故障卡片 -->
+      <div v-for="(items, group) in groupedFaults" :key="group" class="fault-group">
+        <div class="group-label">{{ group }}</div>
+        <div class="fault-grid">
+          <div
+            v-for="cfg in items"
+            :key="cfg.type"
+            class="fault-card"
+            :class="{ active: faults[cfg.type].enabled }"
+            :style="faults[cfg.type].enabled ? { borderColor: cfg.color } : {}"
+          >
+            <!-- 卡片头部 -->
+            <div class="card-header">
+              <div class="card-title-row">
+                <component :is="cfg.icon" class="card-icon" :style="{ color: cfg.color }" />
+                <div class="card-text">
+                  <div class="card-title-cn">{{ cfg.title }}</div>
+                  <div class="card-title-en">{{ cfg.enTitle }}</div>
+                </div>
               </div>
+              <Switch
+                :model-value="faults[cfg.type].enabled"
+                @update:model-value="() => toggleFault(cfg.type)"
+              />
             </div>
-            <Switch
-              :model-value="activeFault === cfg.type"
-              @update:model-value="(val: boolean) => val ? toggleFault(cfg.type) : (activeFault = null)"
-            />
-          </div>
-          <div class="card-desc">{{ cfg.desc }}</div>
+            <div class="card-desc">{{ cfg.desc }}</div>
 
-          <!-- 参数控件（仅当该故障被选中时显示） -->
-          <div v-if="activeFault === cfg.type" class="card-params">
-            <!-- Bias: 偏置值滑块 -->
-            <template v-if="cfg.type === 'bias'">
-              <div class="param-row">
-                <Label class="param-label">偏置值</Label>
-                <input
-                  type="range"
-                  class="param-slider"
-                  min="1000"
-                  max="50000"
-                  step="1000"
-                  v-model.number="biasValue"
-                  :style="{ accentColor: cfg.color }"
-                />
-                <span class="param-value">+{{ biasValue }}</span>
-              </div>
-            </template>
+            <!-- 参数控件 -->
+            <div v-if="faults[cfg.type].enabled" class="card-params">
+              <!-- Bias -->
+              <template v-if="cfg.type === 'bias'">
+                <div class="param-row">
+                  <Label class="param-label">偏置值</Label>
+                  <input type="range" class="param-slider" min="1000" max="50000" step="1000"
+                    v-model.number="faults.bias.params.bias_value" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">+{{ faults.bias.params.bias_value }}</span>
+                </div>
+              </template>
 
-            <!-- Signal Loss: 持续时间滑块 -->
-            <template v-else-if="cfg.type === 'signal_loss'">
-              <div class="param-row">
-                <Label class="param-label">持续时间</Label>
-                <input
-                  type="range"
-                  class="param-slider"
-                  min="5"
-                  max="100"
-                  step="5"
-                  v-model.number="lossDuration"
-                  :style="{ accentColor: cfg.color }"
-                />
-                <span class="param-value">{{ lossDuration }} 步</span>
-              </div>
-            </template>
+              <!-- Signal Loss -->
+              <template v-else-if="cfg.type === 'signal_loss'">
+                <div class="param-row">
+                  <Label class="param-label">持续时间</Label>
+                  <input type="range" class="param-slider" min="5" max="100" step="5"
+                    v-model.number="faults.signal_loss.params.loss_duration" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">{{ faults.signal_loss.params.loss_duration }} 步</span>
+                </div>
+              </template>
 
-            <!-- Noise: 噪声幅度滑块 -->
-            <template v-else-if="cfg.type === 'noise'">
-              <div class="param-row">
-                <Label class="param-label">噪声幅度</Label>
-                <input
-                  type="range"
-                  class="param-slider"
-                  min="500"
-                  max="15000"
-                  step="500"
-                  v-model.number="noiseAmplitude"
-                  :style="{ accentColor: cfg.color }"
-                />
-                <span class="param-value">±{{ noiseAmplitude }}</span>
-              </div>
-            </template>
+              <!-- Noise -->
+              <template v-else-if="cfg.type === 'noise'">
+                <div class="param-row">
+                  <Label class="param-label">噪声幅度</Label>
+                  <input type="range" class="param-slider" min="500" max="15000" step="500"
+                    v-model.number="faults.noise.params.noise_amplitude" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">±{{ faults.noise.params.noise_amplitude }}</span>
+                </div>
+              </template>
 
-            <!-- Stuck: 卡死值输入 -->
-            <template v-else-if="cfg.type === 'stuck'">
-              <div class="param-row">
-                <Label class="param-label">卡死值</Label>
-                <Input
-                  type="number"
-                  class="param-input"
-                  min="0"
-                  max="65535"
-                  v-model.number="stuckValue"
-                />
-                <span class="param-value">uint16</span>
-              </div>
-            </template>
+              <!-- Stuck -->
+              <template v-else-if="cfg.type === 'stuck'">
+                <div class="param-row">
+                  <Label class="param-label">卡死值</Label>
+                  <Input type="number" class="param-input" min="0" max="65535"
+                    v-model.number="faults.stuck.params.stuck_value" />
+                  <span class="param-value">uint16</span>
+                </div>
+              </template>
 
-            <!-- Step: 突变时间 + 突变值 -->
-            <template v-else-if="cfg.type === 'step'">
-              <div class="param-row">
-                <Label class="param-label">突变时间步</Label>
-                <Input
-                  type="number"
-                  class="param-input"
-                  min="0"
-                  max="199"
-                  v-model.number="stepTime"
-                />
-                <span class="param-value">step</span>
-              </div>
-              <div class="param-row">
-                <Label class="param-label">突变值</Label>
-                <Input
-                  type="number"
-                  class="param-input"
-                  min="0"
-                  max="65535"
-                  v-model.number="stepValue"
-                />
-                <span class="param-value">uint16</span>
-              </div>
-            </template>
+              <!-- Step -->
+              <template v-else-if="cfg.type === 'step'">
+                <div class="param-row">
+                  <Label class="param-label">突变时间步</Label>
+                  <Input type="number" class="param-input" min="0" max="199"
+                    v-model.number="faults.step.params.step_time" />
+                  <span class="param-value">step</span>
+                </div>
+                <div class="param-row">
+                  <Label class="param-label">突变值</Label>
+                  <Input type="number" class="param-input" min="0" max="65535"
+                    v-model.number="faults.step.params.step_value" />
+                  <span class="param-value">uint16</span>
+                </div>
+              </template>
+
+              <!-- Saturation -->
+              <template v-else-if="cfg.type === 'saturation'">
+                <div class="param-row">
+                  <Label class="param-label">上限</Label>
+                  <Input type="number" class="param-input" min="0" max="65535"
+                    v-model.number="faults.saturation.params.upper_limit" />
+                  <span class="param-value">uint16</span>
+                </div>
+                <div class="param-row">
+                  <Label class="param-label">下限</Label>
+                  <Input type="number" class="param-input" min="0" max="65535"
+                    v-model.number="faults.saturation.params.lower_limit" />
+                  <span class="param-value">uint16</span>
+                </div>
+              </template>
+
+              <!-- Intermittent -->
+              <template v-else-if="cfg.type === 'intermittent'">
+                <div class="param-row">
+                  <Label class="param-label">故障周期</Label>
+                  <input type="range" class="param-slider" min="5" max="60" step="5"
+                    v-model.number="faults.intermittent.params.interval" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">{{ faults.intermittent.params.interval }} 步</span>
+                </div>
+                <div class="param-row">
+                  <Label class="param-label">故障持续</Label>
+                  <input type="range" class="param-slider" min="1" max="20" step="1"
+                    v-model.number="faults.intermittent.params.duration" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">{{ faults.intermittent.params.duration }} 步</span>
+                </div>
+              </template>
+
+              <!-- Drift -->
+              <template v-else-if="cfg.type === 'drift'">
+                <div class="param-row">
+                  <Label class="param-label">漂移速率</Label>
+                  <input type="range" class="param-slider" min="100" max="3000" step="100"
+                    v-model.number="faults.drift.params.drift_rate" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">+{{ faults.drift.params.drift_rate }}/步</span>
+                </div>
+              </template>
+
+              <!-- Timeout -->
+              <template v-else-if="cfg.type === 'timeout'">
+                <div class="param-row">
+                  <Label class="param-label">冻结起始步</Label>
+                  <input type="range" class="param-slider" min="10" max="190" step="10"
+                    v-model.number="faults.timeout.params.timeout_start" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">step {{ faults.timeout.params.timeout_start }}</span>
+                </div>
+              </template>
+
+              <!-- Glitch -->
+              <template v-else-if="cfg.type === 'glitch'">
+                <div class="param-row">
+                  <Label class="param-label">毛刺幅度</Label>
+                  <input type="range" class="param-slider" min="5000" max="60000" step="1000"
+                    v-model.number="faults.glitch.params.glitch_magnitude" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">±{{ faults.glitch.params.glitch_magnitude }}</span>
+                </div>
+                <div class="param-row">
+                  <Label class="param-label">毛刺次数</Label>
+                  <input type="range" class="param-slider" min="1" max="20" step="1"
+                    v-model.number="faults.glitch.params.glitch_count" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">×{{ faults.glitch.params.glitch_count }}</span>
+                </div>
+              </template>
+
+              <!-- Stuck-at-Zero -->
+              <template v-else-if="cfg.type === 'stuck_zero'">
+                <div class="param-row">
+                  <Label class="param-label">失效起始步</Label>
+                  <input type="range" class="param-slider" min="10" max="190" step="10"
+                    v-model.number="faults.stuck_zero.params.stuck_start" :style="{ accentColor: cfg.color }" />
+                  <span class="param-value">step {{ faults.stuck_zero.params.stuck_start }}</span>
+                </div>
+              </template>
+
+              <!-- Polarity — 无参数 -->
+              <template v-else-if="cfg.type === 'polarity'">
+                <div class="no-params">启用后信号自动取反（× -1）</div>
+              </template>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- 底部操作栏 -->
       <div class="action-bar">
-        <Button
-          :disabled="!activeFault"
-          @click="onInject"
-        >
+        <Button :disabled="enabledCount === 0" @click="onInject">
           <Zap class="w-4 h-4" />
           注入故障
+          <span v-if="enabledCount > 1" class="inject-count">×{{ enabledCount }}</span>
         </Button>
         <Button variant="outline" @click="onReset">
           <RotateCcw class="w-4 h-4" />
           重置参数
         </Button>
-        <!-- 已注入状态徽章 -->
-        <span v-if="injected && activeFault" class="injected-badge">
-          ✅ 已注入：{{ faultConfigs.find(f => f.type === activeFault)?.title }}
+        <span v-if="enabledCount > 0" class="hint-text">
+          已选择 {{ enabledCount }} 种故障
         </span>
-        <span v-else-if="!activeFault" class="hint-text">
-          请选择一种故障类型
+        <span v-else class="hint-text">
+          可同时选择多种故障类型
         </span>
       </div>
     </CardContent>
@@ -310,18 +451,30 @@ const onReset = () => {
   gap: 8px;
 }
 
-.title-hint {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--muted-foreground, #a1a1aa);
+/* 分组 */
+.fault-group {
+  margin-bottom: 16px;
 }
 
-/* 5 个故障卡片网格 */
+.fault-group:last-of-type {
+  margin-bottom: 0;
+}
+
+.group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground, #9ca3af);
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+/* 卡片网格 */
 .fault-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
 }
 
 .fault-card {
@@ -330,7 +483,6 @@ const onReset = () => {
   padding: 12px;
   background: var(--background, #fff);
   transition: all 0.2s;
-  cursor: default;
 }
 
 .fault-card.active {
@@ -353,8 +505,8 @@ const onReset = () => {
 }
 
 .card-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   flex-shrink: 0;
 }
 
@@ -364,32 +516,32 @@ const onReset = () => {
 }
 
 .card-title-cn {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--foreground, #1f2937);
 }
 
 .card-title-en {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted-foreground, #9ca3af);
   font-family: 'Consolas', monospace;
 }
 
 .card-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground, #6b7280);
-  margin-top: 8px;
+  margin-top: 6px;
   line-height: 1.5;
 }
 
 /* 参数控件区 */
 .card-params {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
   border-top: 1px dashed var(--border, #e5e7eb);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .param-row {
@@ -399,9 +551,9 @@ const onReset = () => {
 }
 
 .param-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  min-width: 70px;
+  min-width: 72px;
   color: var(--foreground, #374151);
 }
 
@@ -412,17 +564,25 @@ const onReset = () => {
 }
 
 .param-value {
-  font-size: 12px;
+  font-size: 11px;
   font-family: 'Consolas', monospace;
   font-weight: 600;
   color: var(--foreground, #1f2937);
-  min-width: 60px;
+  min-width: 56px;
   text-align: right;
 }
 
 .param-input {
   flex: 1;
-  max-width: 120px;
+  max-width: 110px;
+  font-size: 12px;
+}
+
+.no-params {
+  font-size: 12px;
+  color: var(--muted-foreground, #9ca3af);
+  font-style: italic;
+  padding: 2px 0;
 }
 
 /* 底部操作栏 */
@@ -431,19 +591,22 @@ const onReset = () => {
   align-items: center;
   gap: 12px;
   padding-top: 12px;
+  margin-top: 12px;
   border-top: 1px solid var(--border, #e5e7eb);
 }
 
-.injected-badge {
+.inject-count {
   display: inline-flex;
   align-items: center;
-  padding: 4px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 16px;
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #86efac;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.3);
 }
 
 .hint-text {

@@ -303,73 +303,66 @@
 /* ===================== 生成结果聚焦切换布局 ===================== */
 .focus-layout {
   display: flex;
+  flex-direction: column;
   gap: 14px;
   min-height: 400px;
 }
 
-/* 左侧迷你按钮栏 */
+/* 横向子标签栏 */
 .focus-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 64px;
-  flex-shrink: 0;
+  gap: 6px;
+  background: var(--secondary, #f4f4f5);
+  padding: 4px;
+  border-radius: 10px;
 }
 
 .focus-tab-btn {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 14px 6px;
-  border: 1.5px solid var(--border, #e4e4e7);
-  border-radius: 12px;
-  background: var(--background, #fff);
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground, #6b7280);
+  white-space: nowrap;
 }
 
 .focus-tab-btn:hover {
-  background: var(--secondary, #f4f4f5);
-  border-color: var(--primary, #3b82f6);
-  box-shadow: 0 2px 8px rgba(59,130,246,0.15);
-  transform: translateY(-1px);
+  background: var(--background, #fff);
+  color: var(--foreground, #1f2937);
 }
 
 .focus-tab-btn.active {
-  background: var(--primary, #3b82f6);
-  color: #fff;
-  border-color: var(--primary, #3b82f6);
-  box-shadow: 0 2px 12px rgba(59,130,246,0.3);
+  background: var(--background, #fff);
+  color: var(--primary, #3b82f6);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 .focus-tab-icon {
-  font-size: 22px;
+  font-size: 15px;
   line-height: 1;
 }
 
 .focus-tab-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .focus-tab-badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
   border-radius: 9999px;
   font-size: 10px;
   font-weight: 700;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
 }
@@ -403,16 +396,14 @@
 /* ===================== 响应式 ===================== */
 @media (max-width: 768px) {
   .focus-layout {
-    flex-direction: column;
     min-height: auto;
   }
   .focus-tabs {
-    flex-direction: row;
-    width: 100%;
-    justify-content: center;
+    flex-wrap: wrap;
   }
-  .focus-tab-label {
-    writing-mode: horizontal-tb;
+  .focus-tab-btn {
+    padding: 6px 12px;
+    font-size: 12px;
   }
 }
 

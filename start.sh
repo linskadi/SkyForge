@@ -14,17 +14,25 @@ echo ""
 # ====================== Check Dependencies ======================
 echo "[1/5] Checking dependencies..."
 
-# Check Python
+# Check Python (Git Bash on Windows may not have python in PATH, try py launcher)
 PYTHON_CMD=""
 if command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
 elif command -v python &> /dev/null; then
     PYTHON_CMD="python"
+elif command -v py &> /dev/null; then
+    PYTHON_CMD="py -3"
+elif command -v uv &> /dev/null; then
+    # uv can find python even if it's not in PATH
+    PYTHON_CMD="uv run python"
 else
     echo "[ERROR] Python not found. Please install Python 3.12+"
+    echo "  Windows: install from https://www.python.org/downloads/"
+    echo "  macOS:   brew install python"
+    echo "  Linux:   sudo apt install python3"
     exit 1
 fi
-echo "  Python: $($PYTHON_CMD --version)"
+echo "  Python: $($PYTHON_CMD --version 2>&1)"
 
 # Check Node.js
 if ! command -v node &> /dev/null; then
@@ -43,9 +51,12 @@ echo "  pnpm: $(pnpm --version)"
 # Check uv (Python package manager)
 if ! command -v uv &> /dev/null; then
     echo "  Installing uv..."
-    $PYTHON_CMD -m pip install uv
+    curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null || \
+    $PYTHON_CMD -m pip install uv 2>/dev/null || \
+    echo "  [WARN] Could not install uv automatically, please install manually"
+    export PATH="$HOME/.local/bin:$PATH"
 fi
-echo "  uv: installed"
+echo "  uv: $(uv --version 2>/dev/null || echo 'installed')"
 
 echo ""
 
@@ -83,12 +94,8 @@ echo "[3/5] Setting up frontend..."
 FRONTEND_DIR="$ROOT/frontend"
 
 cd "$FRONTEND_DIR"
-if [ ! -d "node_modules" ]; then
-    echo "  Installing Node.js dependencies..."
-    pnpm install
-else
-    echo "  node_modules exists, skipping install"
-fi
+echo "  Installing Node.js dependencies..."
+pnpm install
 cd "$ROOT"
 echo "  Frontend ready"
 echo ""

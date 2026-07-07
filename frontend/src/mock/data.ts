@@ -9,11 +9,9 @@ import type {
   ContractCheckResult,
   MisraViolation,
   RepairIteration,
-  SimulationResult,
   LLMStatus,
   MisraRule,
   HILApproval,
-  HILHistoryItem,
 } from "@/types/domain";
 
 // ===================== Agent 日志 =====================

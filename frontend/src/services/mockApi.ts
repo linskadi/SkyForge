@@ -36,6 +36,7 @@ export type {
   AgentType,
   LogLevel,
   Contract,
+  ContractCondition,
   ContractCheckResult,
   ContractViolation,
   FaultParams,
@@ -46,6 +47,7 @@ export type {
   SimulationResult,
   SimulationStatistics,
   ComposeConnection,
+  ComposeResult,
   CompatibilityResult,
   CompatibilityCheckItem,
   LLMStatus,
@@ -55,6 +57,7 @@ export type {
   ScadeParseResult,
   HILApproval,
   HILHistoryItem,
+  HILCheckpointType,
   ReportSummary,
   ReportResult,
   MisraRule,
@@ -64,17 +67,14 @@ export type {
 // ===================== 数据常量导入 =====================
 import {
   MOCK_AGENT_LOGS,
-  EXAMPLE_REQUIREMENTS,
   MOCK_CONTRACT,
   MOCK_CODE,
   MOCK_VIOLATIONS,
   MOCK_TRACEABILITY,
-  MISRA_RULE_DOCS,
   MOCK_REPAIR_HISTORY,
   MOCK_CONTRACT_CHECK_RESULT,
   MOCK_SIM_LOGS,
   SIM_STEPS,
-  FILTER_ALPHA,
   MOCK_LLM_STATUS,
   MOCK_LP_CODE,
   MOCK_HP_CODE,
@@ -99,8 +99,6 @@ export const PRESET_HP_CONTRACT = MOCK_HP_CONTRACT;
 
 // ===================== 仿真逻辑导入 =====================
 import {
-  genSineInput,
-  lowpassFilter,
   computeStats,
   generateNormalSimulationResult,
   runFaultInjection,

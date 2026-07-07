@@ -3,7 +3,7 @@
  * 纯数据转换：将 GenerateResult 转换为 HTML 报告
  */
 
-import type { GenerateResult, ReportSummary, ReportResult } from "@/types/domain";
+import type { GenerateResult, ReportSummary } from "@/types/domain";
 
 /** HTML 转义工具函数，防止 XSS */
 export function escapeHtml(str: string): string {

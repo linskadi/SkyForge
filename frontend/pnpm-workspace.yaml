@@ -1,0 +1,8 @@
+onlyBuiltDependencies:
+  - "@biomejs/biome"
+  - esbuild
+  - vue-demi
+  - core-js
+  - core-js-pure
+  - leveldown
+  - "@fortawesome/fontawesome-free"
