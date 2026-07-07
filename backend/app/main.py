@@ -19,7 +19,6 @@ from app.utils.cli import get_ascii_banner, center_cli_str
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(get_ascii_banner())
-    print(center_cli_str("SkyForge (天锻): 机载软件安全合规 AI 中台"))
     logger.info("Starting SkyForge")
 
     PROJECT_FOLDER = "./project"
