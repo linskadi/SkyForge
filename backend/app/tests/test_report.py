@@ -472,7 +472,7 @@ class TestReportAPIRoutes(unittest.TestCase):
         """POST /api/report 返回 report_html / traceability_matrix / do178_objectives。"""
         import asyncio
 
-        from app.api.routes.generate import ReportRequest, report
+        from app.api.routes.reports import ReportRequest, report
 
         req = ReportRequest(pipeline_result=SAMPLE_PIPELINE_RESULT)
         result = asyncio.run(report(req))
@@ -497,7 +497,7 @@ class TestReportAPIRoutes(unittest.TestCase):
         """GET /api/report/download 返回 text/html Response。"""
         import asyncio
 
-        from app.api.routes.generate import report, report_download, ReportRequest
+        from app.api.routes.reports import report, report_download, ReportRequest
 
         # 先 POST 一次填充缓存
         asyncio.run(report(ReportRequest(pipeline_result=SAMPLE_PIPELINE_RESULT)))
@@ -520,12 +520,10 @@ class TestReportAPIRoutes(unittest.TestCase):
         """无缓存时 GET /api/report/download 返回提示 HTML（不报错）。"""
         import asyncio
 
-        from app.api.routes import generate as gen_mod
-        from app.api.routes.generate import report_download
+        from app.api.routes.reports import _report_cache, report_download
 
         # 清空缓存
-        gen_mod._last_report_html = None
-        gen_mod._last_report_cache = None
+        _report_cache.clear()
         response = asyncio.run(report_download())
         self.assertEqual(response.media_type, "text/html; charset=utf-8")
         body_text = (

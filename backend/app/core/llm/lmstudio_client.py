@@ -1,5 +1,15 @@
 # -*- coding: utf-8 -*-
-"""LM Studio 轻量级客户端，提供 OpenAI 兼容 API 调用。
+"""LM Studio 轻量级客户端：本地开发用，httpx 直连 LM Studio。
+
+何时使用此类（vs LLM 类）：
+- 单轮 prompt 调用、无需历史管理 → 用 LMStudioClient
+- 需要多轮对话、工具调用、Redis 流式推送 → 用 LLM（通过 LLMFactory 创建）
+
+Pipeline 的 4 个 Agent 均使用本客户端（get_lmstudio_client() 单例）：
+- RequirementParserAgent: 需求解析
+- ContractGeneratorAgent: 契约生成
+- CodeGeneratorAgent: 代码生成
+- CodeRepairerAgent: 代码修复
 
 直接用 httpx 调用 LM Studio Local Server（localhost:1234/v1），
 不依赖重型组件。
@@ -14,6 +24,7 @@
 
 import os
 import json
+import time
 import httpx
 from typing import Optional
 from app.utils.log_util import logger
@@ -52,17 +63,29 @@ class LMStudioClient:
         )
         self.timeout = timeout
         self._available: Optional[bool] = None
+        self._last_check: float = 0.0
+        self._cache_ttl: int = 60  # 缓存有效期（秒）
 
-    def is_available(self) -> bool:
+    def is_available(self, force_recheck: bool = False) -> bool:
         """检查 LM Studio 是否可用（server 已启动 + 至少一个模型已加载）。
+
+        使用 TTL 缓存，避免频繁请求。默认每 60 秒重新检查一次。
+
+        Args:
+            force_recheck: 强制重新检查，忽略缓存
 
         Returns:
             True 如果 LM Studio 可用且 USE_LLM=true
         """
         if not self.use_llm:
             return False
-        if self._available is not None:
-            return self._available
+
+        # TTL 缓存：未过期且非强制刷新时直接返回缓存值
+        if not force_recheck and self._available is not None:
+            if time.time() - self._last_check < self._cache_ttl:
+                return self._available
+
+        # 执行实际检查
         try:
             resp = httpx.get(f"{self.base_url}/models", timeout=5)
             if resp.status_code == 200:
@@ -79,6 +102,9 @@ class LMStudioClient:
         except Exception as e:
             self._available = False
             logger.warning(f"LM Studio 不可用: {e}")
+
+        # 更新检查时间戳
+        self._last_check = time.time()
         return self._available
 
     def chat(

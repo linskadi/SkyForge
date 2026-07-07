@@ -10,7 +10,7 @@
  * 双向追溯可视化（Patch 3 亮点）
  */
 import { computed, ref } from "vue";
-import { MISRA_RULE_DOCS } from "@/services/mockApi";
+import { parseInlineTags, type InlineToken } from "@/utils/tagParser";
 
 interface Props {
 	/** C 代码内容 */
@@ -32,44 +32,6 @@ interface CodeLine {
 	text: string;
 }
 
-/** 行内 Token：普通文本 / REQ 徽章 / MISRA 徽章 / CON 徽章 */
-type Token =
-	| { type: "text"; value: string }
-	| { type: "req"; value: string }
-	| { type: "misra"; value: string; doc: string }
-	| { type: "con"; value: string };
-
-/** 把一行代码解析为 token 列表，识别 [REQ-001] [MISRA-Rule-8.1] [CON-001-POST-000] 等 */
-const parseLine = (text: string): Token[] => {
-	const tokens: Token[] = [];
-	// 正则：匹配 [REQ-xxx] / [MISRA-Rule-x.x] / [CON-xxx-XXX-nnn]
-	const regex = /\[(REQ-\d+|MISRA-Rule-[\d.]+|CON-\d+-[A-Z]+-\d+)\]/g;
-	let lastIdx = 0;
-	let match: RegExpExecArray | null;
-	while ((match = regex.exec(text)) !== null) {
-		if (match.index > lastIdx) {
-			tokens.push({ type: "text", value: text.slice(lastIdx, match.index) });
-		}
-		const tag = match[1];
-		if (tag.startsWith("REQ-")) {
-			tokens.push({ type: "req", value: tag });
-		} else if (tag.startsWith("MISRA-Rule-")) {
-			tokens.push({
-				type: "misra",
-				value: tag,
-				doc: MISRA_RULE_DOCS[tag] ?? `未收录规则说明：${tag}`,
-			});
-		} else if (tag.startsWith("CON-")) {
-			tokens.push({ type: "con", value: tag });
-		}
-		lastIdx = match.index + match[0].length;
-	}
-	if (lastIdx < text.length) {
-		tokens.push({ type: "text", value: text.slice(lastIdx) });
-	}
-	return tokens;
-};
-
 /** 代码行列表（带行号） */
 const lines = computed<CodeLine[]>(() => {
 	return props.code.split("\n").map((text, idx) => ({
@@ -79,8 +41,8 @@ const lines = computed<CodeLine[]>(() => {
 });
 
 /** 解析每行的 token */
-const lineTokens = computed<Token[][]>(() => {
-	return lines.value.map((line) => parseLine(line.text));
+const lineTokens = computed<InlineToken[][]>(() => {
+	return lines.value.map((line) => parseInlineTags(line.text));
 });
 
 /** 当前需要高亮的行号集合 */
@@ -192,8 +154,14 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .code-line.highlighted {
-  background: rgba(255, 213, 79, 0.22);
-  box-shadow: inset 3px 0 0 #ffd54f;
+  background: rgba(255, 213, 79, 0.18);
+  box-shadow: inset 4px 0 0 #f59e0b;
+  border-left: none;
+}
+
+.code-line.highlighted .line-no {
+  color: #f59e0b;
+  font-weight: 700;
 }
 
 .line-no {
@@ -243,9 +211,11 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .req-badge.active {
-  background: #ffd54f;
+  background: #f59e0b;
   color: #1e1e1e;
-  box-shadow: 0 0 0 2px rgba(255, 213, 79, 0.5);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4), 0 0 12px rgba(245, 158, 11, 0.3);
+  transform: scale(1.08);
+  font-weight: 700;
 }
 
 /* MISRA 徽章：橙色 */
@@ -295,8 +265,12 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .active-legend {
-  color: #ffd54f;
-  font-weight: 600;
+  color: #f59e0b;
+  font-weight: 700;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .dot {

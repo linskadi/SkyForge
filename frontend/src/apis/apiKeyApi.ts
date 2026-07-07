@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use @/services/taskApi instead.
+ * This file is kept for backward compatibility only.
+ * All consumers should migrate to:
+ *   import { validateApiKey, saveApiConfig, validateOpenalexEmail } from "@/services/taskApi";
+ */
 import request from "@/utils/request";
 
 /** 验证 API Key 请求参数 */

@@ -8,10 +8,10 @@ router = APIRouter()
 @router.get("/api/health")
 async def health_check():
     """健康检查接口。"""
-    return {"status": "ok", "service": "AirborneAI"}
+    return {"status": "ok", "service": "SkyForge"}
 
 
 @router.get("/api/hello")
 async def hello_world():
     """Hello World 接口。"""
-    return {"message": "Hello from AirborneAI"}
+    return {"message": "Hello from SkyForge"}

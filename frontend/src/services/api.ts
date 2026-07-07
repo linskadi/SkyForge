@@ -1,15 +1,32 @@
 /**
  * 真实后端 API 服务层
  * ====================================================================
- * AirborneAI 后端 20 个端点的 fetch 封装。
+ * SkyForge 后端 20 个端点的封装。
  *
  * 设计要点：
- * 1. 不引入 axios，纯 fetch 实现；
+ * 1. 使用统一 HTTP 客户端 (./client.ts)，无 axios 依赖；
  * 2. 所有函数签名与 mockApi.ts 中的 mock 函数一致，便于在 apiSwitcher 中互换；
  * 3. 后端响应字段与 mockApi 类型存在差异，本层负责字段转换；
- * 4. 30 秒超时（生成、报告等长任务也使用同一超时）；
- * 5. 网络错误时静默降级到 mockApi，保证前端可用性。
+ * 4. 网络错误时静默降级到 mockApi，保证前端可用性。
  */
+
+import type {
+  GenerateResult,
+  SimulationResult,
+  ComposeResult,
+  CompatibilityResult,
+  ContractCheckResult,
+  ScadeParseResult,
+  LLMStatus,
+  LLMModel,
+  HILApproval,
+  ReportResult,
+  RepairResult,
+  FaultType,
+  FaultParams,
+  MisraRule,
+  ComposeConnection,
+} from "@/types/domain";
 
 import {
   mockGenerate,
@@ -29,56 +46,9 @@ import {
   mockGetFaultTypes,
   mockSearchMisra,
   mockGetMisraRule,
-  type GenerateResult,
-  type SimulationResult,
-  type ComposeResult,
-  type CompatibilityResult,
-  type ContractCheckResult,
-  type ScadeParseResult,
-  type LLMStatus,
-  type LLMModel,
-  type HILApproval,
-  type ReportResult,
-  type RepairResult,
-  type FaultType,
-  type FaultParams,
-  type MisraRule,
-  type ComposeConnection,
 } from "./mockApi";
 
-/** 后端 API 基础地址 */
-const API_BASE_URL = "http://localhost:8000";
-
-/** 默认请求超时（毫秒） */
-const DEFAULT_TIMEOUT_MS = 30_000;
-
-/**
- * 带超时的 fetch 封装
- *
- * @param url 完整 URL
- * @param options fetch 配置
- * @param timeout 超时毫秒
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeout: number = DEFAULT_TIMEOUT_MS,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText}`);
-    }
-    return response;
-  } finally {
-    clearTimeout(timer);
-  }
-}
+import { API_BASE_URL, getJSON, postJSON, request } from "./client";
 
 /**
  * 调用真实后端 API；网络错误时静默降级到 mockApi
@@ -99,25 +69,6 @@ async function withFallback<T>(
     console.warn(`[api] ${label} 真实 API 调用失败，降级到 mock：`, err);
     return fallback();
   }
-}
-
-/** POST JSON 请求 */
-async function postJSON<T = any>(path: string, body: any): Promise<T> {
-  const res = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  return res.json();
-}
-
-/** GET 请求 */
-async function getJSON<T = any>(path: string): Promise<T> {
-  const res = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
-  return res.json();
 }
 
 // ====================================================================
@@ -448,7 +399,7 @@ export async function getFaultTypes(): Promise<FaultType[]> {
  *
  * @param pipelineResult /api/generate 返回的全流程结果
  */
-export async function generateReport(pipelineResult: any): Promise<ReportResult> {
+export async function generateReport(pipelineResult: GenerateResult): Promise<ReportResult> {
   return withFallback(
     async () => {
       const raw = await postJSON("/api/report", {
@@ -536,11 +487,10 @@ export async function uploadScade(file: File): Promise<ScadeParseResult> {
     async () => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetchWithTimeout(`${API_BASE_URL}/api/upload-scade`, {
+      const raw = await request<unknown>("/api/upload-scade", {
         method: "POST",
         body: formData,
       });
-      const raw = await res.json();
       return transformScadeResponse(raw);
     },
     () => mockUploadScade(file),
@@ -682,5 +632,5 @@ export async function getMisraRule(ruleId: string): Promise<MisraRule> {
   );
 }
 
-/** 导出 API 基础地址，供 downloadReport 等场景使用 */
+/** API 基础地址已统一从 ./client.ts 导出，此处仅 re-export 供下游兼容 */
 export { API_BASE_URL };

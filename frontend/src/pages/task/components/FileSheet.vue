@@ -3,7 +3,7 @@ import {
 	getAllFilesDownloadUrl,
 	getFileDownloadUrl,
 	getFiles,
-} from "@/apis/filesApi";
+} from "@/services/taskApi";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -22,12 +22,10 @@ import {
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-	Archive,
 	Download,
 	File,
 	FileText,
 	Files,
-	Folder,
 	RefreshCw,
 } from "lucide-vue-next";
 import { ref } from "vue";
@@ -43,7 +41,8 @@ const { toast } = useToast();
 const fileListVisible = ref(false);
 
 /** 文件列表数据 */
-const fileList = ref<Record<string, unknown>[]>([]);
+// biome-ignore lint/suspicious/noExplicitAny: API 返回结构不确定
+const fileList = ref<any[]>([]);
 
 /** 加载状态 */
 const loadingFiles = ref(false);
@@ -60,10 +59,10 @@ const downloadingAll = ref(false);
 const openFolder = async () => {
 	try {
 		loadingFiles.value = true;
-		const res = await getFiles(taskId as string);
+		const data = await getFiles(taskId as string);
 
-		if (res.data) {
-			fileList.value = Array.isArray(res.data) ? res.data : [res.data];
+		if (data?.files) {
+			fileList.value = data.files;
 			fileListVisible.value = true;
 		} else {
 			toast({
@@ -115,11 +114,11 @@ const formatFileSize = (size: number | undefined) => {
 const downloadSingleFile = async (filename: string) => {
 	try {
 		downloadingFile.value = filename;
-		const res = await getFileDownloadUrl(taskId as string, filename);
-		if (res.data?.download_url) {
+		const data = await getFileDownloadUrl(taskId as string, filename);
+		if (data?.download_url) {
 			// 创建隐藏的链接元素并触发下载
 			const link = document.createElement("a");
-			link.href = res.data.download_url;
+			link.href = data.download_url;
 			link.download = filename;
 			link.target = "_blank";
 			document.body.appendChild(link);
@@ -149,11 +148,11 @@ const downloadSingleFile = async (filename: string) => {
 const downloadAll = async () => {
 	try {
 		downloadingAll.value = true;
-		const res = await getAllFilesDownloadUrl(taskId as string);
-		if (res.data?.download_url) {
+		const data = await getAllFilesDownloadUrl(taskId as string);
+		if (data?.download_url) {
 			// 创建隐藏的链接元素并触发下载
 			const link = document.createElement("a");
-			link.href = res.data.download_url;
+			link.href = data.download_url;
 			link.download = `task_${taskId}_files.zip`;
 			link.target = "_blank";
 			document.body.appendChild(link);

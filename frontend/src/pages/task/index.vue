@@ -1,178 +1,376 @@
 <script setup lang="ts">
-import { getWriterSeque } from "@/apis/commonApi";
-import CoderEditor from "@/components/AgentEditor/CoderEditor.vue";
-import ModelerEditor from "@/components/AgentEditor/ModelerEditor.vue";
-import WriterEditor from "@/components/AgentEditor/WriterEditor.vue";
+/**
+ * Task 页面 - Agent 工作流三面板布局
+ * 布局：左侧 ChatArea + 右侧 Agent Terminal / Code Editor
+ * 支持 4 Agent 流水线：REQ-Parser → CON-Gen → CODE-Gen → REPAIR
+ */
+import { ref, computed, onMounted, onBeforeUnmount } from "vue";
 import ChatArea from "@/components/ChatArea.vue";
-import { Button } from "@/components/ui/button";
+import AgentTerminal from "@/components/AgentTerminal.vue";
+import MonacoCodeEditor from "@/components/MonacoCodeEditor.vue";
+import TaskToolbar from "@/components/task/TaskToolbar.vue";
+import TaskStatusBar from "@/components/task/TaskStatusBar.vue";
 import {
-	ResizableHandle,
-	ResizablePanel,
-	ResizablePanelGroup,
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import FilesSheet from "@/pages/task/components/FileSheet.vue";
 import { useTaskStore } from "@/stores/task";
-import { onBeforeUnmount, onMounted, ref } from "vue";
 
 // ---- Props ----
 
 const props = defineProps<{ task_id: string }>();
 
-// ---- Reactive State ----
+// ---- State ----
 
 const taskStore = useTaskStore();
 
-/** 论文写作顺序 */
-const writerSequence = ref<string[]>([]);
+/** 右侧面板 Tab */
+const activeTab = ref("terminal");
 
-/** 运行时长相关状态 */
-const startTime = ref<number>(Date.now());
-const currentTime = ref<number>(Date.now());
-let timer: ReturnType<typeof setInterval> | null = null;
+/** 代码内容 */
+const codeContent = ref("");
 
-/** 格式化运行时长为可读字符串 */
-const formatDuration = (ms: number): string => {
-	const seconds = Math.floor(ms / 1000);
-	const hours = Math.floor(seconds / 3600);
-	const minutes = Math.floor((seconds % 3600) / 60);
-	const remainingSeconds = seconds % 60;
+/** 高亮的需求标签 */
+const highlightReq = ref<string | null>(null);
 
-	if (hours > 0) {
-		return `${hours}h ${minutes}m ${remainingSeconds}s`;
-	}
-	if (minutes > 0) {
-		return `${minutes}m ${remainingSeconds}s`;
-	}
-	return `${remainingSeconds}s`;
-};
+/** 追溯矩阵 */
+const traceability = ref<Record<string, number[]>>({});
 
-/** 运行时长显示值 */
-const runningDuration = ref<string>("0s");
-
-/** 是否正在请求停止 */
+/** 停止状态 */
 const isStopping = ref(false);
 
-/** 更新运行时长 */
-const updateDuration = () => {
-	currentTime.value = Date.now();
-	runningDuration.value = formatDuration(currentTime.value - startTime.value);
-};
+/** Agent 状态 */
+const activeAgent = ref<string | null>(null);
+const completedAgents = ref<string[]>([]);
 
-/** 处理停止运行 */
+// ---- Terminal Ref ----
+const terminalRef = ref<InstanceType<typeof AgentTerminal> | null>(null);
+
+// ---- Computed ----
+
+/** 合规检查通过率 */
+const complianceRate = computed(() => {
+  // TODO: 从消息中解析
+  return null;
+});
+
+/** 数字孪生状态 */
+const twinStatus = ref<"idle" | "running" | "passed" | "failed">("idle");
+
+/** 文件数量 */
+const fileCount = computed(() => taskStore.files?.length ?? 0);
+
+// ---- Actions ----
+
 async function handleStop() {
-	isStopping.value = true;
-	await taskStore.stopTask(props.task_id);
-	isStopping.value = false;
+  isStopping.value = true;
+  await taskStore.stopTask(props.task_id);
+  isStopping.value = false;
 }
 
-// ---- Lifecycle Hooks ----
+// ---- Lifecycle ----
 
 onMounted(async () => {
-	await taskStore.loadTaskMessages(props.task_id);
-	taskStore.connectWebSocket(props.task_id);
-	const res = await getWriterSeque();
-	writerSequence.value = Array.isArray(res.data) ? res.data : [];
-
-	// 开始计时
-	timer = setInterval(updateDuration, 1000);
-	updateDuration(); // 立即更新一次
+  await taskStore.loadTaskMessages(props.task_id);
+  taskStore.connectWebSocket(props.task_id);
 });
 
 onBeforeUnmount(() => {
-	taskStore.closeWebSocket();
-	// 清理计时器
-	if (timer) {
-		clearInterval(timer);
-		timer = null;
-	}
+  taskStore.closeWebSocket();
 });
 </script>
 
 <template>
-  <div class="fixed inset-0">
-    <ResizablePanelGroup direction="horizontal" class="h-full rounded-lg border">
-      <ResizablePanel :default-size="40" class="h-full">
-        <ChatArea :messages="taskStore.chatMessages" />
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel :default-size="60" class="h-full min-w-0">
-        <div class="flex h-full flex-col min-w-0">
-          <Tabs default-value="modeler" class="w-full h-full flex flex-col">
-            <!-- TODO: Agent 的状态 -->
-            <div class="border-b px-4 py-1 flex justify-between">
-              <div class="flex items-center gap-4">
-                <div class="text-sm text-gray-600">
-                  运行时长: <span class="font-mono text-blue-600">{{ runningDuration }}</span>
-                </div>
-                <div class="flex items-center gap-1.5 text-sm">
-                  <span
-                    class="inline-block h-2 w-2 rounded-full"
-                    :class="{
-                      'bg-green-500': taskStore.wsStatus === 'connected',
-                      'bg-yellow-500 animate-pulse': taskStore.wsStatus === 'connecting' || taskStore.wsStatus === 'reconnecting',
-                      'bg-red-500': taskStore.wsStatus === 'disconnected',
-                    }"
-                  />
-                  <span class="text-gray-500">
-                    {{
-                      taskStore.wsStatus === 'connected' ? '已连接'
-                      : taskStore.wsStatus === 'connecting' ? '连接中'
-                      : taskStore.wsStatus === 'reconnecting' ? '重连中'
-                      : '未连接'
-                    }}
-                  </span>
-                </div>
-                <TabsList>
-                  <TabsTrigger value="modeler" class="text-sm">
-                    ModelerAgent
-                  </TabsTrigger>
-                  <TabsTrigger value="coder" class="text-sm">
-                    CoderAgent
-                  </TabsTrigger>
-                  <TabsTrigger value="writer" class="text-sm">
-                    WriterAgent
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-              <!--  TODO: 其他选项 -->
+  <div class="task-page">
+    <!-- 顶部工具栏 -->
+    <TaskToolbar
+      :ws-status="taskStore.wsStatus"
+      :is-running="taskStore.isRunning"
+      :is-stopping="isStopping"
+      :active-agent="activeAgent"
+      :completed-agents="completedAgents"
+      @stop="handleStop"
+      @download="taskStore.downloadMessages"
+    />
 
-              <div class="flex justify-end gap-2 items-center">
-                <Button
-                  v-if="taskStore.isRunning"
-                  variant="destructive"
-                  :disabled="isStopping"
-                  @click="handleStop"
-                >
-                  {{ isStopping ? "停止中..." : "停止运行" }}
-                </Button>
-                <Button @click="taskStore.downloadMessages" class="flex justify-end">
-                  下载消息
-                </Button>
-
-                <FilesSheet />
-
-              </div>
-
-            </div>
-
-            <TabsContent value="modeler" class="flex-1 p-1 min-w-0 h-full overflow-hidden">
-              <ModelerEditor />
-            </TabsContent>
-
-            <TabsContent value="coder" class="flex-1 p-1 min-w-0 h-full overflow-hidden">
-              <CoderEditor />
-            </TabsContent>
-
-            <TabsContent value="writer" class="flex-1 p-1 min-w-0 h-full overflow-hidden">
-              <WriterEditor :messages="taskStore.writerMessages" :writerSequence="writerSequence" />
-            </TabsContent>
-          </Tabs>
+    <!-- 主内容区：左右分栏 -->
+    <ResizablePanelGroup direction="horizontal" class="task-main">
+      <!-- 左侧：聊天区（需求输入 + Agent 对话） -->
+      <ResizablePanel :default-size="30" :min-size="20" class="panel-chat">
+        <div class="panel-wrapper panel-chat-inner">
+          <div class="panel-label">
+            <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            需求对话
+          </div>
+          <ChatArea :messages="taskStore.chatMessages" />
         </div>
+      </ResizablePanel>
+
+      <ResizableHandle class="panel-handle-v" />
+
+      <!-- 右侧：Agent Terminal + Code Editor（上下分栏） -->
+      <ResizablePanel :default-size="70" :min-size="30" class="panel-right">
+        <ResizablePanelGroup direction="vertical" class="h-full">
+          <!-- 上半：Agent Terminal（实时日志） -->
+          <ResizablePanel :default-size="55" :min-size="20" class="panel-terminal">
+            <div class="panel-wrapper panel-terminal-inner">
+              <div class="panel-label panel-label-dark">
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+                Agent 实时日志
+                <span v-if="activeAgent" class="agent-badge">{{ activeAgent }}</span>
+              </div>
+              <AgentTerminal
+                ref="terminalRef"
+                :use-mock="true"
+                class="terminal-body"
+              />
+            </div>
+          </ResizablePanel>
+
+          <ResizableHandle class="panel-handle-h" />
+
+          <!-- 下半：Code Editor（代码 + Diff） -->
+          <ResizablePanel :default-size="45" :min-size="20" class="panel-editor">
+            <div class="panel-wrapper panel-editor-inner">
+              <Tabs v-model="activeTab" class="h-full flex flex-col">
+                <div class="panel-label panel-label-editor">
+                  <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+                  </svg>
+                  代码查看
+                  <TabsList class="editor-tabs">
+                    <TabsTrigger value="terminal" class="text-xs">代码</TabsTrigger>
+                    <TabsTrigger value="diff" class="text-xs">Diff</TabsTrigger>
+                  </TabsList>
+                </div>
+                <TabsContent value="terminal" class="flex-1 min-h-0">
+                  <MonacoCodeEditor
+                    :code="codeContent"
+                    :read-only="true"
+                    :traceability="traceability"
+                    :highlight-req="highlightReq"
+                    @req-click="(req) => highlightReq = highlightReq === req ? null : req"
+                    class="h-full"
+                  />
+                </TabsContent>
+                <TabsContent value="diff" class="flex-1 min-h-0">
+                  <div class="empty-state">
+                    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                      <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                    <span>等待代码修复完成后显示 Diff 对比</span>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </ResizablePanel>
     </ResizablePanelGroup>
 
+    <!-- 底部状态栏 -->
+    <TaskStatusBar
+      :compliance-rate="complianceRate"
+      :twin-status="twinStatus"
+      :file-count="fileCount"
+    />
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+/* ===== Page Layout ===== */
+.task-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.task-main {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ===== Panel Wrappers ===== */
+.panel-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ===== Panel Labels (统一标签栏样式) ===== */
+.panel-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.panel-label-dark {
+  color: #94a3b8;
+  background: #1e293b;
+  border-bottom-color: #334155;
+}
+
+.panel-label-editor {
+  color: #64748b;
+  background: #f8fafc;
+  border-bottom-color: #e2e8f0;
+}
+
+.panel-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.agent-badge {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  background: #3b82f6;
+  color: #fff;
+  animation: pulse-badge 2s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ===== Panel Inner Styles ===== */
+.panel-chat-inner {
+  background: #fff;
+}
+
+.panel-terminal-inner {
+  background: #0f172a;
+}
+
+.terminal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.panel-editor-inner {
+  background: #fff;
+}
+
+/* ===== Panel Sizes ===== */
+.panel-chat {
+  min-width: 280px;
+}
+
+.panel-right {
+  min-width: 400px;
+}
+
+.panel-terminal {
+  min-height: 180px;
+}
+
+.panel-editor {
+  min-height: 180px;
+}
+
+/* ===== Resize Handles ===== */
+.panel-handle-v {
+  width: 3px !important;
+  background: transparent;
+  transition: background 0.15s;
+}
+.panel-handle-v:hover,
+.panel-handle-v[data-resize-handle-active] {
+  background: #3b82f6;
+}
+
+.panel-handle-h {
+  height: 3px !important;
+  background: transparent;
+  transition: background 0.15s;
+}
+.panel-handle-h:hover,
+.panel-handle-h[data-resize-handle-active] {
+  background: #3b82f6;
+}
+
+/* ===== Editor Tabs (嵌入标签栏) ===== */
+.editor-tabs {
+  margin-left: auto;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+/* ===== Empty State ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.empty-icon {
+  width: 32px;
+  height: 32px;
+  opacity: 0.4;
+}
+
+/* ===== Responsive: Tablet (< 1024px) ===== */
+@media (max-width: 1024px) {
+  .panel-chat {
+    min-width: 220px;
+  }
+  .panel-right {
+    min-width: 320px;
+  }
+}
+
+/* ===== Responsive: Mobile (< 768px) ===== */
+@media (max-width: 768px) {
+  .task-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
+  }
+  .task-main {
+    flex-direction: column;
+    min-height: 600px;
+  }
+  .panel-chat {
+    min-width: unset;
+    min-height: 300px;
+  }
+  .panel-right {
+    min-width: unset;
+    min-height: 400px;
+  }
+}
+</style>

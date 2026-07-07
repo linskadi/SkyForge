@@ -13,7 +13,7 @@ import { GalleryVerticalEnd } from 'lucide-vue-next'
       <div class="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground">
         <GalleryVerticalEnd class="size-4" />
       </div>
-      Acme Inc.
+      SkyForge
     </a>
     <div class="w-full max-w-sm md:max-w-3xl">
       <LoginForm />

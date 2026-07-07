@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { saveApiConfig } from "@/apis/apiKeyApi";
-import { submitModelingTask } from "@/apis/submitModelingApi";
+import { saveApiConfig } from "@/services/taskApi";
+import { submitModelingTask } from "@/services/taskApi";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,10 +116,10 @@ const handleSubmit = async () => {
 
 		// 保存 API Key
 		await saveApiConfig({
-			coordinator: apiKeyStore.coordinatorConfig,
-			modeler: apiKeyStore.modelerConfig,
-			coder: apiKeyStore.coderConfig,
-			writer: apiKeyStore.writerConfig,
+			req_parser: apiKeyStore.reqParserConfig,
+			con_gen: apiKeyStore.conGenConfig,
+			code_gen: apiKeyStore.codeGenConfig,
+			repair: apiKeyStore.reviewerConfig,
 			openalex_email: apiKeyStore.openalexEmail,
 		});
 
@@ -149,7 +149,7 @@ const handleSubmit = async () => {
 			uploadedFiles.value,
 		);
 
-		taskId.value = response?.data?.task_id ?? null;
+		taskId.value = response?.task_id ?? null;
 		taskStore.addUserMessage(question.value);
 
 		showSubmitSuccess.value = true;

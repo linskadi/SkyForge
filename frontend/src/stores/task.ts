@@ -1,14 +1,14 @@
-import { getTaskMessages } from "@/apis/commonApi";
-import { cancelTask as cancelTaskAPI } from "@/apis/commonApi";
+import { getTaskMessages } from "@/services/taskApi";
+import { cancelTask as cancelTaskAPI } from "@/services/taskApi";
 import { AgentType } from "@/utils/enum";
 import type {
-	CoderMessage,
-	CoordinatorMessage,
+	CodeGenMessage,
+	RequirementParserMessage,
 	InterpreterMessage,
 	Message,
-	ModelerMessage,
+	ContractGenMessage,
 	UserMessage,
-	WriterMessage,
+	ReviewerMessage,
 } from "@/utils/response";
 import { TaskWebSocket } from "@/utils/websocket";
 import { defineStore } from "pinia";
@@ -85,7 +85,7 @@ export const useTaskStore = defineStore("task", () => {
 	function setCurrentTask(taskId: string) {
 		currentTaskId.value = taskId;
 		if (typeof window !== "undefined") {
-			window.localStorage.setItem("currentTaskId", taskId);
+			window.sessionStorage.setItem("currentTaskId", taskId);
 		}
 	}
 
@@ -188,8 +188,8 @@ export const useTaskStore = defineStore("task", () => {
 		setCurrentTask(taskId);
 		ensureTaskBucket(taskId);
 		try {
-			const response = await getTaskMessages(taskId);
-			const validMessages = (response.data ?? []).filter(isMessagePayload);
+			const messages = await getTaskMessages(taskId);
+			const validMessages = (messages ?? []).filter(isMessagePayload);
 			mergeMessages(taskId, validMessages);
 		} catch (error) {
 			console.error("加载任务历史消息失败:", error);
@@ -205,11 +205,11 @@ export const useTaskStore = defineStore("task", () => {
 	/** 取消正在运行的任务 */
 	async function stopTask(taskId: string) {
 		try {
-			const res = await cancelTaskAPI(taskId);
-			if (res.data.success) {
+			const data = await cancelTaskAPI(taskId);
+			if (data.success) {
 				isRunning.value = false;
 			}
-			return res.data;
+			return data;
 		} catch (error) {
 			console.error("取消任务失败:", error);
 			return { success: false, message: "取消请求失败" };
@@ -242,12 +242,12 @@ export const useTaskStore = defineStore("task", () => {
 
 	// ---- Computed ----
 
-	/** 聊天消息列表（用户、Coder Agent、系统消息） */
+	/** 聊天消息列表（用户、CODE-Gen Agent、系统消息） */
 	const chatMessages = computed(() =>
 		messages.value.filter((msg) => {
 			if (
 				msg.msg_type === "agent" &&
-				msg.agent_type === AgentType.CODER &&
+				msg.agent_type === AgentType.CODE_GEN &&
 				msg.content != null &&
 				msg.content !== ""
 			) {
@@ -259,49 +259,46 @@ export const useTaskStore = defineStore("task", () => {
 			if (msg.msg_type === "system") {
 				return true;
 			}
-			// if (msg.msg_type === 'tool' && msg.tool_name === 'execute_code') {
-			// return true
-			// }
 			return false;
 		}),
 	);
 
-	/** 协调者消息列表 */
-	const coordinatorMessages = computed(() =>
+	/** 需求解析消息列表 (REQ-Parser) */
+	const reqParserMessages = computed(() =>
 		messages.value.filter(
-			(msg): msg is CoordinatorMessage =>
+			(msg): msg is RequirementParserMessage =>
 				msg.msg_type === "agent" &&
-				msg.agent_type === AgentType.COORDINATOR &&
+				msg.agent_type === AgentType.REQ_PARSER &&
 				msg.content != null,
 		),
 	);
 
-	/** 建模者消息列表 */
-	const modelerMessages = computed(() =>
+	/** 合约生成消息列表 (CON-Gen) */
+	const conGenMessages = computed(() =>
 		messages.value.filter(
-			(msg): msg is ModelerMessage =>
+			(msg): msg is ContractGenMessage =>
 				msg.msg_type === "agent" &&
-				msg.agent_type === AgentType.MODELER &&
+				msg.agent_type === AgentType.CON_GEN &&
 				msg.content != null,
 		),
 	);
 
-	/** 代码手消息列表 */
-	const coderMessages = computed(() =>
+	/** 代码生成消息列表 (CODE-Gen) */
+	const codeGenMessages = computed(() =>
 		messages.value.filter(
-			(msg): msg is CoderMessage =>
+			(msg): msg is CodeGenMessage =>
 				msg.msg_type === "agent" &&
-				msg.agent_type === AgentType.CODER &&
+				msg.agent_type === AgentType.CODE_GEN &&
 				msg.content != null,
 		),
 	);
 
-	/** 论文手消息列表 */
-	const writerMessages = computed(() =>
+	/** 修复消息列表 (REPAIR) */
+	const reviewerMessages = computed(() =>
 		messages.value.filter(
-			(msg): msg is WriterMessage =>
+			(msg): msg is ReviewerMessage =>
 				msg.msg_type === "agent" &&
-				msg.agent_type === AgentType.WRITER &&
+				msg.agent_type === AgentType.REPAIR &&
 				msg.content != null,
 		),
 	);
@@ -316,23 +313,21 @@ export const useTaskStore = defineStore("task", () => {
 		),
 	);
 
-	/** 从最新代码手消息中提取文件列表 */
+	/** 从最新代码生成消息中提取文件列表 */
 	const files = computed(() => {
 		// 反向遍历消息找到最新的文件列表
-		for (let i = coderMessages.value.length - 1; i >= 0; i--) {
-			const msg = coderMessages.value[i];
+		for (let i = codeGenMessages.value.length - 1; i >= 0; i--) {
+			const msg = codeGenMessages.value[i];
 			if (
 				"files" in msg &&
 				msg.files &&
 				Array.isArray(msg.files) &&
 				msg.files.length > 0
 			) {
-				console.log("找到文件列表:", msg.files);
 				return msg.files;
 			}
 		}
 		// 如果没有找到文件列表，返回空数组
-		console.log("没有找到文件列表，返回空数组");
 		return [];
 	});
 
@@ -345,10 +340,10 @@ export const useTaskStore = defineStore("task", () => {
 		wsStatus,
 		isRunning,
 		chatMessages,
-		coordinatorMessages,
-		modelerMessages,
-		coderMessages,
-		writerMessages,
+		reqParserMessages,
+		conGenMessages,
+		codeGenMessages,
+		reviewerMessages,
 		interpreterMessage,
 		files,
 		loadTaskMessages,

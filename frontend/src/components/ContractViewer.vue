@@ -8,6 +8,7 @@
  */
 import { computed } from "vue";
 import type { Contract, ContractCondition } from "@/services/mockApi";
+import { parseConTags } from "@/utils/tagParser";
 
 interface Props {
 	contract: Contract | null;
@@ -43,24 +44,7 @@ const outputEntries = computed<Array<[string, string]>>(() => {
 	return Object.entries(props.contract.outputs);
 });
 
-/** 从一行表达式中识别 [CON-xxx-XXX-nnn] 标签 */
-const parseTags = (text: string): Array<{ type: "text" | "con"; value: string }> => {
-	const tokens: Array<{ type: "text" | "con"; value: string }> = [];
-	const regex = /\[(CON-\d+-[A-Z]+-\d+)\]/g;
-	let lastIdx = 0;
-	let match: RegExpExecArray | null;
-	while ((match = regex.exec(text)) !== null) {
-		if (match.index > lastIdx) {
-			tokens.push({ type: "text", value: text.slice(lastIdx, match.index) });
-		}
-		tokens.push({ type: "con", value: match[1] });
-		lastIdx = match.index + match[0].length;
-	}
-	if (lastIdx < text.length) {
-		tokens.push({ type: "text", value: text.slice(lastIdx) });
-	}
-	return tokens;
-};
+
 
 /** YAML 颜色高亮（简单实现：对 string / number / key 着色） */
 const renderYaml = (text: string): string => {
@@ -182,7 +166,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
           <div class="cond-row">
             <span class="con-badge" :style="{ backgroundColor: section.color }">{{ cond.id }}</span>
             <code class="cond-expr">
-              <template v-for="(tok, ti) in parseTags(cond.expression)" :key="ti"><span
+              <template v-for="(tok, ti) in parseConTags(cond.expression)" :key="ti"><span
                   v-if="tok.type === 'text'"
                 >{{ tok.value }}</span><span v-else class="con-tag">[{{ tok.value }}]</span></template>
             </code>

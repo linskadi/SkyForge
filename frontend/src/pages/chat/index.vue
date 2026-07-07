@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getHelloWorld } from "@/apis/commonApi";
+import { getHelloWorld } from "@/services/taskApi";
 import AppSidebar from "@/components/AppSidebar.vue";
 import ServiceStatus from "@/components/ServiceStatus.vue";
 import UserStepper from "@/components/UserStepper.vue";
@@ -10,7 +10,7 @@ import {
 	SidebarTrigger,
 } from "@/components/ui/sidebar";
 import MoreDetail from "@/pages/chat/components/MoreDetail.vue";
-import { AppWindow, CircleEllipsis } from "lucide-vue-next";
+import { CircleEllipsis } from "lucide-vue-next";
 import { onMounted, ref } from "vue";
 
 // ---- Reactive State ----
@@ -20,8 +20,8 @@ const isMoreDetailOpen = ref(false);
 // ---- Lifecycle Hooks ----
 
 onMounted(() => {
-	getHelloWorld().then((res) => {
-		console.log(res.data);
+	getHelloWorld().then((data) => {
+		console.log(data);
 	});
 });
 </script>
@@ -48,7 +48,7 @@ onMounted(() => {
       <div class="py-5 px-4">
         <div class="space-y-6">
           <div class="text-center space-y-2 mb-10">
-            <h1 class="text-2xl font-semibold">AirborneAI</h1>
+            <h1 class="text-2xl font-semibold">SkyForge</h1>
             <p class="text-muted-foreground">
               机载软件安全合规 AI 中台
             </p>

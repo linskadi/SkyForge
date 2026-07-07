@@ -8,18 +8,18 @@
  *
  * 通过 apiSwitcher 调用 searchMisra，支持 mock/真实 API 切换
  */
-import { ref, computed } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import {
   Search,
-  Loader2,
   ChevronDown,
   ChevronRight,
   BookOpen,
   XCircle,
   CheckCircle2,
+  Loader2,
 } from "lucide-vue-next";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getApi } from "@/services/apiSwitcher";
 import type { MisraRule } from "@/services/mockApi";
 
@@ -106,6 +106,26 @@ const resultCountText = computed(() => {
   if (results.value.length === 0) return "无匹配结果";
   return `找到 ${results.value.length} 条规则`;
 });
+
+/** 虚拟滚动容器引用 */
+const ruleListRef = ref<HTMLDivElement | null>(null);
+
+/** 虚拟滚动 */
+const virtualizer = useVirtualizer({
+  count: results.value.length,
+  getScrollElement: () => ruleListRef.value,
+  estimateSize: () => 120,
+  overscan: 5,
+});
+
+watch(results, () => {
+  nextTick(() => {
+    virtualizer.value.setOptions({
+      ...virtualizer.value.options,
+      count: results.value.length,
+    });
+  });
+});
 </script>
 
 <template>
@@ -142,50 +162,60 @@ const resultCountText = computed(() => {
       {{ resultCountText }}
     </div>
 
-    <!-- 结果列表 -->
-    <div v-if="results.length > 0" class="rule-list">
+    <!-- 结果列表（虚拟滚动） -->
+    <div v-if="results.length > 0" ref="ruleListRef" class="rule-list">
       <div
-        v-for="rule in results"
-        :key="rule.rule_id"
-        class="rule-item"
+        :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }"
       >
-        <!-- 规则头部（点击展开） -->
-        <div class="rule-header" @click="toggleExpand(rule.rule_id)">
-          <component
-            :is="expandedId === rule.rule_id ? ChevronDown : ChevronRight"
-            class="chevron"
-          />
-          <code class="rule-id">{{ rule.rule_id }}</code>
-          <span class="rule-title">{{ rule.title }}</span>
-          <span :class="['category-badge', categoryClass(rule.category)]">
-            {{ categoryLabel(rule.category) }}
-          </span>
-          <span v-if="rule.section" class="rule-section">{{ rule.section }}</span>
-        </div>
-
-        <!-- 规则描述 -->
-        <div class="rule-description">
-          {{ rule.description }}
-        </div>
-
-        <!-- 展开后的示例代码 -->
-        <div v-if="expandedId === rule.rule_id" class="rule-detail">
-          <div v-if="rule.bad_example" class="example-block bad">
-            <div class="example-label">
-              <XCircle class="example-icon" />
-              违规示例
-            </div>
-            <pre class="example-code">{{ rule.bad_example }}</pre>
+        <div
+          v-for="virtualRow in virtualizer.getVirtualItems()"
+          :key="String(virtualRow.key)"
+          class="rule-item"
+          :style="{
+            position: 'absolute',
+            top: `${virtualRow.start}px`,
+            left: 0,
+            right: 0,
+          }"
+        >
+          <!-- 规则头部（点击展开） -->
+          <div class="rule-header" @click="toggleExpand(results[virtualRow.index].rule_id)">
+            <component
+              :is="expandedId === results[virtualRow.index].rule_id ? ChevronDown : ChevronRight"
+              class="chevron"
+            />
+            <code class="rule-id">{{ results[virtualRow.index].rule_id }}</code>
+            <span class="rule-title">{{ results[virtualRow.index].title }}</span>
+            <span :class="['category-badge', categoryClass(results[virtualRow.index].category)]">
+              {{ categoryLabel(results[virtualRow.index].category) }}
+            </span>
+            <span v-if="results[virtualRow.index].section" class="rule-section">{{ results[virtualRow.index].section }}</span>
           </div>
-          <div v-if="rule.good_example" class="example-block good">
-            <div class="example-label">
-              <CheckCircle2 class="example-icon" />
-              合规示例
-            </div>
-            <pre class="example-code">{{ rule.good_example }}</pre>
+
+          <!-- 规则描述 -->
+          <div class="rule-description">
+            {{ results[virtualRow.index].description }}
           </div>
-          <div v-if="!rule.bad_example && !rule.good_example" class="no-example">
-            暂无示例代码
+
+          <!-- 展开后的示例代码 -->
+          <div v-if="expandedId === results[virtualRow.index].rule_id" class="rule-detail">
+            <div v-if="results[virtualRow.index].bad_example" class="example-block bad">
+              <div class="example-label">
+                <XCircle class="example-icon" />
+                违规示例
+              </div>
+              <pre class="example-code">{{ results[virtualRow.index].bad_example }}</pre>
+            </div>
+            <div v-if="results[virtualRow.index].good_example" class="example-block good">
+              <div class="example-label">
+                <CheckCircle2 class="example-icon" />
+                合规示例
+              </div>
+              <pre class="example-code">{{ results[virtualRow.index].good_example }}</pre>
+            </div>
+            <div v-if="!results[virtualRow.index].bad_example && !results[virtualRow.index].good_example" class="no-example">
+              暂无示例代码
+            </div>
           </div>
         </div>
       </div>
@@ -307,7 +337,7 @@ const resultCountText = computed(() => {
 }
 
 .rule-id {
-  font-family: 'Consolas', monospace;
+  font-family: 'Consolas', 'Courier New', monospace;
   font-size: 11px;
   font-weight: 600;
   background: #1f2937;
@@ -353,7 +383,7 @@ const resultCountText = computed(() => {
 .rule-section {
   font-size: 11px;
   color: var(--muted-foreground, #9ca3af);
-  font-family: 'Consolas', monospace;
+  font-family: 'Consolas', 'Courier New', monospace;
 }
 
 .rule-description {

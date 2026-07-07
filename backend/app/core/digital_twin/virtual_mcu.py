@@ -9,6 +9,7 @@
 GCC 不可用时优雅降级：使用 Python 模拟 filter（一阶低通滤波：y = 0.9*y_prev + 0.1*x）。
 """
 
+import asyncio
 import os
 import platform
 import subprocess
@@ -27,6 +28,23 @@ from app.utils.log_util import logger
 # - agent：TERMINAL / SYSTEM（与前端 AgentType 对齐）
 # - level：info / success / warn / error
 LogCallback = Callable[[str, str, str], None]
+
+# Forbidden includes and function calls that should not appear in user code
+FORBIDDEN_INCLUDES: list[str] = [
+    "#include <windows.h>",
+    "#include <winsock2.h>",
+    "#include <sys/socket.h>",
+    "#include <netinet/in.h>",
+    "#include <netdb.h>",
+]
+
+FORBIDDEN_FUNCTION_CALLS: list[str] = [
+    "system(",
+    "exec(",
+    "popen(",
+    "fork(",
+    "socket(",
+]
 
 # test_harness.c 模板（参考文档 6.5.2）
 # 占位符：
@@ -211,6 +229,27 @@ class VirtualMCU:
             if log_callback:
                 log_callback("TERMINAL", "warn", "代码缺少 filter 函数，可能编译失败")
 
+        # Security: scan for forbidden includes and function calls
+        violations = []
+        for inc in FORBIDDEN_INCLUDES:
+            if inc in code:
+                violations.append(f"禁止的头文件: {inc}")
+        for func in FORBIDDEN_FUNCTION_CALLS:
+            if func in code:
+                violations.append(f"禁止的函数调用: {func}")
+        if violations:
+            msg = "安全检查失败：\n" + "\n".join(violations)
+            logger.warning(f"VirtualMCU:{msg}")
+            if log_callback:
+                log_callback("TERMINAL", "error", msg)
+            return CompileResult(
+                success=False,
+                executable_path="",
+                errors=msg,
+                used_mock=False,
+                source_path="",
+            )
+
         # 检查 GCC 是否可用
         if not self.is_gcc_available():
             logger.warning("VirtualMCU:GCC 未安装，使用 Python 模拟")
@@ -384,6 +423,32 @@ class VirtualMCU:
                 msg += f"\n{result.stderr[:1000]}"
             log_callback("TERMINAL", level, msg)
         return result
+
+    async def compile_async(
+        self,
+        code: str,
+        assert_code: str = "",
+        log_callback: LogCallback | None = None,
+    ) -> CompileResult:
+        """异步版本的 compile()，避免阻塞 FastAPI 事件循环。"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self.compile, code, assert_code, log_callback
+        )
+
+    async def run_async(
+        self,
+        executable_path: str,
+        input_data: np.ndarray,
+        timeout: int = 30,
+        used_mock: bool = False,
+        log_callback: LogCallback | None = None,
+    ) -> RunResult:
+        """异步版本的 run()，避免阻塞 FastAPI 事件循环。"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self.run, executable_path, input_data, timeout, used_mock, log_callback
+        )
 
     def _run_native(
         self, executable_path: str, input_data: np.ndarray, timeout: int

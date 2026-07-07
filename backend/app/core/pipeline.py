@@ -601,7 +601,7 @@ async def run_full_pipeline(
         await hook("SYSTEM", "info", "阶段 3：数字孪生仿真（无故障默认）")
         try:
             engine = SimulationEngine()
-            sim = engine.run_simulation(
+            sim = await engine.run_simulation_async(
                 code=repair_result["final_code"],
                 contract_yaml=pipeline_result["contract"],
                 fault_type=None,

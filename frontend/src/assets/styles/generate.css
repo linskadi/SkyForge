@@ -1,0 +1,609 @@
+/* ===================== 页面整体布局 ===================== */
+.generate-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ===================== 顶部页头 ===================== */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid var(--border, #e4e4e7);
+}
+
+.title-area h1 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--foreground, #18181b);
+}
+
+.title-area h1 .accent {
+  background: linear-gradient(90deg, #1e6fb8, #7c3aed);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.title-area p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted-foreground, #71717a);
+}
+
+.switch-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--secondary, #f4f4f5);
+}
+
+.switch-label {
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch-hint {
+  color: var(--muted-foreground, #a1a1aa);
+  font-size: 12px;
+}
+
+/* API 模式切换按钮 + 连接状态指示灯 */
+.api-mode-switch {
+  border: 1px solid var(--border, #e4e4e7);
+}
+
+.api-status-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  margin-left: 4px;
+  transition: all 0.2s;
+}
+
+.api-status-dot.mock {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.api-status-dot.real.connected {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.api-status-dot.real.disconnected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.api-status-icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* MISRA 搜索卡片 */
+.misra-collapse-card {
+  border-left: 3px solid #16a34a;
+}
+
+.misra-collapse-card .icon {
+  width: 18px;
+  height: 18px;
+  color: #16a34a;
+}
+
+/* ===================== 折叠卡片 ===================== */
+.scade-collapse-card,
+.hil-collapse-card {
+  border-left: 3px solid #0891b2;
+}
+
+.hil-collapse-card {
+  border-left-color: #ea580c;
+}
+
+.scade-collapse-card :deep(.card-title),
+.hil-collapse-card :deep(.card-title) {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.scade-collapse-card .icon,
+.hil-collapse-card .icon {
+  width: 18px;
+  height: 18px;
+  color: #0891b2;
+}
+
+.hil-collapse-card .icon {
+  color: #ea580c;
+}
+
+.collapse-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--muted-foreground, #6b7280);
+  margin-left: auto;
+}
+
+/* 折叠面板过渡动画 */
+.collapse-panel {
+  overflow: hidden;
+  transition: max-height 0.3s ease, opacity 0.25s ease;
+}
+
+.collapse-panel[style*="display: none"] {
+  max-height: 0;
+  opacity: 0;
+}
+
+/* ===================== 输入卡片 ===================== */
+.input-card :deep(.card-title),
+.result-card :deep(.card-title),
+.terminal-card :deep(.card-title) {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted-foreground, #a1a1aa);
+}
+
+.req-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--input, #e4e4e7);
+  border-radius: 8px;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  background: var(--background, #fff);
+  color: var(--foreground, #18181b);
+}
+
+.req-textarea:focus {
+  border-color: #1e6fb8;
+  box-shadow: 0 0 0 3px rgba(30, 111, 184, 0.15);
+}
+
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.examples-label {
+  font-size: 13px;
+  color: var(--muted-foreground, #71717a);
+}
+
+.example-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px dashed var(--border, #d4d4d8);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground, #3f3f46);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.example-btn:hover:not(:disabled) {
+  border-color: #1e6fb8;
+  color: #1e6fb8;
+  background: rgba(30, 111, 184, 0.06);
+}
+
+.example-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.status-text {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-text.generating { color: #1e6fb8; }
+.status-text.done { color: #15803d; }
+.status-text.error { color: #dc2626; }
+
+.animate-spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* ===================== 终端卡片 ===================== */
+.terminal-card {
+  border-left: 3px solid #1e6fb8;
+}
+
+.terminal-wrapper {
+  background: #0b0f17;
+  border-radius: 8px;
+  padding: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* ===================== 结果区 / Tab 切换 ===================== */
+.results-section {
+  margin-top: 0;
+}
+
+.result-tabs {
+  width: 100%;
+}
+
+.tabs-list {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--secondary, #f4f4f5);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 9px;
+  background: var(--muted, #e4e4e7);
+  color: var(--foreground, #3f3f46);
+}
+
+.tab-badge.pass {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.tab-badge.fail {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* ===================== 生成结果聚焦切换布局 ===================== */
+.focus-layout {
+  display: flex;
+  gap: 14px;
+  min-height: 400px;
+}
+
+/* 左侧迷你按钮栏 */
+.focus-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 64px;
+  flex-shrink: 0;
+}
+
+.focus-tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 6px;
+  border: 1.5px solid var(--border, #e4e4e7);
+  border-radius: 12px;
+  background: var(--background, #fff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.focus-tab-btn:hover {
+  background: var(--secondary, #f4f4f5);
+  border-color: var(--primary, #3b82f6);
+  box-shadow: 0 2px 8px rgba(59,130,246,0.15);
+  transform: translateY(-1px);
+}
+
+.focus-tab-btn.active {
+  background: var(--primary, #3b82f6);
+  color: #fff;
+  border-color: var(--primary, #3b82f6);
+  box-shadow: 0 2px 12px rgba(59,130,246,0.3);
+}
+
+.focus-tab-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.focus-tab-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  white-space: nowrap;
+}
+
+.focus-tab-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focus-tab-badge.fail {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* 主内容区 */
+.focus-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.focus-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.focus-card :deep(.card-content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ===================== 响应式 ===================== */
+@media (max-width: 768px) {
+  .focus-layout {
+    flex-direction: column;
+    min-height: auto;
+  }
+  .focus-tabs {
+    flex-direction: row;
+    width: 100%;
+    justify-content: center;
+  }
+  .focus-tab-label {
+    writing-mode: horizontal-tb;
+  }
+}
+
+/* ===================== 卡片头部内联操作按钮（复制/下载） ===================== */
+.header-actions-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border, #d4d4d8);
+  border-radius: 6px;
+  background: var(--secondary, #f4f4f5);
+  color: var(--foreground, #3f3f46);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.action-btn:hover {
+  border-color: #1e6fb8;
+  color: #1e6fb8;
+  background: rgba(30, 111, 184, 0.08);
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.action-icon.ok {
+  color: #15803d;
+}
+
+/* ===================== 移动端响应式适配 ===================== */
+@media (max-width: 768px) {
+  .generate-page {
+    padding: 12px 12px 32px;
+    gap: 12px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .title-area h1 {
+    font-size: 18px;
+  }
+
+  .title-area p {
+    font-size: 12px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tabs-list {
+    display: flex;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .terminal-wrapper {
+    max-height: 220px;
+  }
+
+  .req-textarea {
+    font-size: 13px;
+  }
+}
+
+.result-card {
+  border: 1px solid var(--border, #e4e4e7);
+  border-radius: 10px;
+  background: var(--background, #fff);
+}
+
+/* ===================== MISRA 违规列表 ===================== */
+.misra-summary {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+}
+
+.badge.error { background: #fee2e2; color: #b91c1c; }
+.badge.warn { background: #fef3c7; color: #b45309; }
+.badge.total {
+  background: var(--secondary, #f4f4f5);
+  color: var(--foreground, #3f3f46);
+}
+
+.violation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.violation-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid;
+  background: var(--secondary, #f9fafb);
+  font-size: 13px;
+}
+
+.violation-error {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
+.violation-warn {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.violation-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cat-tag,
+.rule-tag,
+.line-tag {
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.cat-tag.cat-required { background: #dbeafe; color: #1d4ed8; }
+.cat-tag.cat-mandatory { background: #fee2e2; color: #b91c1c; }
+.cat-tag.cat-advisory { background: #fef3c7; color: #b45309; }
+
+.rule-tag {
+  background: #1f2937;
+  color: #fbbf24;
+}
+
+.line-tag {
+  background: var(--muted, #e4e4e7);
+  color: var(--foreground, #3f3f46);
+}
+
+.violation-msg {
+  font-size: 12px;
+  color: var(--foreground, #3f3f46);
+  line-height: 1.5;
+}
+
+.empty-tip {
+  padding: 16px;
+  text-align: center;
+  color: #15803d;
+  font-size: 14px;
+  font-weight: 500;
+  background: #f0fdf4;
+  border-radius: 8px;
+}
+
+/* ===================== 数字孪生 Tab ===================== */
+.simulation-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

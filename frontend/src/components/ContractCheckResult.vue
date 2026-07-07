@@ -11,6 +11,7 @@
 import { ref, computed } from "vue";
 import { CheckCircle2, XCircle, ChevronDown, ChevronRight, Code2 } from "lucide-vue-next";
 import type { ContractCheckResult } from "@/services/mockApi";
+import { parseConTags } from "@/utils/tagParser";
 
 interface Props {
   result: ContractCheckResult;
@@ -55,19 +56,7 @@ const sectionIcon = (key: string): string => {
   return map[key] ?? "📋";
 };
 
-const parseTags = (text: string): Array<{ type: "text" | "con"; value: string }> => {
-  const tokens: Array<{ type: "text" | "con"; value: string }> = [];
-  const regex = /\[(CON-\d+-[A-Z]+-\d+)\]/g;
-  let lastIdx = 0;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    if (match.index > lastIdx) tokens.push({ type: "text", value: text.slice(lastIdx, match.index) });
-    tokens.push({ type: "con", value: match[1] });
-    lastIdx = match.index + match[0].length;
-  }
-  if (lastIdx < text.length) tokens.push({ type: "text", value: text.slice(lastIdx) });
-  return tokens;
-};
+
 </script>
 <template>
   <div class="contract-check">
@@ -83,7 +72,7 @@ const parseTags = (text: string): Array<{ type: "text" | "con"; value: string }>
             {{ result.overall_passed ? "✅ 契约校验通过" : "❌ 契约校验未通过" }}
           </div>
           <div class="overview-sub">
-            组件：{{ result.component }} · Patch 2 契约转断言
+            组件：{{ result.component }}
           </div>
         </div>
       </div>
@@ -128,7 +117,7 @@ const parseTags = (text: string): Array<{ type: "text" | "con"; value: string }>
             />
             <span class="item-id">{{ item.id }}</span>
             <code class="item-expr">
-              <template v-for="(tok, ti) in parseTags(item.expression)" :key="ti">
+              <template v-for="(tok, ti) in parseConTags(item.expression)" :key="ti">
                 <span v-if="tok.type === 'text'">{{ tok.value }}</span>
                 <span v-else class="con-tag">[{{ tok.value }}]</span>
               </template>

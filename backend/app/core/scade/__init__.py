@@ -3,7 +3,7 @@
 G-Lustre 是 Lustre 数据流语言的一种变体，由 SCADE 工程转换工具生成。
 
 本模块将 G-Lustre 文件作为可选输入，解析为结构化数据，
-并转换为自然语言需求 + 契约 YAML，接入 AirborneAI 流水线。
+并转换为自然语言需求 + 契约 YAML，接入 SkyForge 流水线。
 
 子模块：
 - lustre_parser：G-Lustre 文本解析器（node/inputs/outputs/locals/equations）

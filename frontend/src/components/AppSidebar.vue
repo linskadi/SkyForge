@@ -34,7 +34,7 @@ const props = defineProps<SidebarProps>();
 const data = {
 	navMain: [
 		{
-			title: "AirborneAI 航空适航",
+			title: "SkyForge 天锻",
 			url: "#",
 			items: [
 				{
@@ -114,7 +114,7 @@ const socialMedia = [
       <div class="flex items-center gap-2 h-15">
         <router-link to="/" class="flex items-center gap-2">
           <img src="@/assets/icon.png" alt="logo" class="w-10 h-10">
-          <div class="text-lg font-bold">AirborneAI</div>
+          <div class="text-lg font-bold">SkyForge</div>
         </router-link>
       </div>
     </SidebarHeader>
@@ -142,8 +142,8 @@ const socialMedia = [
     </SidebarFooter>
     <SidebarFooter>
       <!-- 展示图标社交媒体  -->
-      <div class="flex items-center gap-4 justify-centermb-4 border-t  border-light-purple pt-3">
-        <a v-for="item in socialMedia" :href="item.url" target="_blank">
+      <div class="flex items-center gap-4 justify-center mb-4 border-t  border-light-purple pt-3">
+        <a v-for="item in socialMedia" :key="item.url" :href="item.url" target="_blank">
           <img :src="item.icon" :alt="item.name" width="24" height="24" class="icon">
         </a>
       </div>

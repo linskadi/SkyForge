@@ -39,9 +39,6 @@ _AGENT_DEFAULT_QUERIES: dict[str, list[str]] = {
     "contract_generator": ["契约", "前置条件", "后置条件", "断言"],
     "code_generator": ["函数声明", "类型声明", "命名规范", "static"],
     "code_repairer": ["隐式转换", "动态内存", "未初始化", "返回值"],
-    "coordinator": ["可追溯性", "运行时故障", "编译错误"],
-    "modeler": ["类型", "枚举", "结构体", "typedef"],
-    "writer": ["文档", "注释", "可追溯性"],
 }
 
 # Agent 名称 → 中文友好名
@@ -50,9 +47,6 @@ _AGENT_DISPLAY_NAMES: dict[str, str] = {
     "contract_generator": "契约生成 Agent",
     "code_generator": "代码生成 Agent",
     "code_repairer": "代码修复 Agent",
-    "coordinator": "协调 Agent",
-    "modeler": "建模 Agent",
-    "writer": "文档 Agent",
 }
 
 

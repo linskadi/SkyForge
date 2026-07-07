@@ -10,9 +10,11 @@ import {
 	SidebarMenuSub,
 } from "@/components/ui/sidebar";
 import { ChevronRight, File, Folder } from "lucide-vue-next";
+// biome-ignore lint/suspicious/noExplicitAny: Tree 组件 item 类型不确定
 const props = defineProps<{
-	item: string | unknown[];
+	item: any;
 }>();
+// biome-ignore lint/suspicious/noExplicitAny: Tree 组件 item 类型不确定
 const [name, ...items] = Array.isArray(props.item) ? props.item : [props.item];
 </script>
 

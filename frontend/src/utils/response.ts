@@ -38,14 +38,14 @@ export interface AgentMessage extends BaseMessage {
 	agent_type: AgentType;
 }
 
-/** 建模手消息 */
-export interface ModelerMessage extends AgentMessage {
-	agent_type: AgentType.MODELER;
+/** 合约生成消息 (CON-Gen) */
+export interface ContractGenMessage extends AgentMessage {
+	agent_type: AgentType.CON_GEN;
 }
 
-/** 协调者消息 */
-export interface CoordinatorMessage extends AgentMessage {
-	agent_type: AgentType.COORDINATOR;
+/** 需求解析消息 (REQ-Parser) */
+export interface RequirementParserMessage extends AgentMessage {
+	agent_type: AgentType.REQ_PARSER;
 }
 
 /** 代码执行结果格式类型 */
@@ -114,14 +114,14 @@ export interface InterpreterMessage extends ToolMessage {
 	output: OutputItem[] | null;
 }
 
-/** 代码手消息 */
-export interface CoderMessage extends AgentMessage {
-	agent_type: AgentType.CODER;
+/** 代码生成消息 (CODE-Gen) */
+export interface CodeGenMessage extends AgentMessage {
+	agent_type: AgentType.CODE_GEN;
 }
 
-/** 论文手消息 */
-export interface WriterMessage extends AgentMessage {
-	agent_type: AgentType.WRITER;
+/** 修复消息 (REPAIR) */
+export interface ReviewerMessage extends AgentMessage {
+	agent_type: AgentType.REPAIR;
 	sub_title?: string;
 }
 
@@ -129,8 +129,11 @@ export interface WriterMessage extends AgentMessage {
 export type Message =
 	| SystemMessage
 	| UserMessage
-	| CoderMessage
-	| WriterMessage
-	| ModelerMessage
-	| CoordinatorMessage
+	| CodeGenMessage
+	| ReviewerMessage
+	| ContractGenMessage
+	| RequirementParserMessage
 	| ToolMessage;
+
+/** 代码执行结果（兼容旧命名） */
+export type CodeExecutionResult = OutputItem;

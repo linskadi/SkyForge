@@ -1,6 +1,6 @@
-# AirborneAI
+# SkyForge (天锻)
 
-机载软件安全合规 AI 中台 - 通过多 Agent 协同生成符合 DO-178C/MISRA-C 标准的机载 C 代码。
+AI智能体驱动的机载软件轻量化开发工具 - 通过多 Agent 协同生成符合 DO-178C/MISRA-C 标准的机载 C 代码。
 
 ## 核心功能
 

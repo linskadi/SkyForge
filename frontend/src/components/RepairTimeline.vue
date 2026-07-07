@@ -43,7 +43,7 @@ const finalViolations = (): number => {
   <div v-else class="repair-timeline">
     <!-- 总览徽章 -->
     <div class="overview">
-      <span class="overview-label">🔧 Patch 1 查改解耦闭环</span>
+      <span class="overview-label">🔧 MISRA 修复闭环</span>
       <span class="overview-stat">
         共 {{ history.length }} 轮修复
       </span>

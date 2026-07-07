@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use @/services/taskApi instead.
+ * This file is kept for backward compatibility only.
+ * All consumers should migrate to:
+ *   import { getHelloWorld, getTaskMessages, cancelTask, getServiceStatus, ... } from "@/services/taskApi";
+ */
 import request from "@/utils/request";
 import type { Message } from "@/utils/response";
 

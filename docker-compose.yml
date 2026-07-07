@@ -3,7 +3,7 @@
 services:
   redis:
     image: redis:alpine
-    container_name: airborne_redis
+    container_name: skyforge_redis
     ports:
       - "6379:6379" # 将 Redis 容器的 6379 端口映射到主机的 6379 端口
     volumes:
@@ -13,7 +13,7 @@ services:
     build:
       context: ./backend # Dockerfile 的上下文路径
       dockerfile: Dockerfile # Dockerfile 文件名
-    container_name: airborne_backend
+    container_name: skyforge_backend
     ports:
       - "8000:8000" # 将后端容器的 8000 端口映射到主机的 8000 端口
     env_file:
@@ -34,7 +34,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: airborne_frontend
+    container_name: skyforge_frontend
     ports:
       - "5173:5173" # 将前端容器的 5173 端口 (Vite 默认) 映射到主机的 5173 端口
     env_file:

@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
                 Welcome back
               </h1>
               <p class="text-balance text-muted-foreground">
-                Login to your Acme Inc account
+                Login to your SkyForge account
               </p>
             </div>
             <div class="grid gap-6">

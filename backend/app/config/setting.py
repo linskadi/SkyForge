@@ -39,6 +39,31 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     DEBUG: bool = True
 
+    # Agent LLM 配置
+    REQ_PARSER_API_TYPE: str = "openai-chat"
+    REQ_PARSER_API_KEY: str = ""
+    REQ_PARSER_MODEL: str = ""
+    REQ_PARSER_BASE_URL: str = ""
+    REQ_PARSER_MAX_TOKENS: int = 4096
+
+    CON_GEN_API_TYPE: str = "openai-chat"
+    CON_GEN_API_KEY: str = ""
+    CON_GEN_MODEL: str = ""
+    CON_GEN_BASE_URL: str = ""
+    CON_GEN_MAX_TOKENS: int = 4096
+
+    CODE_GEN_API_TYPE: str = "openai-chat"
+    CODE_GEN_API_KEY: str = ""
+    CODE_GEN_MODEL: str = ""
+    CODE_GEN_BASE_URL: str = ""
+    CODE_GEN_MAX_TOKENS: int = 4096
+
+    REPAIR_API_TYPE: str = "openai-chat"
+    REPAIR_API_KEY: str = ""
+    REPAIR_MODEL: str = ""
+    REPAIR_BASE_URL: str = ""
+    REPAIR_MAX_TOKENS: int = 4096
+
     # Redis 配置（可选）
     REDIS_URL: str = "redis://localhost:6379/0"
 
@@ -53,7 +78,7 @@ class Settings(BaseSettings):
     HIL_TIMEOUT: int = 300
 
     model_config = SettingsConfigDict(
-        env_file=".env.dev",
+        env_file=(".env", ".env.dev"),
         env_file_encoding="utf-8",
         extra="allow",
     )

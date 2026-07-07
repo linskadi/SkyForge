@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="text-center mb-10">
       <h1 class="text-5xl font-custom-bold mb-4">
-        <span class="gradient-text">AirborneAI</span>
+        <span class="gradient-text">SkyForge (天锻)</span>
       </h1>
       <p class="text-xl text-gray-600 max-w-3xl mx-auto">
         机载软件安全合规 AI 中台 - 让 AI 写的机载代码通过 DO-178C 合规审查
@@ -90,7 +90,7 @@
           </div>
           <div>
             <div class="flex justify-between mb-1">
-              <span class="text-sm font-medium">AirborneAI</span>
+              <span class="text-sm font-medium">SkyForge</span>
               <span class="text-sm font-medium">数小时</span>
             </div>
             <div class="w-full bg-gray-200 rounded-full h-2.5">

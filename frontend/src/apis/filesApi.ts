@@ -1,3 +1,9 @@
+/**
+ * @deprecated Use @/services/taskApi instead.
+ * This file is kept for backward compatibility only.
+ * All consumers should migrate to:
+ *   import { getFiles, getFileDownloadUrl, getAllFilesDownloadUrl } from "@/services/taskApi";
+ */
 import request from "@/utils/request";
 
 /**

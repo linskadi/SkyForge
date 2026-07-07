@@ -16,7 +16,7 @@
 </template>
 
 <script setup lang="ts">
-import { getServiceStatus } from "@/apis/commonApi";
+import { getServiceStatus } from "@/services/taskApi";
 import { useToast } from "@/components/ui/toast/use-toast";
 import { onMounted, onUnmounted, ref } from "vue";
 
@@ -45,6 +45,30 @@ const services = ref<Services>({
 });
 
 let statusInterval: number | null = null;
+
+/** 启动轮询 */
+function startPolling() {
+	stopPolling();
+	statusInterval = window.setInterval(checkStatus, 30000);
+}
+
+/** 停止轮询 */
+function stopPolling() {
+	if (statusInterval !== null) {
+		clearInterval(statusInterval);
+		statusInterval = null;
+	}
+}
+
+/** 页面可见性变化时控制轮询 */
+const handleVisibilityChange = () => {
+	if (document.visibilityState === "visible") {
+		checkStatus();
+		startPolling();
+	} else {
+		stopPolling();
+	}
+};
 
 // ---- Methods ----
 
@@ -75,20 +99,20 @@ const getStatusDotClass = (status: string) => {
 /** 检查服务状态并处理状态变化 */
 const checkStatus = async () => {
 	try {
-		const response = await getServiceStatus();
+		const data = await getServiceStatus();
 		const oldStatus = { ...services.value };
-		services.value = response.data as Services;
+		services.value = data as Services;
 
 		// 检查是否有服务状态变化为错误
-		for (const key of Object.keys(response.data)) {
+		for (const key of Object.keys(data)) {
 			const serviceKey = key as keyof Services;
-			const newStatus = response.data[serviceKey].status;
+			const newStatus = data[serviceKey].status;
 			const oldStatusValue = oldStatus[serviceKey].status;
 
 			if (newStatus === "error" && oldStatusValue !== "error") {
 				toast({
 					title: "服务警告",
-					description: `${serviceKey.toUpperCase()} 服务连接失败: ${response.data[serviceKey].message}`,
+					description: `${serviceKey.toUpperCase()} 服务连接失败: ${data[serviceKey].message}`,
 					variant: "destructive",
 				});
 			}
@@ -107,12 +131,12 @@ const checkStatus = async () => {
 
 onMounted(() => {
 	checkStatus();
-	statusInterval = setInterval(checkStatus, 30000);
+	startPolling();
+	document.addEventListener("visibilitychange", handleVisibilityChange);
 });
 
 onUnmounted(() => {
-	if (statusInterval) {
-		clearInterval(statusInterval);
-	}
+	stopPolling();
+	document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 </script>

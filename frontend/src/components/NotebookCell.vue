@@ -2,6 +2,7 @@
 import type { CodeCell, NoteCell, ResultCell } from "@/utils/interface";
 import { renderMarkdown } from "@/utils/markdown";
 import type { CodeExecutionResult } from "@/utils/response";
+import DOMPurify from "dompurify";
 
 // ---- Props ----
 
@@ -127,7 +128,7 @@ const isResultCell = (cell: NoteCell): cell is ResultCell => {
             
             <!-- 执行结果 - HTML -->
             <template v-else-if="result.res_type === 'result' && result.format === 'html'">
-              <div class="prose prose-sm max-w-none" v-html="result.msg || ''"></div>
+              <div class="prose prose-sm max-w-none" v-html="DOMPurify.sanitize(result.msg || '')"></div>
             </template>
             
             <!-- 执行结果 - Markdown -->
@@ -137,7 +138,7 @@ const isResultCell = (cell: NoteCell): cell is ResultCell => {
             
             <!-- 执行结果 - LaTeX -->
             <template v-else-if="isLatexResult(result)">
-              <div class="katex-display" v-html="result.msg || ''"></div>
+              <div class="katex-display" v-html="DOMPurify.sanitize(result.msg || '')"></div>
             </template>
             
             <!-- 执行结果 - JSON -->

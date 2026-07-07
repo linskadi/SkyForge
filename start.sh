@@ -1,5 +1,5 @@
 #!/bin/bash
-# AirborneAI Development Server Launcher
+# SkyForge (天锻) Development Server Launcher
 # 自动构建虚拟环境、安装依赖、启动服务
 
 set -e
@@ -7,7 +7,7 @@ set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=============================================="
-echo " AirborneAI Development Server Launcher"
+echo " SkyForge (天锻) Development Server Launcher"
 echo "=============================================="
 echo ""
 
@@ -93,6 +93,20 @@ cd "$ROOT"
 echo "  Frontend ready"
 echo ""
 
+# ====================== Kill Residual Processes ======================
+echo "[4/5] Cleaning up residual processes..."
+# Kill any leftover uvicorn/python backend processes on port 8000
+for pid in $(netstat -ano 2>/dev/null | grep ':8000 ' | grep LISTENING | awk '{print $5}' | sort -u); do
+    taskkill //F //PID $pid 2>/dev/null && echo "  Killed residual process on port 8000 (PID $pid)" || true
+done
+# Kill any leftover vite/node frontend processes on common ports
+for port in 5173 5174 5175; do
+    for pid in $(netstat -ano 2>/dev/null | grep ":$port " | grep LISTENING | awk '{print $5}' | sort -u); do
+        taskkill //F //PID $pid 2>/dev/null && echo "  Killed residual process on port $port (PID $pid)" || true
+    done
+done
+echo ""
+
 # ====================== Start Redis (Optional) ======================
 echo "[4/5] Starting services..."
 if command -v redis-server &> /dev/null; then
@@ -113,7 +127,7 @@ else
     VENV_PYTHON="$BACKEND_DIR/.venv/bin/python"
 fi
 
-(cd "$BACKEND_DIR" && ENV=DEV "$VENV_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 60 --ws-ping-timeout 120 --reload) &
+(cd "$BACKEND_DIR" && ENV=DEV UVICORN_RELOAD_EXCLUDE="\.venv|node_modules|__pycache__|\.ruff_cache" "$VENV_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 60 --ws-ping-timeout 120 --reload) &
 echo "  [OK] Backend started on http://localhost:8000"
 
 # Start frontend

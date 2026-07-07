@@ -27,7 +27,7 @@ def get_ascii_banner(center: bool = True) -> str:
     Returns:
         ASCII 横幅字符串。
     """
-    text = "AirborneAI: 机载软件安全合规 AI 中台"
+    text = "SkyForge (天锻): AI智能体驱动的机载软件轻量化开发工具"
     if center:
         return center_cli_str(text)
     else:

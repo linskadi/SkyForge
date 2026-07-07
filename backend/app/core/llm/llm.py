@@ -1,16 +1,22 @@
-"""LLM 交互模块，封装大语言模型的调用、重试和消息发送。"""
+"""LLM 交互模块：多 Provider 生产级客户端（OpenAI / Anthropic）。
+
+何时使用此类：
+- 需要多轮对话 + 历史管理 + 工具调用 → 用 LLM 类（通过 LLMFactory 创建）
+- 需要单轮 prompt 调用、LM Studio 本地直连、Mock 降级 → 用 LMStudioClient
+- LLMFactory 创建的实例绑定到具体 agent 类型（REQ-Parser/CON-Gen/CODE-Gen/REPAIR），
+  通过 Redis 向前端推送 Agent 消息
+
+两者不互相替代：
+- LLM: 生产级，支持 OpenAI Chat / OpenAI Responses / Anthropic 三种 Provider，
+  带重试、tool call 验证、Redis 流式推送
+- LMStudioClient: 开发级，httpx 直连 LM Studio localhost:1234，轻量无依赖
+"""
 
 from typing import Any
 from app.utils.common_utils import transform_link, split_footnotes
 from app.utils.log_util import logger
 import time
-from app.schemas.response import (
-    CoderMessage,
-    WriterMessage,
-    ModelerMessage,
-    SystemMessage,
-    CoordinatorMessage,
-)
+from app.schemas.response import AgentMessage, SystemMessage
 from app.services.redis_manager import redis_manager
 from app.schemas.enums import AgentType
 from app.config.setting import ApiType
@@ -174,18 +180,20 @@ class LLM:
 
         agent_msg: Any = None
         match agent_name:
-            case AgentType.CODER:
-                agent_msg = CoderMessage(content=content)
-            case AgentType.WRITER:
+            case AgentType.CODE_GENERATOR:
+                agent_msg = AgentMessage(content=content, agent_type=agent_name)
+            case AgentType.CODE_REPAIRER:
                 content, _ = split_footnotes(content)
                 content = transform_link(self.task_id, content)
-                agent_msg = WriterMessage(content=content, sub_title=sub_title)
-            case AgentType.MODELER:
-                agent_msg = ModelerMessage(content=content)
-            case AgentType.SYSTEM:
-                agent_msg = SystemMessage(content=content)
-            case AgentType.COORDINATOR:
-                agent_msg = CoordinatorMessage(content=content)
+                agent_msg = AgentMessage(content=content, agent_type=agent_name)
+            case AgentType.REQUIREMENT_PARSER:
+                agent_msg = AgentMessage(content=content, agent_type=agent_name)
+            case AgentType.CONTRACT_GENERATOR:
+                agent_msg = AgentMessage(content=content, agent_type=agent_name)
+            case AgentType.SIMULATION_ENGINE:
+                agent_msg = AgentMessage(content=content, agent_type=agent_name)
+            case AgentType.REPORT_GENERATOR:
+                agent_msg = AgentMessage(content=content, agent_type=agent_name)
             case _:
                 raise ValueError(f"不支持的agent类型: {agent_name}")
 

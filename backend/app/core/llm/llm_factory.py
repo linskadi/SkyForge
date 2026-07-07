@@ -5,7 +5,7 @@ from app.core.llm.llm import LLM
 
 
 class LLMFactory:
-    """LLM 工厂类，根据配置创建协调者、建模手、代码手和写作手的 LLM 实例。"""
+    """LLM 工厂类，根据配置创建需求解析、契约生成、代码生成和代码修复的 LLM 实例。"""
 
     task_id: str
 
@@ -16,42 +16,42 @@ class LLMFactory:
         """创建所有 Agent 的 LLM 实例。
 
         Returns:
-            包含 (coordinator_llm, modeler_llm, coder_llm, writer_llm) 的元组。
+            包含 (req_parser_llm, con_gen_llm, code_gen_llm, reviewer_llm) 的元组。
         """
-        coordinator_llm = LLM(
-            api_type=settings.COORDINATOR_API_TYPE,
-            api_key=settings.COORDINATOR_API_KEY,
-            model=settings.COORDINATOR_MODEL,
-            base_url=settings.COORDINATOR_BASE_URL,
+        req_parser_llm = LLM(
+            api_type=settings.REQ_PARSER_API_TYPE,
+            api_key=settings.REQ_PARSER_API_KEY,
+            model=settings.REQ_PARSER_MODEL,
+            base_url=settings.REQ_PARSER_BASE_URL,
             task_id=self.task_id,
-            max_tokens=settings.COORDINATOR_MAX_TOKENS,
+            max_tokens=settings.REQ_PARSER_MAX_TOKENS,
         )
 
-        modeler_llm = LLM(
-            api_type=settings.MODELER_API_TYPE,
-            api_key=settings.MODELER_API_KEY,
-            model=settings.MODELER_MODEL,
-            base_url=settings.MODELER_BASE_URL,
+        con_gen_llm = LLM(
+            api_type=settings.CON_GEN_API_TYPE,
+            api_key=settings.CON_GEN_API_KEY,
+            model=settings.CON_GEN_MODEL,
+            base_url=settings.CON_GEN_BASE_URL,
             task_id=self.task_id,
-            max_tokens=settings.MODELER_MAX_TOKENS,
+            max_tokens=settings.CON_GEN_MAX_TOKENS,
         )
 
-        coder_llm = LLM(
-            api_type=settings.CODER_API_TYPE,
-            api_key=settings.CODER_API_KEY,
-            model=settings.CODER_MODEL,
-            base_url=settings.CODER_BASE_URL,
+        code_gen_llm = LLM(
+            api_type=settings.CODE_GEN_API_TYPE,
+            api_key=settings.CODE_GEN_API_KEY,
+            model=settings.CODE_GEN_MODEL,
+            base_url=settings.CODE_GEN_BASE_URL,
             task_id=self.task_id,
-            max_tokens=settings.CODER_MAX_TOKENS,
+            max_tokens=settings.CODE_GEN_MAX_TOKENS,
         )
 
-        writer_llm = LLM(
-            api_type=settings.WRITER_API_TYPE,
-            api_key=settings.WRITER_API_KEY,
-            model=settings.WRITER_MODEL,
-            base_url=settings.WRITER_BASE_URL,
+        reviewer_llm = LLM(
+            api_type=settings.REPAIR_API_TYPE,
+            api_key=settings.REPAIR_API_KEY,
+            model=settings.REPAIR_MODEL,
+            base_url=settings.REPAIR_BASE_URL,
             task_id=self.task_id,
-            max_tokens=settings.WRITER_MAX_TOKENS,
+            max_tokens=settings.REPAIR_MAX_TOKENS,
         )
 
-        return coordinator_llm, modeler_llm, coder_llm, writer_llm
+        return req_parser_llm, con_gen_llm, code_gen_llm, reviewer_llm

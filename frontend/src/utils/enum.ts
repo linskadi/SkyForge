@@ -1,9 +1,11 @@
 /** Agent 类型枚举 */
 export enum AgentType {
-	COORDINATOR = "CoordinatorAgent",
-	MODELER = "ModelerAgent",
-	CODER = "CoderAgent",
-	WRITER = "WriterAgent",
+	REQ_PARSER = "REQ-Parser",
+	CON_GEN = "CON-Gen",
+	CODE_GEN = "CODE-Gen",
+	REPAIR = "REPAIR",
+	SYSTEM = "SYSTEM",
+	TERMINAL = "TERMINAL",
 }
 
 /** LLM API 类型枚举 */

@@ -132,6 +132,10 @@ def _mock_scan(code: str) -> list[Violation]:
     - Rule 8.7：非 static 全局变量
     - Rule 17.7：未检查返回值的函数调用
     - Rule 8.1：函数定义缺少原型
+    - Rule 11.3：不同类型指针间转换
+    - Rule 12.1：运算符优先级混淆
+    - Rule 14.2：for 循环计数器未修改
+    - Rule 21.6：标准库 I/O 函数使用
     """
     violations: list[Violation] = []
     lines = code.splitlines()
@@ -215,6 +219,73 @@ def _mock_scan(code: str) -> list[Violation]:
                     severity="style",
                     rule_id="misra-c2012-8.1",
                     message="函数需要类型声明/原型（Rule 8.1）",
+                )
+            )
+
+        # Rule 11.3：不同类型指针间转换（粗暴匹配：强制类型转换指针）
+        if re.search(r"\(\w+\s*\*\)\s*\w+", stripped) and not stripped.startswith("//"):
+            violations.append(
+                Violation(
+                    file="code.c",
+                    line=i,
+                    column=0,
+                    severity="error",
+                    rule_id="misra-c2012-11.3",
+                    message="不同类型指针间转换需要显式强制类型转换（Rule 11.3）",
+                )
+            )
+
+        # Rule 12.1：运算符优先级混淆（粗暴匹配：混合算术和位运算、逻辑运算）
+        if re.search(r"\w+\s*\+\s*\w+\s*<<\s*\w+", stripped) or re.search(
+            r"\w+\s*\|\s*\w+\s*\&\s*\w+", stripped
+        ):
+            violations.append(
+                Violation(
+                    file="code.c",
+                    line=i,
+                    column=0,
+                    severity="style",
+                    rule_id="misra-c2012-12.1",
+                    message="运算符优先级需要括号明确（Rule 12.1）",
+                )
+            )
+
+        # Rule 14.2：for 循环计数器未修改（粗暴匹配：for 循环但循环体内无计数器修改）
+        if re.search(r"for\s*\([^;]*;\s*(\w+)\s*[<>=!]+[^;]*;", stripped):
+            # 简化检测：如果 for 循环后面几行没有计数器递增，则标记违规
+            counter_match = re.search(r"for\s*\([^;]*;\s*(\w+)\s*[<>=!]+[^;]*;", stripped)
+            if counter_match:
+                counter_var = counter_match.group(1)
+                # 检查后续几行是否有计数器修改
+                has_increment = False
+                for j in range(i, min(i + 10, len(lines) + 1)):
+                    if j - 1 < len(lines):
+                        next_line = lines[j - 1].strip()
+                        if re.search(rf"\b{counter_var}\s*(\+\+|--|[+=]|-=|\*=|/=)", next_line):
+                            has_increment = True
+                            break
+                if not has_increment:
+                    violations.append(
+                        Violation(
+                            file="code.c",
+                            line=i,
+                            column=0,
+                            severity="error",
+                            rule_id="misra-c2012-14.2",
+                            message="for 循环计数器未在循环体内修改（Rule 14.2）",
+                        )
+                    )
+
+        # Rule 21.6：标准库 I/O 函数使用（printf/scanf）
+        if re.search(r"\b(printf|fprintf|scanf|fscanf)\s*\(", stripped):
+            violations.append(
+                Violation(
+                    file="code.c",
+                    line=i,
+                    column=0,
+                    severity="error",
+                    rule_id="misra-c2012-21.6",
+                    message="标准库 I/O 函数在嵌入式系统中不允许使用（Rule 21.6）",
                 )
             )
 

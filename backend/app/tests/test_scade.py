@@ -434,7 +434,7 @@ class TestScadeAPIRoutes(unittest.TestCase):
     def test_upload_scade_route(self) -> None:
         """POST /api/upload-scade 路由：上传 G-Lustre 文件。"""
         from starlette.datastructures import UploadFile
-        from app.api.routes.generate import upload_scade
+        from app.api.routes.pipeline import upload_scade
 
         with open(_EXAMPLE_LUS, "rb") as f:
             content_bytes = f.read()
@@ -470,7 +470,7 @@ class TestScadeAPIRoutes(unittest.TestCase):
 
     def test_generate_with_scade_route(self) -> None:
         """POST /api/generate 含 scade_file 参数。"""
-        from app.api.routes.generate import GenerateRequest, generate
+        from app.api.routes.pipeline import GenerateRequest, generate
 
         with open(_EXAMPLE_LUS, "r", encoding="utf-8") as f:
             scade_content = f.read()
@@ -490,7 +490,7 @@ class TestScadeAPIRoutes(unittest.TestCase):
 
     def test_generate_no_input_returns_error(self) -> None:
         """POST /api/generate 无输入时返回错误。"""
-        from app.api.routes.generate import GenerateRequest, generate
+        from app.api.routes.pipeline import GenerateRequest, generate
 
         req = GenerateRequest(requirement="", scade_file="")
         result = asyncio.run(generate(req))

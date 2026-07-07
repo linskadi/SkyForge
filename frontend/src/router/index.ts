@@ -19,17 +19,14 @@ const routes = [
 		component: () => import("@/pages/task/index.vue"),
 		props: true,
 	},
-	// AirborneAI - Day 1 需求输入页（Patch 4）
 	{
 		path: "/generate",
 		component: () => import("@/views/Generate.vue"),
 	},
-	// AirborneAI - 组件组合验证页
 	{
 		path: "/compose",
 		component: () => import("@/views/Compose.vue"),
 	},
-	// AirborneAI - HIL 人机协作审批页（也可集成在 Generate.vue 侧边栏）
 	{
 		path: "/hil",
 		component: () => import("@/views/HILPage.vue"),

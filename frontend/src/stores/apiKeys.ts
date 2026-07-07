@@ -9,8 +9,8 @@ export const useApiKeyStore = defineStore(
 	() => {
 		// ---- State ----
 
-		/** 协调者模型配置 */
-		const coordinatorConfig = ref<ModelConfig>({
+		/** 需求解析模型配置 (REQ-Parser) */
+		const reqParserConfig = ref<ModelConfig>({
 			apiKey: "",
 			baseUrl: "",
 			modelId: "",
@@ -18,8 +18,8 @@ export const useApiKeyStore = defineStore(
 			contextWindow: 128000,
 		});
 
-		/** 建模者模型配置 */
-		const modelerConfig = ref<ModelConfig>({
+		/** 合约生成模型配置 (CON-Gen) */
+		const conGenConfig = ref<ModelConfig>({
 			apiKey: "",
 			baseUrl: "",
 			modelId: "",
@@ -27,8 +27,8 @@ export const useApiKeyStore = defineStore(
 			contextWindow: 128000,
 		});
 
-		/** 编码者模型配置 */
-		const coderConfig = ref<ModelConfig>({
+		/** 代码生成模型配置 (CODE-Gen) */
+		const codeGenConfig = ref<ModelConfig>({
 			apiKey: "",
 			baseUrl: "",
 			modelId: "",
@@ -36,8 +36,8 @@ export const useApiKeyStore = defineStore(
 			contextWindow: 128000,
 		});
 
-		/** 写作者模型配置 */
-		const writerConfig = ref<ModelConfig>({
+		/** 修复模型配置 (REPAIR) */
+		const reviewerConfig = ref<ModelConfig>({
 			apiKey: "",
 			baseUrl: "",
 			modelId: "",
@@ -59,66 +59,65 @@ export const useApiKeyStore = defineStore(
 
 		// ---- Actions ----
 
-		/** 设置协调者模型配置 */
-		function setCoordinatorConfig(config: ModelConfig) {
-			coordinatorConfig.value = { ...config };
+		/** 设置需求解析模型配置 (REQ-Parser) */
+		function setReqParserConfig(config: ModelConfig) {
+			reqParserConfig.value = { ...config };
 		}
 
-		/** 设置建模者模型配置 */
-		function setModelerConfig(config: ModelConfig) {
-			modelerConfig.value = { ...config };
+		/** 设置合约生成模型配置 (CON-Gen) */
+		function setConGenConfig(config: ModelConfig) {
+			conGenConfig.value = { ...config };
 		}
 
-		/** 设置编码者模型配置 */
-		function setCoderConfig(config: ModelConfig) {
-			coderConfig.value = { ...config };
+		/** 设置代码生成模型配置 (CODE-Gen) */
+		function setCodeGenConfig(config: ModelConfig) {
+			codeGenConfig.value = { ...config };
 		}
 
-		/** 设置写作者模型配置 */
-		function setWriterConfig(config: ModelConfig) {
-			writerConfig.value = { ...config };
+		/** 设置修复模型配置 (REPAIR) */
+		function setReviewerConfig(config: ModelConfig) {
+			reviewerConfig.value = { ...config };
 		}
 
 		/** 设置 OpenAlex 邮箱 */
 		function setOpenalexEmail(email: string) {
-			console.log("setOpenalexEmail", email);
 			openalexEmail.value = email;
 		}
 
 		/** 获取所有 Agent 的模型配置 */
 		function getAllAgentConfigs() {
 			return {
-				[AgentType.COORDINATOR]: coordinatorConfig.value,
-				[AgentType.MODELER]: modelerConfig.value,
-				[AgentType.CODER]: coderConfig.value,
-				[AgentType.WRITER]: writerConfig.value,
+				[AgentType.REQ_PARSER]: reqParserConfig.value,
+				[AgentType.CON_GEN]: conGenConfig.value,
+				[AgentType.CODE_GEN]: codeGenConfig.value,
+				[AgentType.REPAIR]: reviewerConfig.value,
 			};
 		}
 
 		/** 重置所有配置为默认值 */
 		function resetAll() {
-			coordinatorConfig.value = {
+			reqParserConfig.value = {
 				apiKey: "",
 				baseUrl: "",
 				modelId: "",
 				apiType: "",
 				contextWindow: 128000,
 			};
-			modelerConfig.value = {
+			conGenConfig.value = {
 				apiKey: "",
 				baseUrl: "",
 				modelId: "",
 				apiType: "",
 				contextWindow: 128000,
 			};
-			coderConfig.value = {
+			codeGenConfig.value = {
 				apiKey: "",
 				baseUrl: "",
 				modelId: "",
 				apiType: "",
 				contextWindow: 128000,
 			};
-			writerConfig.value = {
+			reviewerConfig.value = {
 				apiKey: "",
 				baseUrl: "",
 				modelId: "",
@@ -130,24 +129,26 @@ export const useApiKeyStore = defineStore(
 
 		return {
 			// 状态
-			coordinatorConfig,
-			modelerConfig,
-			coderConfig,
-			writerConfig,
+			reqParserConfig,
+			conGenConfig,
+			codeGenConfig,
+			reviewerConfig,
 			openalexEmail,
 			isEmpty,
 
 			// 方法
-			setCoordinatorConfig,
-			setModelerConfig,
-			setCoderConfig,
-			setWriterConfig,
+			setReqParserConfig,
+			setConGenConfig,
+			setCodeGenConfig,
+			setReviewerConfig,
 			setOpenalexEmail,
 			getAllAgentConfigs,
 			resetAll,
 		};
 	},
 	{
-		persist: true, // 启用持久化存储
+		persist: {
+			storage: sessionStorage, // 使用 sessionStorage 防止长期暴露
+		},
 	},
 );

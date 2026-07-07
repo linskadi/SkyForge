@@ -1,18 +1,14 @@
 <script setup lang="ts">
 /**
- * AgentTerminal 组件（Patch 4 重点）
+ * AgentTerminal 组件（VSCode 终端样式 + 虚拟滚动）
  *
- * VSCode 终端样式：黑色背景 #1e1e1e，Consolas 字体，#d4d4d4 文字色
- * - 顶部：红黄绿三圆点 + 标题"🤖 AirborneAI Agent Console"
- * - 主体：日志列表，自动滚动到底部
- * - 每行日志：时间戳 + Agent 徽章（彩色） + 内容
+ * - 顶部：红黄绿三圆点 + 标题
+ * - 主体：日志列表，虚拟滚动支持万级日志
  * - 打字机效果：逐字推入（20ms/字）
  * - 闪烁光标 ▊
- * - 日志分级：error #f44747 / warn #cca700 / success #4ec9b0 / info 默认色
- *
- * 默认走 mock 模式；将 useMock 设为 false 时连接真实 WebSocket。
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
 	connectAgentStream,
 	type AgentLog,
@@ -20,15 +16,12 @@ import {
 	type LogLevel,
 	mockAgentStream,
 } from "@/services/mockApi";
+import { agentColorMap, levelColorMap } from "@/utils/colors";
 
 interface Props {
-	/** 是否使用 mock 数据演示（后端未完成时为 true） */
 	useMock?: boolean;
-	/** WebSocket 地址（仅 useMock=false 时生效） */
 	wsUrl?: string;
-	/** 打字机效果每字间隔（毫秒） */
 	typeInterval?: number;
-	/** 最大保留日志条数 */
 	maxLogs?: number;
 }
 
@@ -36,54 +29,45 @@ const props = withDefaults(defineProps<Props>(), {
 	useMock: true,
 	wsUrl: "ws://localhost:8000/ws/agent-stream",
 	typeInterval: 20,
-	maxLogs: 200,
+	maxLogs: 5000,
 });
 
-/** 已渲染的日志条目（含正在打字中的） */
 interface RenderedLog {
 	ts: number;
 	agent: AgentType;
 	level: LogLevel;
-	/** 已经"打字"出来的内容（逐步增长） */
 	visibleText: string;
-	/** 完整内容 */
 	fullText: string;
-	/** 是否已打字完毕 */
 	done: boolean;
 }
 
 const logs = ref<RenderedLog[]>([]);
 const logContainerRef = ref<HTMLDivElement | null>(null);
 
-/** Agent 徽章颜色（与文档 11.2.1 节对齐） */
-const agentColorMap: Record<AgentType, { bg: string; fg: string }> = {
-	"REQ-Parser": { bg: "#1e6fb8", fg: "#d6e8ff" },
-	"CON-Gen": { bg: "#7e22ce", fg: "#f0e6ff" },
-	"CODE-Gen": { bg: "#15803d", fg: "#dcfce7" },
-	REPAIR: { bg: "#ea580c", fg: "#ffedd5" },
-	SYSTEM: { bg: "#525252", fg: "#e5e5e5" },
-	TERMINAL: { bg: "#0891b2", fg: "#cffafe" },
-};
+/** 虚拟滚动 */
+const virtualizer = useVirtualizer({
+	count: logs.value.length,
+	getScrollElement: () => logContainerRef.value,
+	estimateSize: () => 24,
+	overscan: 20,
+});
 
-/** 日志级别颜色 */
-const levelColorMap: Record<LogLevel, string> = {
-	info: "#d4d4d4",
-	success: "#4ec9b0",
-	warn: "#cca700",
-	error: "#f44747",
-};
+// 监听 logs 变化更新虚拟滚动
+watch(logs, () => {
+	virtualizer.value.setOptions({
+		...virtualizer.value.options,
+		count: logs.value.length,
+	});
+}, { deep: true });
 
-/** 当前正在打字的日志索引与定时器 */
 let typingIndex = -1;
 let typingTimer: ReturnType<typeof setTimeout> | null = null;
 let stopStream: (() => void) | null = null;
 
-/** 把一条日志加入列表，并启动打字机效果 */
 const pushLog = (log: AgentLog) => {
 	if (logs.value.length >= props.maxLogs) {
 		logs.value.shift();
 	}
-	// 前一条立即打字完成
 	finishCurrent();
 
 	const newLog: RenderedLog = {
@@ -100,7 +84,6 @@ const pushLog = (log: AgentLog) => {
 	scrollToBottom();
 };
 
-/** 启动打字机效果 */
 const startTyping = () => {
 	if (typingIndex < 0 || typingIndex >= logs.value.length) return;
 	const target = logs.value[typingIndex];
@@ -120,7 +103,6 @@ const startTyping = () => {
 	tick();
 };
 
-/** 强制把当前正在打字的日志立即完整显示 */
 const finishCurrent = () => {
 	if (typingTimer) {
 		clearTimeout(typingTimer);
@@ -135,21 +117,17 @@ const finishCurrent = () => {
 	}
 };
 
-/** 自动滚动到底部 */
 const scrollToBottom = () => {
 	nextTick(() => {
-		const el = logContainerRef.value;
-		if (el) {
-			el.scrollTop = el.scrollHeight;
+		if (logs.value.length > 0) {
+			virtualizer.value.scrollToIndex(logs.value.length - 1, { align: "end" });
 		}
 	});
 };
 
-/** 启动日志流（mock 或真实 WS） */
 const startStream = () => {
 	if (props.useMock) {
 		stopStream = mockAgentStream(pushLog, () => {
-			// mock 全部推送完毕
 			finishCurrent();
 		});
 	} else {
@@ -157,7 +135,6 @@ const startStream = () => {
 	}
 };
 
-/** 停止日志流 */
 const stopAll = () => {
 	if (typingTimer) {
 		clearTimeout(typingTimer);
@@ -169,13 +146,11 @@ const stopAll = () => {
 	}
 };
 
-/** 清空日志 */
 const clearLogs = () => {
 	logs.value = [];
 	typingIndex = -1;
 };
 
-/** 暴露给父组件：手动追加日志 / 启动 / 停止 / 清空 */
 defineExpose({
 	start: startStream,
 	stop: stopAll,
@@ -184,7 +159,6 @@ defineExpose({
 	finish: finishCurrent,
 });
 
-/** 时间戳格式化 HH:MM:SS.mmm */
 const formatTs = (ts: number) => {
 	const d = new Date(ts);
 	const pad = (n: number, len = 2) => n.toString().padStart(len, "0");
@@ -193,7 +167,6 @@ const formatTs = (ts: number) => {
 	)}.${pad(d.getMilliseconds(), 3)}`;
 };
 
-/** Agent 徽章样式 */
 const badgeStyle = (agent: AgentType) => {
 	const c = agentColorMap[agent];
 	return {
@@ -202,18 +175,15 @@ const badgeStyle = (agent: AgentType) => {
 	};
 };
 
-/** 主内容颜色 */
 const contentStyle = (level: LogLevel) => ({
 	color: levelColorMap[level],
 });
 
-/** 是否显示闪烁光标（只在最新一条未完成时显示） */
 const showCursor = computed(() => {
 	const last = logs.value[logs.value.length - 1];
 	return last && !last.done;
 });
 
-/** 组件挂载即开始流式输出 */
 watch(
 	() => props.useMock,
 	() => {
@@ -241,7 +211,7 @@ onBeforeUnmount(() => {
         <span class="light green" />
       </div>
       <div class="terminal-title">
-        🤖 AirborneAI Agent Console
+        SkyForge Agent Console
       </div>
       <div class="header-actions">
         <span v-if="useMock" class="mock-badge">MOCK</span>
@@ -249,18 +219,32 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- 终端日志主体 -->
+    <!-- 终端日志主体（虚拟滚动） -->
     <div ref="logContainerRef" class="terminal-body">
       <div v-if="!logs.length" class="empty-hint">
         等待 Agent 思考日志流入...
       </div>
-      <div v-for="(log, i) in logs" :key="i" class="log-line">
-        <span class="log-ts">{{ formatTs(log.ts) }}</span>
-        <span class="log-badge" :style="badgeStyle(log.agent)">{{ log.agent }}</span>
-        <span class="log-content" :style="contentStyle(log.level)">
-          <span>{{ log.visibleText }}</span><span v-if="showCursor && i === logs.length - 1"
-            class="cursor">▊</span>
-        </span>
+      <div
+        :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }"
+      >
+        <div
+          v-for="virtualRow in virtualizer.getVirtualItems()"
+          :key="String(virtualRow.key)"
+          class="log-line"
+          :style="{
+            position: 'absolute',
+            top: `${virtualRow.start}px`,
+            left: 0,
+            right: 0,
+          }"
+        >
+          <span class="log-ts">{{ formatTs(logs[virtualRow.index].ts) }}</span>
+          <span class="log-badge" :style="badgeStyle(logs[virtualRow.index].agent)">{{ logs[virtualRow.index].agent }}</span>
+          <span class="log-content" :style="contentStyle(logs[virtualRow.index].level)">
+            <span>{{ logs[virtualRow.index].visibleText }}</span><span v-if="showCursor && virtualRow.index === logs.length - 1"
+              class="cursor">▊</span>
+          </span>
+        </div>
       </div>
     </div>
   </div>
@@ -300,17 +284,9 @@ onBeforeUnmount(() => {
   display: inline-block;
 }
 
-.light.red {
-  background: #ff5f56;
-}
-
-.light.yellow {
-  background: #ffbd2e;
-}
-
-.light.green {
-  background: #27c93f;
-}
+.light.red { background: #ff5f56; }
+.light.yellow { background: #ffbd2e; }
+.light.green { background: #27c93f; }
 
 .terminal-title {
   font-size: 13px;
@@ -360,22 +336,10 @@ onBeforeUnmount(() => {
   scroll-behavior: smooth;
 }
 
-.terminal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.terminal-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.terminal-body::-webkit-scrollbar-thumb {
-  background: #3c3c3c;
-  border-radius: 4px;
-}
-
-.terminal-body::-webkit-scrollbar-thumb:hover {
-  background: #505050;
-}
+.terminal-body::-webkit-scrollbar { width: 8px; }
+.terminal-body::-webkit-scrollbar-track { background: transparent; }
+.terminal-body::-webkit-scrollbar-thumb { background: #3c3c3c; border-radius: 4px; }
+.terminal-body::-webkit-scrollbar-thumb:hover { background: #505050; }
 
 .empty-hint {
   color: #6a6a6a;
@@ -421,8 +385,6 @@ onBeforeUnmount(() => {
 }
 
 @keyframes blink {
-  to {
-    visibility: hidden;
-  }
+  to { visibility: hidden; }
 }
 </style>

@@ -1,6 +1,7 @@
 import katex from "katex";
 import { marked } from "marked";
-import type { Renderer, RendererObject, Token } from "marked";
+import type { Renderer, RendererObject } from "marked";
+import DOMPurify from "dompurify";
 
 // 默认的markdown渲染配置
 const defaultOptions = {
@@ -70,7 +71,7 @@ marked.use({
 			// 处理图片链接
 			const baseUrl =
 				import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-			const taskId = window.localStorage.getItem("currentTaskId") || "";
+			const taskId = window.sessionStorage.getItem("currentTaskId") || "";
 
 			return markdown.replace(
 				/!\[(.*?)\]\(((?!http[s]?:\/\/).*?\.(?:png|jpg|jpeg|gif|bmp|webp))\)/g,
@@ -91,7 +92,12 @@ export const renderMarkdown = async (content: string, options = {}) => {
 	const normalized = content
 		.replace(/\\\[\s*\n/g, "\\[")
 		.replace(/\n\s*\\\]/g, "\\]");
-	return marked.parse(normalized, { ...defaultOptions, ...options });
+	const rawHtml = await marked.parse(normalized, { ...defaultOptions, ...options });
+	return DOMPurify.sanitize(rawHtml, {
+		ADD_TAGS: ["div", "span"],
+		ADD_ATTR: ["class"],
+		ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+	});
 };
 
 /**

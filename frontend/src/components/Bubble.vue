@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { cn } from "@/lib/utils";
 import type { AgentType } from "@/utils/enum";
-import { marked } from "marked";
+import { renderMarkdown } from "@/utils/markdown";
 import type { HTMLAttributes } from "vue";
-import { computed } from "vue";
+import { ref, watch } from "vue";
 
 // ---- Props ----
 
@@ -18,28 +18,33 @@ const props = withDefaults(defineProps<BubbleProps>(), {
 	type: "user",
 });
 
-// ---- Computed ----
+// ---- Reactive state ----
 
-/** 渲染 Markdown 内容 */
-const renderedContent = computed(() => {
-	return marked.parse(props.content);
-});
+const renderedContent = ref("");
+
+watch(
+	() => props.content,
+	async (content) => {
+		renderedContent.value = await renderMarkdown(content);
+	},
+	{ immediate: true },
+);
 </script>
 
 <template>
   <div :class="[
     'bubble',
     props.type === 'user' ? 'bubble-user' : '',
-    props.type === 'agent' && props.agentType === 'CoderAgent' ? 'bubble-coder' : '',
-    props.type === 'agent' && props.agentType === 'WriterAgent' ? 'bubble-writer' : '',
+    props.type === 'agent' && props.agentType === 'CODE-Gen' ? 'bubble-coder' : '',
+    props.type === 'agent' && props.agentType === 'REPAIR' ? 'bubble-writer' : '',
     props.class
   ]">
     <div class="flex flex-col gap-1 flex-1">
       <!-- 头像在上方 -->
       <span v-if="props.type === 'user'" class="text-2xl select-none mb-1">🧑</span>
-      <span v-else-if="props.type === 'agent' && props.agentType === 'CoderAgent'"
+      <span v-else-if="props.type === 'agent' && props.agentType === 'CODE-Gen'"
         class="text-2xl select-none mb-1">👨‍💻</span>
-      <span v-else-if="props.type === 'agent' && props.agentType === 'WriterAgent'"
+      <span v-else-if="props.type === 'agent' && props.agentType === 'REPAIR'"
         class="text-2xl select-none mb-1">✍️</span>
       <!-- 气泡内容在下方 -->
       <div :class="cn(
@@ -184,7 +189,7 @@ const renderedContent = computed(() => {
   border: 1px solid #2563eb;
 }
 
-/* CoderAgent 气泡颜色 */
+/* CODE-Gen 气泡颜色 */
 .bubble-coder .prose {
   background: #f1f5f9;
   /* 浅灰 */
@@ -192,7 +197,7 @@ const renderedContent = computed(() => {
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
 }
 
-/* WriterAgent 气泡颜色 */
+/* REPAIR 气泡颜色 */
 .bubble-writer .prose {
   background: #fef9c3;
   /* 浅黄 */

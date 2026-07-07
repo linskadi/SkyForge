@@ -17,11 +17,9 @@
  */
 import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
-import { Loader2, Play, RotateCcw, Sparkles, ChevronDown, ChevronRight, FileCode, FileText, Copy, Check, Download, BookOpen, Wifi, WifiOff } from "lucide-vue-next";
+import { Loader2, Play, RotateCcw, Sparkles, ChevronDown, ChevronRight, FileCode, FileText, Copy, Check, Download, BookOpen } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AgentTerminal from "@/components/AgentTerminal.vue";
 import CodeViewer from "@/components/CodeViewer.vue";
@@ -44,7 +42,7 @@ import {
   type FaultType,
   type FaultParams,
 } from "@/services/mockApi";
-import { getApi, USE_REAL_API, setUseRealAPI } from "@/services/apiSwitcher";
+import { getApi } from "@/services/apiSwitcher";
 
 /** 路由实例（用于读取 query 参数，例如从 SCADE 上传跳转回来） */
 const route = useRoute();
@@ -70,6 +68,13 @@ const highlightEnabled = ref<boolean>(true);
 /** 当前激活的 tab：result / repair / contract / simulation / report */
 const activeTab = ref<"result" | "repair" | "contract" | "simulation" | "report">("result");
 
+/** 聚焦面板：null=三栏均显示，'code'/'contract'/'misra'=聚焦某一个 */
+const focusedPanel = ref<"code" | "contract" | "misra" | null>(null);
+
+function toggleFocus(panel: "code" | "contract" | "misra") {
+  focusedPanel.value = focusedPanel.value === panel ? null : panel;
+}
+
 /** 数字孪生仿真结果（默认用 mockGenerate 返回的，故障注入后更新） */
 const simResult = ref<SimulationResult | null>(null);
 /** 是否正在执行故障仿真 */
@@ -86,9 +91,6 @@ const hilExpanded = ref<boolean>(HIL_ENABLED);
 
 /** 是否展开 MISRA 规则搜索面板 */
 const misraExpanded = ref<boolean>(false);
-
-/** API 模式响应式状态（Mock / 真实 API） */
-const { useRealAPI, connected } = USE_REAL_API();
 
 /** 是否可点击生成 */
 const canGenerate = computed(
@@ -113,11 +115,6 @@ const toggleMisra = () => {
 /** 切换 HIL 面板展开 */
 const toggleHIL = () => {
   hilExpanded.value = !hilExpanded.value;
-};
-
-/** 切换 API 模式（Mock ↔ 真实 API） */
-const onToggleAPI = (val: boolean) => {
-  setUseRealAPI(val);
 };
 
 /** 点击生成按钮（一键全流程：生成 + 修复 + 校验） */
@@ -298,37 +295,11 @@ onMounted(() => {
       <div class="title-area">
         <h1 class="page-title">
           <Sparkles class="icon" />
-          AirborneAI · 代码生成
+          SkyForge · 代码生成
         </h1>
         <p class="subtitle">
           自然语言需求 → 契约 + C 代码 + MISRA-C 合规 + 修复闭环 + 契约校验 + 数字孪生仿真
         </p>
-      </div>
-      <div class="header-actions">
-        <div class="switch-group api-mode-switch">
-          <Switch
-            :model-value="useRealAPI"
-            @update:model-value="(v: boolean) => onToggleAPI(v)"
-            id="api-mode-switch"
-          />
-          <Label for="api-mode-switch" class="switch-label">
-            {{ useRealAPI ? "真实 API" : "Mock 模式" }}
-          </Label>
-          <span
-            class="api-status-dot"
-            :class="{ mock: !useRealAPI, real: useRealAPI, connected: connected, disconnected: useRealAPI && !connected }"
-            :title="useRealAPI ? (connected ? '真实 API 已连接' : '真实 API 未连接') : '使用 Mock 数据'"
-          >
-            <component :is="useRealAPI ? (connected ? Wifi : WifiOff) : Wifi" class="api-status-icon" />
-          </span>
-        </div>
-        <div class="switch-group">
-          <Switch v-model:checked="highlightEnabled" id="highlight-switch" />
-          <Label for="highlight-switch" class="switch-label">
-            高亮追溯
-            <span class="switch-hint">（Patch 3）</span>
-          </Label>
-        </div>
       </div>
     </header>
 
@@ -348,7 +319,7 @@ onMounted(() => {
           />
         </CardTitle>
       </CardHeader>
-      <CardContent v-if="misraExpanded">
+      <CardContent v-show="misraExpanded" class="collapse-panel">
         <MisraSearch />
       </CardContent>
     </Card>
@@ -366,7 +337,7 @@ onMounted(() => {
           />
         </CardTitle>
       </CardHeader>
-      <CardContent v-if="scadeExpanded">
+      <CardContent v-show="scadeExpanded" class="collapse-panel">
         <ScadeUpload />
       </CardContent>
     </Card>
@@ -419,7 +390,7 @@ onMounted(() => {
       <CardHeader>
         <CardTitle class="card-title">
           🤖 Agent 思考流
-          <span class="title-hint">（打字机效果，Patch 4 亮点）</span>
+          <span class="title-hint">（实时展示 Agent 推理过程）</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -457,97 +428,132 @@ onMounted(() => {
           </TabsTrigger>
         </TabsList>
 
-        <!-- Tab 1: 生成结果（三栏：契约 / 代码 / MISRA） -->
+        <!-- Tab 1: 生成结果（聚焦切换模式） -->
         <TabsContent value="result">
-          <div class="results-grid">
-            <!-- 左栏：契约 -->
-            <Card class="result-card contract-card">
-              <CardHeader>
-                <CardTitle class="card-title">
-                  📋 契约
-                  <span class="title-hint">（YAML，由 LLM 生成）</span>
-                  <button
-                    type="button"
-                    class="action-btn"
-                    title="下载契约 YAML"
-                    @click="onDownloadContractYaml"
-                  >
-                    <Download class="action-icon" />
-                  </button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ContractViewer :contract="result.contract" />
-              </CardContent>
-            </Card>
+          <div class="focus-layout">
+            <!-- 左侧：非聚焦面板的迷你按钮 -->
+            <div class="focus-tabs">
+              <button
+                class="focus-tab-btn"
+                :class="{ active: focusedPanel === 'code' }"
+                @click="toggleFocus('code')"
+              >
+                <span class="focus-tab-icon">💻</span>
+                <span class="focus-tab-label">C 代码</span>
+              </button>
+              <button
+                class="focus-tab-btn"
+                :class="{ active: focusedPanel === 'contract' }"
+                @click="toggleFocus('contract')"
+              >
+                <span class="focus-tab-icon">📋</span>
+                <span class="focus-tab-label">契约</span>
+              </button>
+              <button
+                class="focus-tab-btn"
+                :class="{ active: focusedPanel === 'misra' }"
+                @click="toggleFocus('misra')"
+              >
+                <span class="focus-tab-icon">⚠️</span>
+                <span class="focus-tab-label">MISRA</span>
+                <span
+                  v-if="result.violations.length > 0"
+                  class="focus-tab-badge fail"
+                >{{ result.violations.length }}</span>
+              </button>
+            </div>
 
-            <!-- 中栏：代码 -->
-            <Card class="result-card code-card">
-              <CardHeader>
-                <CardTitle class="card-title">
-                  💻 C 代码
-                  <span class="title-hint">（含 [REQ]/[MISRA-Rule]/[CON] 徽章）</span>
-                  <div class="header-actions-inline">
+            <!-- 主内容区：聚焦的面板 -->
+            <div class="focus-main">
+              <!-- 代码面板 -->
+              <Card v-show="focusedPanel === 'code' || focusedPanel === null" class="result-card focus-card">
+                <CardHeader>
+                  <CardTitle class="card-title">
+                    💻 C 代码
+                    <span class="title-hint">（含 [REQ]/[MISRA-Rule]/[CON] 徽章）</span>
+                    <div class="header-actions-inline">
+                      <button
+                        type="button"
+                        class="action-btn"
+                        :title="copiedCode ? '已复制' : '复制代码'"
+                        @click="onCopyCode"
+                      >
+                        <Check v-if="copiedCode" class="action-icon ok" />
+                        <Copy v-else class="action-icon" />
+                      </button>
+                      <button
+                        type="button"
+                        class="action-btn"
+                        title="下载 C 文件"
+                        @click="onDownloadCFile"
+                      >
+                        <Download class="action-icon" />
+                      </button>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CodeViewer
+                    :code="result.code"
+                    :traceability="result.traceability"
+                    :highlight-enabled="highlightEnabled"
+                  />
+                </CardContent>
+              </Card>
+
+              <!-- 契约面板 -->
+              <Card v-show="focusedPanel === 'contract'" class="result-card focus-card">
+                <CardHeader>
+                  <CardTitle class="card-title">
+                    📋 契约规格
+                    <span class="title-hint">（YAML，由 LLM 生成）</span>
                     <button
                       type="button"
                       class="action-btn"
-                      :title="copiedCode ? '已复制' : '复制代码'"
-                      @click="onCopyCode"
-                    >
-                      <Check v-if="copiedCode" class="action-icon ok" />
-                      <Copy v-else class="action-icon" />
-                    </button>
-                    <button
-                      type="button"
-                      class="action-btn"
-                      title="下载 C 文件"
-                      @click="onDownloadCFile"
+                      title="下载契约 YAML"
+                      @click="onDownloadContractYaml"
                     >
                       <Download class="action-icon" />
                     </button>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CodeViewer
-                  :code="result.code"
-                  :traceability="result.traceability"
-                  :highlight-enabled="highlightEnabled"
-                />
-              </CardContent>
-            </Card>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ContractViewer :contract="result.contract" />
+                </CardContent>
+              </Card>
 
-            <!-- 右栏：MISRA 违规 -->
-            <Card class="result-card misra-card">
-              <CardHeader>
-                <CardTitle class="card-title">
-                  ⚠ MISRA-C 校验
-                  <span class="title-hint">（Cppcheck 静态扫描）</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div class="misra-summary">
-                  <span class="badge error">Error ×{{ violationStats.error }}</span>
-                  <span class="badge warn">Warn ×{{ violationStats.warn }}</span>
-                  <span class="badge total">Total ×{{ violationStats.total }}</span>
-                </div>
-                <ul v-if="result.violations.length > 0" class="violation-list">
-                  <li
-                    v-for="(v, idx) in result.violations"
-                    :key="idx"
-                    :class="['violation-item', violationClass(v)]"
-                  >
-                    <div class="violation-row">
-                      <span :class="['cat-tag', categoryClass(v.category)]">{{ v.category }}</span>
-                      <span class="rule-tag">{{ v.rule }}</span>
-                      <span class="line-tag">@L{{ v.line }}</span>
-                    </div>
-                    <div class="violation-msg">{{ v.message }}</div>
-                  </li>
-                </ul>
-                <div v-else class="empty-tip">✅ 无 MISRA 违规</div>
-              </CardContent>
-            </Card>
+              <!-- MISRA 面板 -->
+              <Card v-show="focusedPanel === 'misra'" class="result-card focus-card">
+                <CardHeader>
+                  <CardTitle class="card-title">
+                    ⚠ MISRA-C 校验
+                    <span class="title-hint">（Cppcheck 静态扫描）</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div class="misra-summary">
+                    <span class="badge error">Error ×{{ violationStats.error }}</span>
+                    <span class="badge warn">Warn ×{{ violationStats.warn }}</span>
+                    <span class="badge total">Total ×{{ violationStats.total }}</span>
+                  </div>
+                  <ul v-if="result.violations.length > 0" class="violation-list">
+                    <li
+                      v-for="(v, idx) in result.violations"
+                      :key="idx"
+                      :class="['violation-item', violationClass(v)]"
+                    >
+                      <div class="violation-row">
+                        <span :class="['cat-tag', categoryClass(v.category)]">{{ v.category }}</span>
+                        <span class="rule-tag">{{ v.rule }}</span>
+                        <span class="line-tag">@L{{ v.line }}</span>
+                      </div>
+                      <div class="violation-msg">{{ v.message }}</div>
+                    </li>
+                  </ul>
+                  <div v-else class="empty-tip">✅ 无 MISRA 违规</div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 
@@ -622,507 +628,10 @@ onMounted(() => {
           />
         </CardTitle>
       </CardHeader>
-      <CardContent v-if="hilExpanded">
+      <CardContent v-show="hilExpanded" class="collapse-panel">
         <HILPanel />
       </CardContent>
     </Card>
   </div>
 </template>
-<style scoped>
-/* ===================== 页面整体布局 ===================== */
-.generate-page {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 24px 32px 64px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* ===================== 顶部页头 ===================== */
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 0 8px;
-  border-bottom: 1px solid var(--border, #e4e4e7);
-}
-
-.title-area h1 {
-  font-size: 22px;
-  font-weight: 700;
-  margin: 0;
-  color: var(--foreground, #18181b);
-}
-
-.title-area h1 .accent {
-  background: linear-gradient(90deg, #1e6fb8, #7c3aed);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.title-area p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--muted-foreground, #71717a);
-}
-
-.switch-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: var(--secondary, #f4f4f5);
-}
-
-.switch-label {
-  font-size: 13px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.switch-hint {
-  color: var(--muted-foreground, #a1a1aa);
-  font-size: 12px;
-}
-
-/* API 模式切换按钮 + 连接状态指示灯 */
-.api-mode-switch {
-  border: 1px solid var(--border, #e4e4e7);
-}
-
-.api-status-dot {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  margin-left: 4px;
-  transition: all 0.2s;
-}
-
-.api-status-dot.mock {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.api-status-dot.real.connected {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.api-status-dot.real.disconnected {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.api-status-icon {
-  width: 12px;
-  height: 12px;
-}
-
-/* MISRA 搜索卡片 */
-.misra-collapse-card {
-  border-left: 3px solid #16a34a;
-}
-
-.misra-collapse-card .icon {
-  width: 18px;
-  height: 18px;
-  color: #16a34a;
-}
-
-/* ===================== 折叠卡片 ===================== */
-.scade-collapse-card,
-.hil-collapse-card {
-  border-left: 3px solid #0891b2;
-}
-
-.hil-collapse-card {
-  border-left-color: #ea580c;
-}
-
-.scade-collapse-card :deep(.card-title),
-.hil-collapse-card :deep(.card-title) {
-  font-size: 16px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.scade-collapse-card .icon,
-.hil-collapse-card .icon {
-  width: 18px;
-  height: 18px;
-  color: #0891b2;
-}
-
-.hil-collapse-card .icon {
-  color: #ea580c;
-}
-
-.collapse-icon {
-  width: 16px;
-  height: 16px;
-  color: var(--muted-foreground, #6b7280);
-  margin-left: auto;
-}
-
-/* ===================== 输入卡片 ===================== */
-.input-card :deep(.card-title),
-.result-card :deep(.card-title),
-.terminal-card :deep(.card-title) {
-  font-size: 16px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.title-hint {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--muted-foreground, #a1a1aa);
-}
-
-.req-textarea {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--input, #e4e4e7);
-  border-radius: 8px;
-  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
-  font-size: 14px;
-  line-height: 1.6;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.15s;
-  background: var(--background, #fff);
-  color: var(--foreground, #18181b);
-}
-
-.req-textarea:focus {
-  border-color: #1e6fb8;
-  box-shadow: 0 0 0 3px rgba(30, 111, 184, 0.15);
-}
-
-.examples {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.examples-label {
-  font-size: 13px;
-  color: var(--muted-foreground, #71717a);
-}
-
-.example-btn {
-  padding: 4px 10px;
-  font-size: 12px;
-  border: 1px dashed var(--border, #d4d4d8);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--foreground, #3f3f46);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.example-btn:hover:not(:disabled) {
-  border-color: #1e6fb8;
-  color: #1e6fb8;
-  background: rgba(30, 111, 184, 0.06);
-}
-
-.example-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-.status-text {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.status-text.generating { color: #1e6fb8; }
-.status-text.done { color: #15803d; }
-.status-text.error { color: #dc2626; }
-
-.animate-spin { animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-/* ===================== 终端卡片 ===================== */
-.terminal-card {
-  border-left: 3px solid #1e6fb8;
-}
-
-.terminal-wrapper {
-  background: #0b0f17;
-  border-radius: 8px;
-  padding: 12px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-/* ===================== 结果区 / Tab 切换 ===================== */
-.results-section {
-  margin-top: 8px;
-}
-
-.result-tabs {
-  width: 100%;
-}
-
-.tabs-list {
-  display: inline-flex;
-  gap: 4px;
-  background: var(--secondary, #f4f4f5);
-  padding: 4px;
-  border-radius: 10px;
-  margin-bottom: 16px;
-}
-
-.tab-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 18px;
-  padding: 0 6px;
-  margin-left: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 9px;
-  background: var(--muted, #e4e4e7);
-  color: var(--foreground, #3f3f46);
-}
-
-.tab-badge.pass {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.tab-badge.fail {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-/* ===================== 生成结果三栏布局 ===================== */
-.results-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr 1fr;
-  gap: 16px;
-  align-items: start;
-}
-
-@media (max-width: 1100px) {
-  .results-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ===================== 卡片头部内联操作按钮（复制/下载） ===================== */
-.header-actions-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-}
-
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 1px solid var(--border, #d4d4d8);
-  border-radius: 6px;
-  background: var(--secondary, #f4f4f5);
-  color: var(--foreground, #3f3f46);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.action-btn:hover {
-  border-color: #1e6fb8;
-  color: #1e6fb8;
-  background: rgba(30, 111, 184, 0.08);
-}
-
-.action-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.action-icon.ok {
-  color: #15803d;
-}
-
-/* ===================== 移动端响应式适配 ===================== */
-@media (max-width: 768px) {
-  .generate-page {
-    padding: 12px 12px 32px;
-    gap: 12px;
-  }
-
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .title-area h1 {
-    font-size: 18px;
-  }
-
-  .title-area p {
-    font-size: 12px;
-  }
-
-  .actions {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .tabs-list {
-    display: flex;
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    max-width: 100%;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .terminal-wrapper {
-    max-height: 220px;
-  }
-
-  .req-textarea {
-    font-size: 13px;
-  }
-}
-
-.result-card {
-  border: 1px solid var(--border, #e4e4e7);
-  border-radius: 10px;
-  background: var(--background, #fff);
-}
-
-/* ===================== MISRA 违规列表 ===================== */
-.misra-summary {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 12px;
-}
-
-.badge.error { background: #fee2e2; color: #b91c1c; }
-.badge.warn { background: #fef3c7; color: #b45309; }
-.badge.total {
-  background: var(--secondary, #f4f4f5);
-  color: var(--foreground, #3f3f46);
-}
-
-.violation-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.violation-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border-left: 3px solid;
-  background: var(--secondary, #f9fafb);
-  font-size: 13px;
-}
-
-.violation-error {
-  border-left-color: #dc2626;
-  background: #fef2f2;
-}
-
-.violation-warn {
-  border-left-color: #f59e0b;
-  background: #fffbeb;
-}
-
-.violation-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-
-.cat-tag,
-.rule-tag,
-.line-tag {
-  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-}
-
-.cat-tag.cat-required { background: #dbeafe; color: #1d4ed8; }
-.cat-tag.cat-mandatory { background: #fee2e2; color: #b91c1c; }
-.cat-tag.cat-advisory { background: #fef3c7; color: #b45309; }
-
-.rule-tag {
-  background: #1f2937;
-  color: #fbbf24;
-}
-
-.line-tag {
-  background: var(--muted, #e4e4e7);
-  color: var(--foreground, #3f3f46);
-}
-
-.violation-msg {
-  font-size: 12px;
-  color: var(--foreground, #3f3f46);
-  line-height: 1.5;
-}
-
-.empty-tip {
-  padding: 16px;
-  text-align: center;
-  color: #15803d;
-  font-size: 14px;
-  font-weight: 500;
-  background: #f0fdf4;
-  border-radius: 8px;
-}
-
-/* ===================== 数字孪生 Tab ===================== */
-.simulation-tab {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-</style>
+<style src="@/assets/styles/generate.css"></style>

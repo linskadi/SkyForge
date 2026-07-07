@@ -82,6 +82,22 @@ class SimulationEngine:
         self.fault_injector = FaultInjector()
         self.mcu = VirtualMCU()
 
+    async def run_simulation_async(
+        self,
+        code: str,
+        contract_yaml: str,
+        fault_type: str | None = None,
+        fault_params: dict[str, Any] | None = None,
+        steps: int = 200,
+    ) -> SimulationResult:
+        """异步版本的 run_simulation()，避免阻塞 FastAPI 事件循环。"""
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self.run_simulation, code, contract_yaml, fault_type, fault_params, steps
+        )
+
     def run_simulation(
         self,
         code: str,

@@ -91,12 +91,47 @@ class CodeGeneratorAgent:
         return code
 
     def _mock_run(self, requirement_json: dict[str, Any]) -> str:
-        """Mock 实现：按需求类型套用机载 C 代码模板。"""
-        req_type = requirement_json.get("type", "filter")
+        """Mock 实现：按需求类型套用机载 C 代码模板。
+
+        支持中文关键词检测：从需求文本中识别领域关键词，自动选择对应模板。
+        """
+        # 中文关键词 → 模板类型映射
+        keyword_map = {
+            "导航": "navigation",
+            "GPS": "navigation",
+            "INS": "navigation",
+            "惯导": "navigation",
+            "滤波": "navigation",
+            "位置融合": "navigation",
+            "电源": "power",
+            "电池": "power",
+            "电压": "power",
+            "电流": "power",
+            "功率": "power",
+            "供电": "power",
+        }
+
+        # 优先使用显式指定的 type 字段
+        req_type = requirement_json.get("type", "")
+
+        # 如果未指定 type，从需求文本中检测关键词
+        if not req_type:
+            req_text = str(requirement_json).lower()
+            for keyword, template_type in keyword_map.items():
+                if keyword.lower() in req_text:
+                    req_type = template_type
+                    break
+
+        # 默认回退到 filter
+        if not req_type:
+            req_type = "filter"
+
         generator = {
             "filter": self._gen_filter_code,
             "control": self._gen_control_code,
             "comms": self._gen_comms_code,
+            "navigation": self._gen_navigation_code,
+            "power": self._gen_power_management_code,
         }.get(req_type, self._gen_filter_code)
         return generator(requirement_json)
 
@@ -308,6 +343,170 @@ uint8_t {module}_crc8(const uint8_t *data, int length)
 #include <stdint.h>
 
 uint8_t {module}_crc8(const uint8_t *data, int length);
+
+#endif /* {guard} */
+"""
+
+    def _gen_navigation_code(self, req: dict[str, Any]) -> str:
+        """生成 GPS/INS 导航互补滤波器 C 代码（机载导航系统）。"""
+        req_id = req.get("req_id", "REQ-001")
+        module = req.get("module_name", "nav_filter")
+        params = req.get("params", {})
+        alpha = params.get("alpha", 0.98)  # 互补滤波器融合系数
+        dt = params.get("dt_sec", 0.01)  # 采样周期
+
+        header_name = module + ".h"
+        guard = module.upper() + "_H"
+
+        return f"""/* [REQ-001] [MISRA-Rule-8.13] 机载导航滤波器实现（GPS/INS 互补滤波）
+ * Traceability: {req_id}
+ * 模块: {module}
+ * 融合系数: {alpha}, 采样周期: {dt}s
+ */
+#include "{header_name}"
+#include <math.h>
+
+/* [REQ-001] [MISRA-Rule-8.9] 导航状态变量，静态持久化 */
+static double s_ins_position = 0.0;
+static double s_ins_velocity = 0.0;
+static double s_gps_position = 0.0;
+static int    s_initialized = 0;
+
+/* [REQ-001] [MISRA-Rule-8.13] 初始化导航滤波器状态 */
+void {module}_init(void)
+{{
+    s_ins_position = 0.0;
+    s_ins_velocity = 0.0;
+    s_gps_position = 0.0;
+    s_initialized = 1;
+}}
+
+/* [REQ-001] [MISRA-Rule-15.7] 互补滤波融合 GPS 与 INS 数据
+ * position = alpha * (position_ins + velocity_ins * dt) + (1-alpha) * position_gps
+ * alpha = {alpha:.4f}
+ */
+double {module}_update(double ins_accel, double gps_pos)
+{{
+    double fused_position;
+
+    /* [REQ-001] [MISRA-Rule-10.1] 未初始化保护 */
+    if (0 == s_initialized)
+    {{
+        {module}_init();
+    }}
+
+    /* [REQ-001] [MISRA-Rule-10.4] INS 积分更新 */
+    s_ins_velocity += ins_accel * {dt:.4f};
+    s_ins_position += s_ins_velocity * {dt:.4f};
+
+    /* [REQ-001] [MISRA-Rule-10.4] 互补滤波融合 */
+    fused_position = {alpha:.4f} * s_ins_position + (1.0 - {alpha:.4f}) * gps_pos;
+    s_gps_position = gps_pos;
+    s_ins_position = fused_position;
+
+    return fused_position;
+}}
+
+/* ===== 头文件 {header_name} =====
+ * {guard}
+ */
+#ifndef {guard}
+#define {guard}
+
+/* [REQ-001] [MISRA-Rule-8.13] 接口仅暴露必要符号 */
+void   {module}_init(void);
+double {module}_update(double ins_accel, double gps_pos);
+
+#endif /* {guard} */
+"""
+
+    def _gen_power_management_code(self, req: dict[str, Any]) -> str:
+        """生成电池监控与电源切换 C 代码（机载电源管理系统）。"""
+        req_id = req.get("req_id", "REQ-001")
+        module = req.get("module_name", "power_mgr")
+        params = req.get("params", {})
+        v_low = params.get("voltage_low_threshold", 10.5)
+        v_high = params.get("voltage_high_threshold", 28.0)
+        i_max = params.get("current_max_amps", 5.0)
+
+        header_name = module + ".h"
+        guard = module.upper() + "_H"
+
+        return f"""/* [REQ-001] [MISRA-Rule-8.13] 机载电源管理系统实现
+ * Traceability: {req_id}
+ * 模块: {module}
+ * 低压阈值: {v_low}V, 高压阈值: {v_high}V, 最大电流: {i_max}A
+ */
+#include "{header_name}"
+#include <stdint.h>
+
+/* [REQ-001] [MISRA-Rule-8.9] 电源状态变量，静态持久化 */
+static double s_voltage = 0.0;
+static double s_current = 0.0;
+static int    s_power_state = 0;  /* 0: normal, 1: low_voltage, 2: fault */
+static int    s_initialized = 0;
+
+/* [REQ-001] [MISRA-Rule-8.13] 初始化电源管理系统 */
+void {module}_init(void)
+{{
+    s_voltage = 0.0;
+    s_current = 0.0;
+    s_power_state = 0;
+    s_initialized = 1;
+}}
+
+/* [REQ-001] [MISRA-Rule-15.7] 电源监控与故障切换
+ * 检测电压/电流异常，执行电源切换
+ */
+int {module}_monitor(double voltage, double current)
+{{
+    int new_state;
+
+    /* [REQ-001] [MISRA-Rule-10.1] 未初始化保护 */
+    if (0 == s_initialized)
+    {{
+        {module}_init();
+    }}
+
+    s_voltage = voltage;
+    s_current = current;
+    new_state = 0;
+
+    /* [REQ-001] [MISRA-Rule-10.1] 低压检测 */
+    if (voltage < {v_low:.1f})
+    {{
+        new_state = 1;
+    }}
+    /* [REQ-001] [MISRA-Rule-10.1] 过压检测 */
+    else if (voltage > {v_high:.1f})
+    {{
+        new_state = 2;
+    }}
+    /* [REQ-001] [MISRA-Rule-10.1] 过流检测 */
+    else if (current > {i_max:.1f})
+    {{
+        new_state = 2;
+    }}
+
+    /* [REQ-001] [MISRA-Rule-15.7] 状态切换逻辑 */
+    if (new_state != s_power_state)
+    {{
+        s_power_state = new_state;
+        /* 实际硬件切换逻辑在此处实现 */
+    }}
+
+    return s_power_state;
+}}
+
+/* ===== 头文件 {header_name} =====
+ * {guard}
+ */
+#ifndef {guard}
+#define {guard}
+
+/* [REQ-001] [MISRA-Rule-8.13] 接口仅暴露必要符号 */
+void {module}_init(void);
+int  {module}_monitor(double voltage, double current);
 
 #endif /* {guard} */
 """
