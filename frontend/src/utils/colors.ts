@@ -5,22 +5,22 @@
 
 import type { AgentType, LogLevel } from "@/services/mockApi";
 
-/** Agent 徽章颜色（与文档 11.2.1 节对齐） */
+/** Agent 徽章颜色（航空信号灯语义系统 - 深沉专业色调） */
 export const agentColorMap: Record<AgentType, { bg: string; fg: string }> = {
-  "REQ-Parser": { bg: "#1e6fb8", fg: "#d6e8ff" },
-  "CON-Gen": { bg: "#7e22ce", fg: "#f0e6ff" },
-  "CODE-Gen": { bg: "#15803d", fg: "#dcfce7" },
-  REPAIR: { bg: "#ea580c", fg: "#ffedd5" },
-  SYSTEM: { bg: "#525252", fg: "#e5e5e5" },
-  TERMINAL: { bg: "#0891b2", fg: "#cffafe" },
+  "REQ-Parser": { bg: "#1d4ed8", fg: "#dbeafe" },      /* 深蓝色 - 需求解析 */
+  "CON-Gen": { bg: "#6d28d9", fg: "#ede9fe" },         /* 紫色 - 合约生成 */
+  "CODE-Gen": { bg: "#047857", fg: "#d1fae5" },        /* 深绿色 - 代码生成 */
+  REPAIR: { bg: "#c2410c", fg: "#ffedd5" },            /* 深橙色 - 修复 */
+  SYSTEM: { bg: "#475569", fg: "#f1f5f9" },            /* 石灰色 - 系统 */
+  TERMINAL: { bg: "#0e7490", fg: "#cffafe" },          /* 深青色 - 终端 */
 };
 
-/** 日志级别颜色 */
+/** 日志级别颜色（深沉专业色调） */
 export const levelColorMap: Record<LogLevel, string> = {
-  info: "#d4d4d4",
-  success: "#4ec9b0",
-  warn: "#cca700",
-  error: "#f44747",
+  info: "#94a3b8",    /* 石灰色 - 信息 */
+  success: "#059669", /* 深绿色 - 成功 */
+  warn: "#d97706",    /* 深橙色 - 警告 */
+  error: "#dc2626",   /* 深红色 - 错误 */
 };
 
 /** Agent 徽章样式 */

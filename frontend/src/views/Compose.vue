@@ -476,7 +476,7 @@ const compatStats = computed(() => {
 .title-area h1 .icon {
   width: 24px;
   height: 24px;
-  color: #7c3aed;
+  color: hsl(260, 60%, 55%);
 }
 
 .title-area p {
@@ -504,15 +504,15 @@ const compatStats = computed(() => {
 }
 
 .comp-card.comp-a {
-  border-top: 3px solid #1e6fb8;
+  border-top: 3px solid hsl(220, 70%, 50%);
 }
 
 .comp-card.comp-b {
-  border-top: 3px solid #15803d;
+  border-top: 3px solid #059669;
 }
 
 .connection-card {
-  border-top: 3px solid #7c3aed;
+  border-top: 3px solid hsl(260, 60%, 55%);
 }
 
 .card-title {
@@ -526,7 +526,7 @@ const compatStats = computed(() => {
 .title-icon {
   width: 18px;
   height: 18px;
-  color: #7c3aed;
+  color: hsl(260, 60%, 55%);
 }
 
 .title-hint {
@@ -550,11 +550,11 @@ const compatStats = computed(() => {
 }
 
 .comp-badge.a {
-  background: #1e6fb8;
+  background: hsl(220, 70%, 50%);
 }
 
 .comp-badge.b {
-  background: #15803d;
+  background: #059669;
 }
 
 .comp-name-input {
@@ -610,8 +610,8 @@ const compatStats = computed(() => {
 
 .code-editor:focus,
 .yaml-editor:focus {
-  border-color: #7c3aed;
-  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.15);
+  border-color: hsl(260, 60%, 55%);
+  box-shadow: 0 0 0 2px hsla(260, 60%, 55%, 0.15);
 }
 
 .connection-options {
@@ -633,25 +633,25 @@ const compatStats = computed(() => {
 }
 
 .connection-option:hover {
-  border-color: #7c3aed;
-  background: rgba(124, 58, 237, 0.04);
+  border-color: hsl(260, 60%, 55%);
+  background: hsla(260, 60%, 55%, 0.04);
 }
 
 .connection-option.active {
-  border-color: #7c3aed;
-  background: rgba(124, 58, 237, 0.08);
-  box-shadow: 0 0 0 1px #7c3aed;
+  border-color: hsl(260, 60%, 55%);
+  background: hsla(260, 60%, 55%, 0.08);
+  box-shadow: 0 0 0 1px hsl(260, 60%, 55%);
 }
 
 .radio-input {
   margin-top: 2px;
-  accent-color: #7c3aed;
+  accent-color: hsl(260, 60%, 55%);
 }
 
 .opt-icon {
   width: 16px;
   height: 16px;
-  color: #7c3aed;
+  color: hsl(260, 60%, 55%);
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -697,13 +697,13 @@ const compatStats = computed(() => {
 }
 
 .status-text.generating {
-  color: #1e6fb8;
-  background: rgba(30, 111, 184, 0.08);
+  color: hsl(220, 70%, 50%);
+  background: hsla(220, 70%, 50%, 0.08);
 }
 
 .status-text.done {
-  color: #15803d;
-  background: rgba(21, 128, 61, 0.08);
+  color: #059669;
+  background: rgba(5, 150, 105, 0.08);
 }
 
 .results-section {
@@ -821,10 +821,11 @@ const compatStats = computed(() => {
   font-family: 'Consolas', monospace;
   font-size: 11px;
   font-weight: 600;
-  background: #1e293b;
-  color: #f1f5f9;
+  background: #0F1623;
+  color: #F0F4F8;
   padding: 1px 6px;
   border-radius: 3px;
+  border: 1px solid rgba(14, 165, 233, 0.1);
 }
 
 .check-text {
@@ -890,9 +891,9 @@ const compatStats = computed(() => {
 }
 
 .action-btn:hover {
-  border-color: #7c3aed;
-  color: #7c3aed;
-  background: rgba(124, 58, 237, 0.08);
+  border-color: hsl(260, 60%, 55%);
+  color: hsl(260, 60%, 55%);
+  background: hsla(260, 60%, 55%, 0.08);
 }
 
 .action-icon {
@@ -901,7 +902,7 @@ const compatStats = computed(() => {
 }
 
 .action-icon.ok {
-  color: #15803d;
+  color: #059669;
 }
 
 .compat-summary-badges {
@@ -922,7 +923,7 @@ const compatStats = computed(() => {
 
 .compat-badge.pass {
   background: #dcfce7;
-  color: #15803d;
+  color: #059669;
 }
 
 .compat-badge.fail {

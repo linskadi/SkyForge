@@ -6,7 +6,8 @@
 
 @layer base {
 	:root {
-		--background: 0 0% 100%;
+		/* 浅色模式：柔和灰色背景 + 白色卡片，层级分明 */
+		--background: 220 14% 96%;
 		--foreground: 224 71.4% 4.1%;
 
 		--card: 0 0% 100%;
@@ -15,71 +16,76 @@
 		--popover: 0 0% 100%;
 		--popover-foreground: 224 71.4% 4.1%;
 
-		--primary: 262.1 83.3% 57.8%;
-		--primary-foreground: 210 20% 98%;
+		/* 主色：深蓝色，专业稳重 */
+		--primary: 220 70% 50%;
+		--primary-foreground: 0 0% 100%;
 
-		--secondary: 220 14.3% 95.9%;
-		--secondary-foreground: 220.9 39.3% 11%;
+		--secondary: 220 14% 92%;
+		--secondary-foreground: 220 9% 46%;
 
-		--muted: 220 14.3% 95.9%;
-		--muted-foreground: 220 8.9% 46.1%;
+		--muted: 220 14% 94%;
+		--muted-foreground: 220 9% 46%;
 
-		--accent: 220 14.3% 95.9%;
-		--accent-foreground: 220.9 39.3% 11%;
+		/* 强调色：稍微亮一点的蓝色 */
+		--accent: 215 80% 55%;
+		--accent-foreground: 0 0% 100%;
 
-		--destructive: 0 84.2% 60.2%;
-		--destructive-foreground: 210 20% 98%;
+		--destructive: 0 72% 51%;
+		--destructive-foreground: 0 0% 100%;
 
-		--border: 220 13% 91%;
-		--input: 220 13% 91%;
-		--ring: 262.1 83.3% 57.8%;
+		--border: 220 13% 90%;
+		--input: 220 13% 90%;
+		--ring: 220 70% 50%;
 		--radius: 0.5rem;
 		--sidebar-background: 0 0% 98%;
-		--sidebar-foreground: 240 5.3% 26.1%;
-		--sidebar-primary: 240 5.9% 10%;
-		--sidebar-primary-foreground: 0 0% 98%;
-		--sidebar-accent: 240 4.8% 95.9%;
-		--sidebar-accent-foreground: 240 5.9% 10%;
-		--sidebar-border: 220 13% 91%;
-		--sidebar-ring: 217.2 91.2% 59.8%;
+		--sidebar-foreground: 224 20% 25%;
+		--sidebar-primary: 220 70% 50%;
+		--sidebar-primary-foreground: 0 0% 100%;
+		--sidebar-accent: 220 14% 92%;
+		--sidebar-accent-foreground: 220 9% 46%;
+		--sidebar-border: 220 13% 90%;
+		--sidebar-ring: 220 70% 50%;
 	}
 
 	.dark {
-		--background: 224 71.4% 4.1%;
+		/* 暗色模式：真正的深色背景，明确的层级 */
+		--background: 220 25% 7%;
 		--foreground: 210 20% 98%;
 
-		--card: 224 71.4% 4.1%;
+		--card: 220 20% 11%;
 		--card-foreground: 210 20% 98%;
 
-		--popover: 224 71.4% 4.1%;
+		--popover: 220 20% 11%;
 		--popover-foreground: 210 20% 98%;
 
-		--primary: 263.4 70% 50.4%;
-		--primary-foreground: 210 20% 98%;
+		/* 主色：亮蓝色，在深色背景上更醒目 */
+		--primary: 210 80% 55%;
+		--primary-foreground: 0 0% 100%;
 
-		--secondary: 215 27.9% 16.9%;
+		--secondary: 220 18% 15%;
 		--secondary-foreground: 210 20% 98%;
 
-		--muted: 215 27.9% 16.9%;
-		--muted-foreground: 217.9 10.6% 64.9%;
+		--muted: 220 18% 15%;
+		--muted-foreground: 220 10% 60%;
 
-		--accent: 215 27.9% 16.9%;
-		--accent-foreground: 210 20% 98%;
+		/* 强调色：更亮的蓝色 */
+		--accent: 200 85% 60%;
+		--accent-foreground: 0 0% 100%;
 
-		--destructive: 0 62.8% 30.6%;
-		--destructive-foreground: 210 20% 98%;
+		--destructive: 0 62% 40%;
+		--destructive-foreground: 0 0% 100%;
 
-		--border: 215 27.9% 16.9%;
-		--input: 215 27.9% 16.9%;
-		--ring: 263.4 70% 50.4%;
-		--sidebar-background: 240 5.9% 10%;
-		--sidebar-foreground: 240 4.8% 95.9%;
-		--sidebar-primary: 224.3 76.3% 48%;
+		--border: 220 18% 18%;
+		--input: 220 18% 18%;
+		--ring: 210 80% 55%;
+		--sidebar-background: 220 20% 9%;
+		--sidebar-foreground: 210 20% 98%;
+		--sidebar-primary: 210 80% 55%;
 		--sidebar-primary-foreground: 0 0% 100%;
-		--sidebar-accent: 240 3.7% 15.9%;
-		--sidebar-accent-foreground: 240 4.8% 95.9%;
-		--sidebar-border: 240 3.7% 15.9%;
-		--sidebar-ring: 217.2 91.2% 59.8%;
+		--sidebar-accent: 220 18% 14%;
+		--sidebar-accent-foreground: 210 20% 98%;
+		--sidebar-border: 220 18% 16%;
+		--sidebar-ring: 210 80% 55%;
 	}
 }
 

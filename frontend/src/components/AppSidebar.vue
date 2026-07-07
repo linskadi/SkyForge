@@ -8,6 +8,8 @@ import {
 	XHS,
 } from "@/utils/const";
 import NavUser from "./NavUser.vue";
+import { useTheme } from "@/composables/useTheme";
+import { Moon, Sun } from "lucide-vue-next";
 
 import {
 	Sidebar,
@@ -27,6 +29,7 @@ import {
 // ---- Props ----
 
 const props = defineProps<SidebarProps>();
+const { isDark, toggleTheme } = useTheme();
 
 // ---- Reactive State ----
 
@@ -141,8 +144,16 @@ const socialMedia = [
       <NavUser />
     </SidebarFooter>
     <SidebarFooter>
-      <!-- 展示图标社交媒体  -->
-      <div class="flex items-center gap-4 justify-center mb-4 border-t  border-light-purple pt-3">
+      <!-- 主题切换 + 社交媒体图标 -->
+      <div class="flex items-center gap-3 justify-center mb-4 border-t border-border pt-3">
+        <button
+          @click="toggleTheme"
+          class="p-2 rounded-lg hover:bg-accent transition-colors"
+          :title="isDark ? '切换亮色模式' : '切换深色模式'"
+        >
+          <Sun v-if="isDark" class="w-4 h-4 text-accent" />
+          <Moon v-else class="w-4 h-4 text-muted-foreground" />
+        </button>
         <a v-for="item in socialMedia" :key="item.url" :href="item.url" target="_blank">
           <img :src="item.icon" :alt="item.name" width="24" height="24" class="icon">
         </a>
