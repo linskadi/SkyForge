@@ -1,4 +1,4 @@
-"""通用路由模块，提供健康检查等接口。"""
+"""基础路由模块，提供健康检查等通用接口。"""
 
 from fastapi import APIRouter
 
@@ -9,9 +9,3 @@ router = APIRouter()
 async def health_check():
     """健康检查接口。"""
     return {"status": "ok", "service": "SkyForge"}
-
-
-@router.get("/api/hello")
-async def hello_world():
-    """Hello World 接口。"""
-    return {"message": "Hello from SkyForge"}

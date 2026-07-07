@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import os
-from app.routers import ws_router, common_router, files_router
+from app.api.routes import common as common_router
+from app.api.routes import task_ws as ws_router
 from app.api.routes import generate as ws_streaming_router
 from app.api.routes import pipeline as pipeline_router
 from app.api.routes import reports as reports_router
@@ -35,9 +36,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(ws_router.router)
 app.include_router(common_router.router)
-app.include_router(files_router.router)
+app.include_router(ws_router.router)
 app.include_router(ws_streaming_router.router)
 app.include_router(pipeline_router.router)
 app.include_router(reports_router.router)
