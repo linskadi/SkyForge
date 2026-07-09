@@ -57,22 +57,6 @@ const data = {
 				},
 			],
 		},
-		{
-			title: "开始",
-			url: "#",
-			items: [
-				{
-					title: "开始新任务",
-					url: "#",
-					isActive: false,
-				},
-			],
-		},
-		{
-			title: "历史任务",
-			url: "#",
-			items: [],
-		},
 	],
 };
 

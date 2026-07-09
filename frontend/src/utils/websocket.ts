@@ -54,8 +54,13 @@ export class TaskWebSocket {
 			this.notifyStatus("connected");
 		};
 		this.socket.onmessage = (event) => {
-			const data = JSON.parse(event.data);
-			this.onMessage(data);
+			try {
+				const data = JSON.parse(event.data);
+				this.onMessage(data);
+			} catch (e) {
+				// 非JSON消息（如ping）忽略
+				console.debug("WebSocket 非JSON消息:", event.data);
+			}
 		};
 		this.socket.onclose = (event) => {
 			console.log("WebSocket 连接已关闭", event.code, event.reason);
