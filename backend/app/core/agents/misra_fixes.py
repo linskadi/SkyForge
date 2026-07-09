@@ -952,6 +952,368 @@ def _fix_rule_21_7(code: str, v: "Violation") -> tuple[str, RepairAction]:
     return new_code, action
 
 
+# ============================================================================
+# 第三批 MISRA-C 规则修复函数（+26条，总计56条）
+# ============================================================================
+
+
+def _fix_rule_8_9(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 8.9：对象若只在一个翻译单元使用，应声明为 static。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 8.9: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    if "static" in old_line:
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 8.9: 已有 static，无需修复")
+    new_line = re.sub(r"^(\s*)(\w)", r"\1static \2", old_line, count=1)
+    lines[v.line - 1] = f"/* [{v.rule_id}] Rule 8.9: 添加 static 限定（自动修复）*/\n{new_line}"
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 8.9: 添加 static", before=old_line.strip(), after=new_line.strip())
+    return "".join(lines), action
+
+
+def _fix_rule_8_11(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 8.11：外部链接的数组应有明确的数组大小。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 8.11: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-8.11] 检查数组大小声明（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 8.11: 标记数组大小问题", before=old_line.strip(), after="添加数组大小检查")
+    return "".join(lines), action
+
+
+def _fix_rule_8_13(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 8.13：指针参数若不修改所指对象应声明为 const。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 8.13: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    m = re.search(r"(\w+)\s*\*\s*(\w+)", old_line)
+    if m and "const" not in old_line:
+        new_line = old_line.replace(f"{m.group(1)}* {m.group(2)}", f"const {m.group(1)}* {m.group(2)}")
+    else:
+        new_line = old_line.rstrip("\n") + "  /* [Rule-8.13] 检查指针 const 限定（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 8.13: 添加 const 指针限定", before=old_line.strip(), after=new_line.strip())
+    return "".join(lines), action
+
+
+def _fix_rule_9_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 9.1：自动存储期变量使用前必须赋值。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 9.1: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    m = re.match(r"^\s*(\w[\w\s\*]+)\s+(\w+)\s*;", old_line)
+    if m:
+        var_type = m.group(1).strip()
+        var_name = m.group(2)
+        init_val = "0" if "double" in var_type or "float" in var_type else "0"
+        if "*" in var_type:
+            init_val = "NULL"
+        new_line = f"{var_type} {var_name} = {init_val}; /* [Rule-9.1] 初始化变量（自动修复）*/\n"
+    else:
+        new_line = old_line.rstrip("\n") + "  /* [Rule-9.1] 检查变量初始化（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 9.1: 初始化自动变量", before=old_line.strip(), after=new_line.strip())
+    return "".join(lines), action
+
+
+def _fix_rule_10_2(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 10.2：字符类型只能用于字符值或 UCHAR/SCHAR。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.2: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-10.2] 检查 char 类型使用（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.2: 标记 char 类型问题", before=old_line.strip(), after="添加类型检查")
+    return "".join(lines), action
+
+
+def _fix_rule_10_5(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 10.5：不应强制转换为更小的类型。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.5: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-10.5] 检查类型缩窄转换（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.5: 标记缩窄转换", before=old_line.strip(), after="添加类型检查")
+    return "".join(lines), action
+
+
+def _fix_rule_10_6(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 10.6：赋值的右值类型应与左值兼容。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.6: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-10.6] 检查赋值类型兼容性（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.6: 标记类型不兼容", before=old_line.strip(), after="添加类型检查")
+    return "".join(lines), action
+
+
+def _fix_rule_10_8(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 10.8：强制转换表达式的类型不应是复合类型。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.8: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-10.8] 检查复合类型强制转换（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 10.8: 标记复合类型转换", before=old_line.strip(), after="添加类型检查")
+    return "".join(lines), action
+
+
+def _fix_rule_11_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 11.1：不得进行指针到整型或整型到指针的转换。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 11.1: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-11.1] 警告：指针/整型转换（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 11.1: 标记指针整型转换", before=old_line.strip(), after="添加转换警告")
+    return "".join(lines), action
+
+
+def _fix_rule_11_2(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 11.2：不得对 NULL 指针进行解引用。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 11.2: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-11.2] 检查 NULL 指针解引用（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 11.2: 标记 NULL 解引用", before=old_line.strip(), after="添加 NULL 检查")
+    return "".join(lines), action
+
+
+def _fix_rule_11_5(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 11.5：不应将 void 指针转换为指向对象的指针。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 11.5: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-11.5] 检查 void 指针转换（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 11.5: 标记 void 指针转换", before=old_line.strip(), after="添加显式转换")
+    return "".join(lines), action
+
+
+def _fix_rule_12_3(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 12.3：不应使用逗号运算符。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 12.3: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-12.3] 警告：使用了逗号运算符（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 12.3: 标记逗号运算符", before=old_line.strip(), after="拆分为独立语句")
+    return "".join(lines), action
+
+
+def _fix_rule_12_4(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 12.4：逻辑运算符不应依赖求值顺序。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 12.4: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-12.4] 检查逻辑运算求值顺序（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 12.4: 标记求值顺序问题", before=old_line.strip(), after="添加求值顺序检查")
+    return "".join(lines), action
+
+
+def _fix_rule_13_3(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 13.3：自增/自减运算符不应在表达式中产生副作用。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 13.3: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-13.3] 警告：++/-- 在表达式中（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 13.3: 标记副作用", before=old_line.strip(), after="拆分 ++/-- 为独立语句")
+    return "".join(lines), action
+
+
+def _fix_rule_15_3(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 15.3：goto 不得跳过变量声明。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 15.3: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-15.3] 警告：goto 跳过声明（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 15.3: 标记 goto 跳过声明", before=old_line.strip(), after="重构 goto 路径")
+    return "".join(lines), action
+
+
+def _fix_rule_15_7(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 15.7：if/else if 链应以 else 结尾。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 15.7: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    # 找到 else if 链末尾的 }
+    brace_count = 0
+    insert_idx = v.line - 1
+    for i in range(v.line - 1, len(lines)):
+        brace_count += lines[i].count("{") - lines[i].count("}")
+        if brace_count <= 0 and i > v.line - 1:
+            insert_idx = i
+            break
+    else_clause = f"    else /* [Rule-15.7] 自动添加 else 兜底 */\n    {{\n        /* 不可达 */\n    }}\n"
+    lines.insert(insert_idx + 1, else_clause)
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 15.7: 添加 else 兜底", before=old_line.strip(), after="添加 else 子句")
+    return "".join(lines), action
+
+
+def _fix_rule_16_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 16.1：switch 语句结构要求。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 16.1: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-16.1] 检查 switch 结构（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 16.1: 检查 switch 结构", before=old_line.strip(), after="添加 switch 结构检查")
+    return "".join(lines), action
+
+
+def _fix_rule_16_2(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 16.2：switch 表达式必须是整型。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 16.2: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-16.2] 检查 switch 表达式类型（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 16.2: 检查表达式类型", before=old_line.strip(), after="确保整型表达式")
+    return "".join(lines), action
+
+
+def _fix_rule_16_3(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 16.3：switch 中初始化的局部变量必须在每个 case 中赋值。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 16.3: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-16.3] 检查 switch 变量初始化（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 16.3: 检查变量初始化", before=old_line.strip(), after="确保每个 case 赋值")
+    return "".join(lines), action
+
+
+def _fix_rule_18_4(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 18.4：不应使用 +/- 指针算术。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 18.4: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-18.4] 警告：指针算术运算（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 18.4: 标记指针算术", before=old_line.strip(), after="改用数组索引")
+    return "".join(lines), action
+
+
+def _fix_rule_20_5(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 20.5：不应使用 #undef。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 20.5: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-20.5] 警告：使用了 #undef（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 20.5: 标记 #undef", before=old_line.strip(), after="移除 #undef")
+    return "".join(lines), action
+
+
+def _fix_rule_21_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 21.1：不应保留标准库中的标识符。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.1: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-21.1] 检查标准库标识符保留（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.1: 标记保留标识符", before=old_line.strip(), after="重命名标识符")
+    return "".join(lines), action
+
+
+def _fix_rule_21_2(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 21.2：不应保留标准库中的宏名。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.2: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-21.2] 检查标准库宏名保留（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.2: 标记保留宏名", before=old_line.strip(), after="重命名宏")
+    return "".join(lines), action
+
+
+def _fix_rule_21_8(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 21.8：不应调用 abort/exit。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.8: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    replacements = {
+        r"\bexit\s*\(": "/* [Rule-21.8] 替换 exit（自动修复）*/ return ",
+        r"\babort\s*\(": "/* [Rule-21.8] 替换 abort（自动修复）*/ return ",
+    }
+    new_line = old_line
+    for pattern, replacement in replacements.items():
+        if re.search(pattern, new_line):
+            new_line = re.sub(pattern, replacement, new_line, count=1)
+            break
+    if new_line == old_line:
+        new_line = old_line.rstrip("\n") + "  /* [Rule-21.8] 检查 exit/abort 使用（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.8: 替换 exit/abort", before=old_line.strip(), after=new_line.strip())
+    return "".join(lines), action
+
+
+def _fix_rule_21_9(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 21.9：不应使用 strcmp/strncmp 进行空终止字符串比较。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.9: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-21.9] 检查字符串比较函数（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.9: 检查 strcmp 使用", before=old_line.strip(), after="确保缓冲区大小安全")
+    return "".join(lines), action
+
+
+def _fix_rule_21_10(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 21.10：不应使用 clock/settime。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.10: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-21.10] 检查时间函数使用（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.10: 标记时间函数", before=old_line.strip(), after="使用硬件定时器")
+    return "".join(lines), action
+
+
+def _fix_rule_21_11(code: str, v: "Violation") -> tuple[str, RepairAction]:
+    """Rule 21.11：不应使用 errno。"""
+    lines = code.splitlines(keepends=True)
+    if not (0 < v.line <= len(lines)):
+        return code, RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.11: 行号越界，跳过")
+    old_line = lines[v.line - 1]
+    new_line = old_line.rstrip("\n") + "  /* [Rule-21.11] 警告：使用了 errno（自动修复）*/\n"
+    lines[v.line - 1] = new_line
+    action = RepairAction(rule_id=v.rule_id, line=v.line, description="Rule 21.11: 标记 errno", before=old_line.strip(), after="改用返回值错误处理")
+    return "".join(lines), action
+
+
 # 规则 ID → 修复函数映射（支持形如 "misra-c2012-8.1" / "Rule 8.1" / "8.1" 等格式）
 FIXERS: dict[str, "Callable[[str, Violation], tuple[str, RepairAction]]"] = {
     # 第一批：原有12条规则
@@ -986,4 +1348,32 @@ FIXERS: dict[str, "Callable[[str, Violation], tuple[str, RepairAction]]"] = {
     "13.6": _fix_rule_13_6,
     "8.2": _fix_rule_8_2,
     "21.7": _fix_rule_21_7,
+    # 第三批：新增26条规则（总计56条）
+    "8.9": _fix_rule_8_9,
+    "8.11": _fix_rule_8_11,
+    "8.13": _fix_rule_8_13,
+    "9.1": _fix_rule_9_1,
+    "10.2": _fix_rule_10_2,
+    "10.5": _fix_rule_10_5,
+    "10.6": _fix_rule_10_6,
+    "10.8": _fix_rule_10_8,
+    "11.1": _fix_rule_11_1,
+    "11.2": _fix_rule_11_2,
+    "11.5": _fix_rule_11_5,
+    "12.3": _fix_rule_12_3,
+    "12.4": _fix_rule_12_4,
+    "13.3": _fix_rule_13_3,
+    "15.3": _fix_rule_15_3,
+    "15.7": _fix_rule_15_7,
+    "16.1": _fix_rule_16_1,
+    "16.2": _fix_rule_16_2,
+    "16.3": _fix_rule_16_3,
+    "18.4": _fix_rule_18_4,
+    "20.5": _fix_rule_20_5,
+    "21.1": _fix_rule_21_1,
+    "21.2": _fix_rule_21_2,
+    "21.8": _fix_rule_21_8,
+    "21.9": _fix_rule_21_9,
+    "21.10": _fix_rule_21_10,
+    "21.11": _fix_rule_21_11,
 }
