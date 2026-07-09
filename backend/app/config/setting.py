@@ -1,9 +1,18 @@
 """应用配置模块，基于 pydantic-settings 管理环境变量和全局配置。"""
 
+from enum import Enum
 from pydantic import BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 from typing import Annotated, Optional
+
+
+class ApiType(str, Enum):
+    """LLM API 类型枚举。"""
+
+    OPENAI_CHAT = "openai-chat"
+    OPENAI_RESPONSES = "openai-responses"
+    ANTHROPIC = "anthropic"
 
 
 def parse_cors(value: str) -> list[str]:
@@ -66,6 +75,7 @@ class Settings(BaseSettings):
 
     # Redis 配置（可选）
     REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_MAX_CONNECTIONS: int = 10
 
     # CORS 配置
     CORS_ALLOW_ORIGINS: Annotated[list[str] | str, BeforeValidator(parse_cors)] = "*"

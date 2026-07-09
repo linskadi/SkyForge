@@ -5,6 +5,55 @@ import datetime
 import hashlib
 from app.utils.log_util import logger
 import re
+from typing import Optional
+
+
+def transform_link(task_id: str, content: str) -> str:
+    """将内容中的文件路径转换为可点击的链接。
+
+    Args:
+        task_id: 任务 ID，用于构建链接路径。
+        content: 包含文件路径的文本内容。
+
+    Returns:
+        转换后的文本内容。
+    """
+    if not content:
+        return content
+
+    def replace_path(match: re.Match) -> str:
+        path = match.group(0)
+        return f"[{path}](/task/{task_id}?file={path})"
+
+    pattern = r'(?:backend/project/work_dir/[^ \s\'"]+|[\w/]+\.(?:c|h|yaml|json|txt|md))'
+    return re.sub(pattern, replace_path, content)
+
+
+def split_footnotes(content: str) -> tuple[str, str]:
+    """分离正文和脚注内容。
+
+    Args:
+        content: 包含脚注标记的文本内容。
+
+    Returns:
+        (正文, 脚注) 元组。
+    """
+    if not content:
+        return content, ""
+
+    footnote_pattern = r'\[([^\]]+)\]\(#footnote-(\d+)\)'
+    footnotes = []
+    main_content = content
+
+    for match in re.finditer(footnote_pattern, content):
+        footnote_text = match.group(1)
+        footnote_id = match.group(2)
+        footnotes.append(f"[{footnote_id}]: {footnote_text}")
+
+    main_content = re.sub(footnote_pattern, r'[\1]^{\2}', main_content)
+    footnote_section = "\n\n".join(footnotes) if footnotes else ""
+
+    return main_content, footnote_section
 
 TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
