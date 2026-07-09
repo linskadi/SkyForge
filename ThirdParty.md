@@ -20,6 +20,7 @@
 | NumPy | >=2.2.5 | 数值计算（仿真引擎） | BSD-3-Clause |
 | PyYAML | >=6.0 | YAML 解析（契约处理） | MIT |
 | Jinja2 | >=3.1 | 模板引擎（报告生成） | BSD-3-Clause |
+| Hugging Face Hub | >=0.20.0 | 模型下载管理（本地LLM） | Apache-2.0 |
 
 ### 开发依赖
 

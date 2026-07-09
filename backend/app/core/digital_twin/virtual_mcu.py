@@ -29,21 +29,83 @@ from app.utils.log_util import logger
 # - level：info / success / warn / error
 LogCallback = Callable[[str, str, str], None]
 
-# Forbidden includes and function calls that should not appear in user code
-FORBIDDEN_INCLUDES: list[str] = [
+# 安全策略：白名单模式（仅允许安全的标准库头文件）
+ALLOWED_INCLUDES: set[str] = {
+    "<stdio.h>",
+    "<stdlib.h>",
+    "<math.h>",
+    "<string.h>",
+    "<stdint.h>",
+    "<stdbool.h>",
+    "<assert.h>",
+    "<limits.h>",
+    "<float.h>",
+    "<ctype.h>",
+    "<errno.h>",
+    "<time.h>",
+    "<stddef.h>",
+}
+
+# 允许的标准库函数（白名单）
+ALLOWED_FUNCTION_CALLS: set[str] = {
+    "printf(",
+    "fprintf(",
+    "sprintf(",
+    "snprintf(",
+    "scanf(",
+    "fscanf(",
+    "sscanf(",
+    "malloc(",
+    "calloc(",
+    "realloc(",
+    "free(",
+    "strlen(",
+    "strcpy(",
+    "strncpy(",
+    "strcmp(",
+    "strncmp(",
+    "memcpy(",
+    "memset(",
+    "memmove(",
+    "abs(",
+    "fabs(",
+    "sqrt(",
+    "pow(",
+    "sin(",
+    "cos(",
+    "tan(",
+    "atan2(",
+    "floor(",
+    "ceil(",
+    "round(",
+    "fmod(",
+    "isnan(",
+    "isinf(",
+    "atoi(",
+    "atof(",
+    "strtol(",
+    "strtod(",
+}
+
+# 禁止的危险模式（黑名单作为补充检查）
+FORBIDDEN_PATTERNS: list[str] = [
     "#include <windows.h>",
     "#include <winsock2.h>",
     "#include <sys/socket.h>",
     "#include <netinet/in.h>",
     "#include <netdb.h>",
-]
-
-FORBIDDEN_FUNCTION_CALLS: list[str] = [
+    "#include <dlfcn.h>",
+    "#include <signal.h>",
     "system(",
     "exec(",
     "popen(",
     "fork(",
     "socket(",
+    "raise(",
+    "__attribute__((constructor))",
+    "__attribute__((destructor))",
+    "asm(",
+    "__asm__(",
 ]
 
 # test_harness.c 模板（参考文档 6.5.2）

@@ -65,6 +65,21 @@ class LMStudioClient:
         self._available: Optional[bool] = None
         self._last_check: float = 0.0
         self._cache_ttl: int = 60  # 缓存有效期（秒）
+        # 连接池复用：单例 AsyncClient
+        self._async_client: Optional[httpx.AsyncClient] = None
+
+    def _get_async_client(self) -> httpx.AsyncClient:
+        """获取或创建异步 HTTP 客户端（连接池复用）。"""
+        if self._async_client is None or self._async_client.is_closed:
+            self._async_client = httpx.AsyncClient(
+                timeout=self.timeout,
+                limits=httpx.Limits(
+                    max_connections=10,
+                    max_keepalive_connections=5,
+                    keepalive_expiry=30,
+                ),
+            )
+        return self._async_client
 
     def is_available(self, force_recheck: bool = False) -> bool:
         """检查 LM Studio 是否可用（server 已启动 + 至少一个模型已加载）。
@@ -186,16 +201,16 @@ class LMStudioClient:
         messages.append({"role": "user", "content": prompt})
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                resp = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "temperature": temperature,
-                        "max_tokens": max_tokens,
-                    },
-                )
+            client = self._get_async_client()
+            resp = await client.post(
+                f"{self.base_url}/chat/completions",
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+            )
             if resp.status_code == 200:
                 data = resp.json()
                 return data["choices"][0]["message"]["content"]
@@ -227,31 +242,31 @@ class LMStudioClient:
         messages.append({"role": "user", "content": prompt})
 
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                async with client.stream(
-                    "POST",
-                    f"{self.base_url}/chat/completions",
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "temperature": temperature,
-                        "max_tokens": max_tokens,
-                        "stream": True,
-                    },
-                ) as resp:
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            data_str = line[6:]
-                            if data_str.strip() == "[DONE]":
-                                break
-                            try:
-                                data = json.loads(data_str)
-                                delta = data["choices"][0].get("delta", {})
-                                content = delta.get("content", "")
-                                if content:
-                                    yield content
-                            except json.JSONDecodeError:
-                                continue
+            client = self._get_async_client()
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": True,
+                },
+            ) as resp:
+                async for line in resp.aiter_lines():
+                    if line.startswith("data: "):
+                        data_str = line[6:]
+                        if data_str.strip() == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data["choices"][0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                        except json.JSONDecodeError:
+                            continue
         except Exception as e:
             logger.error(f"LM Studio 流式调用失败: {e}")
 
@@ -269,6 +284,11 @@ class LMStudioClient:
         except Exception:
             pass
         return []
+
+    async def close(self):
+        """关闭异步 HTTP 客户端。"""
+        if self._async_client and not self._async_client.is_closed:
+            await self._async_client.aclose()
 
 
 # 全局单例
