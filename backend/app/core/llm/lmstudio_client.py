@@ -15,7 +15,7 @@ Pipeline 的 4 个 Agent 均使用本客户端（get_lmstudio_client() 单例）
 不依赖重型组件。
 
 使用方式：
-    client = LMStudioClient()
+    client = get_lmstudio_client()
     if client.is_available():
         response = client.chat("你好")
     else:
@@ -26,7 +26,7 @@ import os
 import json
 import time
 import httpx
-from typing import Optional
+from typing import Optional, AsyncGenerator
 from app.utils.log_util import logger
 
 
@@ -65,8 +65,22 @@ class LMStudioClient:
         self._available: Optional[bool] = None
         self._last_check: float = 0.0
         self._cache_ttl: int = 60  # 缓存有效期（秒）
-        # 连接池复用：单例 AsyncClient
+        # 连接池复用：单例 AsyncClient + 同步 Client
         self._async_client: Optional[httpx.AsyncClient] = None
+        self._sync_client: Optional[httpx.Client] = None
+
+    def _get_sync_client(self) -> httpx.Client:
+        """获取或创建同步 HTTP 客户端（连接池复用）。"""
+        if self._sync_client is None or self._sync_client.is_closed:
+            self._sync_client = httpx.Client(
+                timeout=self.timeout,
+                limits=httpx.Limits(
+                    max_connections=10,
+                    max_keepalive_connections=5,
+                    keepalive_expiry=30,
+                ),
+            )
+        return self._sync_client
 
     def _get_async_client(self) -> httpx.AsyncClient:
         """获取或创建异步 HTTP 客户端（连接池复用）。"""
@@ -102,7 +116,8 @@ class LMStudioClient:
 
         # 执行实际检查
         try:
-            resp = httpx.get(f"{self.base_url}/models", timeout=5)
+            client = self._get_sync_client()
+            resp = client.get(f"{self.base_url}/models")
             if resp.status_code == 200:
                 data = resp.json()
                 models = [m.get("id", "") for m in data.get("data", [])]
@@ -149,7 +164,8 @@ class LMStudioClient:
         messages.append({"role": "user", "content": prompt})
 
         try:
-            resp = httpx.post(
+            client = self._get_sync_client()
+            resp = client.post(
                 f"{self.base_url}/chat/completions",
                 json={
                     "model": self.model,
@@ -157,7 +173,6 @@ class LMStudioClient:
                     "temperature": temperature,
                     "max_tokens": max_tokens,
                 },
-                timeout=self.timeout,
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -277,7 +292,8 @@ class LMStudioClient:
             模型 ID 列表
         """
         try:
-            resp = httpx.get(f"{self.base_url}/models", timeout=5)
+            client = self._get_sync_client()
+            resp = client.get(f"{self.base_url}/models")
             if resp.status_code == 200:
                 data = resp.json()
                 return [m.get("id", "") for m in data.get("data", [])]
@@ -286,18 +302,214 @@ class LMStudioClient:
         return []
 
     async def close(self):
-        """关闭异步 HTTP 客户端。"""
+        """关闭 HTTP 客户端。"""
         if self._async_client and not self._async_client.is_closed:
             await self._async_client.aclose()
+        if self._sync_client and not self._sync_client.is_closed:
+            self._sync_client.close()
 
 
+# ---------------------------------------------------------------------------
+# 统一 LLM 客户端：Local → LMStudio → Mock 自动回退链
+# ---------------------------------------------------------------------------
+
+
+class UnifiedLLMClient:
+    """统一 LLM 客户端，自动回退：本地 GGUF → LM Studio → Mock。
+
+    接口与 LMStudioClient 完全兼容（is_available / chat / chat_async / chat_stream），
+    Agent 无需修改代码即可享受多后端支持。
+    """
+
+    def __init__(self):
+        self._local = None
+        self._lmstudio: Optional[LMStudioClient] = None
+        self._active_backend: str = "none"
+
+    def _get_local(self):
+        """延迟加载本地 LLM 客户端。"""
+        if self._local is None:
+            try:
+                from app.core.llm.local_client import get_local_llm_client
+
+                self._local = get_local_llm_client()
+            except Exception:
+                pass
+        return self._local
+
+    def _get_lmstudio(self) -> LMStudioClient:
+        """获取 LM Studio 客户端。"""
+        if self._lmstudio is None:
+            self._lmstudio = LMStudioClient()
+        return self._lmstudio
+
+    def _resolve_backend(self) -> str:
+        """解析当前可用的后端，优先级：Local > LMStudio > mock。
+
+        Returns:
+            "local" | "lmstudio" | "mock"
+        """
+        # 1. 尝试本地 GGUF
+        local = self._get_local()
+        if local and local.is_available():
+            return "local"
+
+        # 2. 尝试 LM Studio
+        lmstudio = self._get_lmstudio()
+        if lmstudio.is_available():
+            return "lmstudio"
+
+        return "mock"
+
+    def is_available(self, force_recheck: bool = False) -> bool:
+        """检查是否有任何 LLM 后端可用（Local 或 LMStudio）。"""
+        backend = self._resolve_backend()
+        self._active_backend = backend
+        return backend != "mock"
+
+    def chat(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+    ) -> str:
+        """同步调用，自动选择后端。"""
+        backend = self._resolve_backend()
+        self._active_backend = backend
+
+        if backend == "local":
+            logger.info("[UnifiedLLM] 使用本地 GGUF 模型")
+            return self._local.generate(
+                prompt, system_prompt, temperature, max_tokens
+            )
+        elif backend == "lmstudio":
+            logger.info("[UnifiedLLM] 使用 LM Studio")
+            return self._get_lmstudio().chat(
+                prompt, system_prompt, temperature, max_tokens
+            )
+        else:
+            logger.info("[UnifiedLLM] 无可用 LLM 后端，返回 Mock")
+            return ""
+
+    async def chat_async(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+    ) -> str:
+        """异步调用，自动选择后端。"""
+        backend = self._resolve_backend()
+        self._active_backend = backend
+
+        if backend == "local":
+            logger.info("[UnifiedLLM] 使用本地 GGUF 模型（异步）")
+            return await self._local.generate_async(
+                prompt, system_prompt, temperature, max_tokens
+            )
+        elif backend == "lmstudio":
+            logger.info("[UnifiedLLM] 使用 LM Studio（异步）")
+            return await self._get_lmstudio().chat_async(
+                prompt, system_prompt, temperature, max_tokens
+            )
+        else:
+            logger.info("[UnifiedLLM] 无可用 LLM 后端，返回 Mock")
+            return ""
+
+    async def chat_stream(
+        self,
+        prompt: str,
+        system_prompt: str = "",
+        temperature: float = 0.7,
+        max_tokens: int = 2048,
+    ) -> AsyncGenerator[str, None]:
+        """流式调用，自动选择后端。"""
+        backend = self._resolve_backend()
+        self._active_backend = backend
+
+        if backend == "local":
+            logger.info("[UnifiedLLM] 使用本地 GGUF 模型（流式）")
+            async for chunk in self._local.generate_stream(
+                prompt, system_prompt, temperature, max_tokens
+            ):
+                yield chunk
+        elif backend == "lmstudio":
+            logger.info("[UnifiedLLM] 使用 LM Studio（流式）")
+            async for chunk in self._get_lmstudio().chat_stream(
+                prompt, system_prompt, temperature, max_tokens
+            ):
+                yield chunk
+        else:
+            logger.info("[UnifiedLLM] 无可用 LLM 后端，流式返回空")
+            return
+
+    def get_active_backend(self) -> str:
+        """返回当前激活的后端名称。"""
+        return self._active_backend
+
+    def get_status(self) -> dict:
+        """获取所有后端的状态信息。"""
+        local = self._get_local()
+        lmstudio = self._get_lmstudio()
+        return {
+            "active_backend": self._active_backend,
+            "local_llm": {
+                "available": local.is_available() if local else False,
+                "model": str(local._ensure_model()) if local else None,
+            },
+            "lmstudio": {
+                "available": lmstudio.is_available(),
+                "base_url": lmstudio.base_url,
+                "model": lmstudio.model,
+            },
+        }
+
+    def get_available_models(self) -> list[str]:
+        """获取当前后端可用模型列表（兼容旧接口）。"""
+        backend = self._resolve_backend()
+        if backend == "lmstudio":
+            return self._get_lmstudio().get_available_models()
+        elif backend == "local":
+            local = self._get_local()
+            if local and local.is_available():
+                return [str(local._ensure_model())]
+        return []
+
+    @property
+    def use_llm(self) -> bool:
+        """兼容旧接口：检查 USE_LLM 开关。"""
+        return os.getenv("USE_LLM", "false").lower() == "true"
+
+    @use_llm.setter
+    def use_llm(self, value: bool):
+        """兼容旧接口：设置 USE_LLM 开关。"""
+        os.environ["USE_LLM"] = "true" if value else "false"
+        # 重置 LM Studio 客户端的缓存
+        lmstudio = self._get_lmstudio()
+        lmstudio.use_llm = value
+        lmstudio._available = None
+
+    async def close(self):
+        """关闭所有后端连接。"""
+        lmstudio = self._get_lmstudio()
+        await lmstudio.close()
+
+
+# ---------------------------------------------------------------------------
 # 全局单例
-_lmstudio_client: Optional[LMStudioClient] = None
+# ---------------------------------------------------------------------------
+
+_unified_client: Optional[UnifiedLLMClient] = None
 
 
-def get_lmstudio_client() -> LMStudioClient:
-    """获取 LM Studio 客户端单例。"""
-    global _lmstudio_client
-    if _lmstudio_client is None:
-        _lmstudio_client = LMStudioClient()
-    return _lmstudio_client
+def get_lmstudio_client() -> UnifiedLLMClient:
+    """获取统一 LLM 客户端单例（向后兼容，Agent 无需修改）。
+
+    返回 UnifiedLLMClient，接口与 LMStudioClient 完全兼容，
+    自动回退：本地 GGUF → LM Studio → Mock。
+    """
+    global _unified_client
+    if _unified_client is None:
+        _unified_client = UnifiedLLMClient()
+    return _unified_client

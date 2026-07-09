@@ -84,12 +84,13 @@ async def clear_model_selection() -> dict[str, Any]:
 
 @router.get("/api/llm/status")
 async def llm_status() -> dict[str, Any]:
-    """查询 LM Studio 状态。"""
+    """查询 LLM 状态（Local / LM Studio / Mock）。"""
     client = get_lmstudio_client()
     return {
         "available": client.is_available(),
         "models": client.get_available_models(),
         "use_llm": client.use_llm,
+        "active_backend": client.get_active_backend(),
     }
 
 
@@ -98,12 +99,12 @@ async def llm_switch(req: LlmSwitchRequest) -> dict[str, Any]:
     """切换 USE_LLM 开关（不重启服务）。"""
     client = get_lmstudio_client()
     client.use_llm = req.use_llm
-    client._available = None
-    available = client.is_available()
+    available = client.is_available(force_recheck=True)
     logger.info(f"USE_LLM 已切换为 {req.use_llm}，available={available}")
     return {
         "use_llm": client.use_llm,
         "available": available,
+        "active_backend": client.get_active_backend(),
     }
 
 

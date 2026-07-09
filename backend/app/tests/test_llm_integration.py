@@ -14,12 +14,12 @@ import unittest
 from app.core.agents.requirement_parser_agent import RequirementParserAgent
 from app.core.llm import lmstudio_client as lmstudio_module
 from app.core.llm.json_parser import safe_parse_llm_json
-from app.core.llm.lmstudio_client import get_lmstudio_client
+from app.core.llm.lmstudio_client import get_unified_client
 
 
 def _reset_lmstudio_singleton() -> None:
     """重置 LM Studio 客户端单例（强制下次重新创建）。"""
-    lmstudio_module._lmstudio_client = None
+    lmstudio_module._unified_client = None
 
 
 class TestSafeParseJson(unittest.TestCase):
@@ -71,7 +71,7 @@ class TestAgentWithMock(unittest.TestCase):
 
     def test_agent_with_mock(self) -> None:
         """USE_LLM=false 时需求解析 Agent 使用 mock（正则提取）。"""
-        client = get_lmstudio_client()
+        client = get_unified_client()
         self.assertFalse(client.is_available())
 
         agent = RequirementParserAgent()
@@ -112,7 +112,7 @@ class TestAgentLlmUnavailable(unittest.TestCase):
 
     def test_agent_llm_unavailable(self) -> None:
         """LM Studio 不可达时 Agent 优雅降级为 mock。"""
-        client = get_lmstudio_client()
+        client = get_unified_client()
         # use_llm=true 但服务不可达
         self.assertTrue(client.use_llm)
         self.assertFalse(client.is_available())

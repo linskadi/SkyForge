@@ -34,7 +34,7 @@ def _reset_singletons() -> None:
     """重置 HIL / ModelRouter / LMStudio / StreamManager 单例。"""
     reset_hil_manager()
     reset_model_router()
-    lmstudio_module._lmstudio_client = None
+    lmstudio_module._unified_client = None
     # 重置 StreamManager 单例，避免测试间连接池污染
     import app.core.streaming.stream_manager as sm_module
 

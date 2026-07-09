@@ -1,5 +1,6 @@
 """应用配置模块，基于 pydantic-settings 管理环境变量和全局配置。"""
 
+import json
 from enum import Enum
 from pydantic import BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,17 +16,33 @@ class ApiType(str, Enum):
     ANTHROPIC = "anthropic"
 
 
-def parse_cors(value: str) -> list[str]:
-    """将 CORS 配置字符串解析为 URL 列表。
+def parse_cors(value: str | list) -> list[str]:
+    """将 CORS 配置解析为 URL 列表。
+
+    支持格式：
+    - "*" → ["*"]
+    - "url1,url2" → ["url1", "url2"]
+    - '["url1","url2"]' → ["url1", "url2"]
+    - ["url1", "url2"] → ["url1", "url2"]（已是列表）
 
     Args:
-        value: 逗号分隔的 URL 字符串，或 "*" 表示允许所有来源。
+        value: CORS 配置值。
 
     Returns:
         解析后的 URL 列表。
     """
+    if isinstance(value, list):
+        return value
     if value == "*":
         return ["*"]
+    # 尝试 JSON 数组解析
+    try:
+        parsed = json.loads(value)
+        if isinstance(parsed, list):
+            return parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    # 逗号分隔
     if "," in value:
         return [url.strip() for url in value.split(",")]
     return [value]
@@ -88,7 +105,6 @@ class Settings(BaseSettings):
     HIL_TIMEOUT: int = 300
 
     model_config = SettingsConfigDict(
-        env_file=(".env", ".env.dev"),
         env_file_encoding="utf-8",
         extra="allow",
     )
@@ -102,7 +118,9 @@ class Settings(BaseSettings):
         """
         env = env or os.getenv("ENV", "dev")
         env_file = f".env.{env.lower()}"
-        return cls(_env_file=env_file, _env_file_encoding="utf-8")  # type: ignore[call-arg]
+        return cls(_env_file=(".env", env_file), _env_file_encoding="utf-8")  # type: ignore[call-arg]
 
 
-settings = Settings()
+# 根据 ENV 环境变量加载对应配置文件
+_env = os.getenv("ENV", "dev")
+settings = Settings(_env_file=(".env", f".env.{_env}"), _env_file_encoding="utf-8")

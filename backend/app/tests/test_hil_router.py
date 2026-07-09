@@ -39,7 +39,7 @@ def _reset_singletons() -> None:
     """重置 HIL 和 ModelRouter 单例（强制下次重新创建）。"""
     reset_hil_manager()
     reset_model_router()
-    lmstudio_module._lmstudio_client = None
+    lmstudio_module._unified_client = None
 
 
 # --------------------------------------------------------------------------- #
