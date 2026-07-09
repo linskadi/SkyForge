@@ -110,6 +110,8 @@ class ContractGeneratorAgent:
             "filter": self._gen_filter_contract,
             "control": self._gen_control_contract,
             "comms": self._gen_comms_contract,
+            "navigation": self._gen_navigation_contract,
+            "power": self._gen_power_contract,
         }.get(req_type, self._gen_filter_contract)
         return generator(requirement_json)
 
@@ -305,4 +307,109 @@ composability:
   timing:
     wcet: 5ms
     period: 50ms
+"""
+
+    def _gen_navigation_contract(self, req: dict[str, Any]) -> str:
+        """导航处理类契约模板。"""
+        module = req.get("module_name", "navigation_module")
+        req_id = req.get("req_id", "REQ-001")
+        safety = req.get("safety_level", "DAL-A")
+        params = req.get("params", {})
+        update_rate = params.get("update_rate_hz", 10.0)
+        return f"""component: {module}
+version: 1.0.0
+safety_level: {safety}
+traceability: [{req_id}]
+
+interface:
+  inputs:
+    - name: gps_position
+      type: struct
+      range: [valid, invalid]
+    - name: ins_data
+      type: struct
+      range: [valid, invalid]
+  outputs:
+    - name: fused_position
+      type: struct
+      range: [valid, invalid]
+    - name: velocity
+      type: double[3]
+      range: [-500, 500]
+
+contracts:
+  preconditions:
+    - "gps_position != NULL"
+    - "ins_data != NULL"
+    - "update_rate == {update_rate}Hz"
+  postconditions:
+    - "fused_position == valid || fallback_mode == true"
+    - "abs(velocity[i]) < 500 for i in [0,1,2]"
+  invariants:
+    - "position_accuracy < 10m (GPS+INS fusion)"
+    - "velocity_accuracy < 0.5m/s"
+  fault_handling:
+    - "if gps_signal_lost > 2s: switch to INS-only mode"
+    - "if ins_drift > 100m: trigger fault alarm"
+
+composability:
+  depends_on: [gps_receiver, ins_sensor]
+  provides: [fused_position, velocity]
+  consumes: [gps_raw, ins_raw]
+  timing:
+    wcet: 5ms
+    period: 100ms
+"""
+
+    def _gen_power_contract(self, req: dict[str, Any]) -> str:
+        """电源管理类契约模板。"""
+        module = req.get("module_name", "power_manager")
+        req_id = req.get("req_id", "REQ-001")
+        safety = req.get("safety_level", "DAL-B")
+        params = req.get("params", {})
+        battery_capacity = params.get("battery_capacity_mah", 10000)
+        nominal_voltage = params.get("nominal_voltage_v", 28.0)
+        return f"""component: {module}
+version: 1.0.0
+safety_level: {safety}
+traceability: [{req_id}]
+
+interface:
+  inputs:
+    - name: battery_voltage
+      type: double
+      range: [0, 50]
+    - name: current_draw
+      type: double
+      range: [0, 100]
+  outputs:
+    - name: power_status
+      type: enum
+      range: [normal, low_battery, critical, fault]
+    - name: remaining_capacity
+      type: double
+      range: [0, {battery_capacity}]
+
+contracts:
+  preconditions:
+    - "battery_voltage >= 0"
+    - "current_draw >= 0"
+  postconditions:
+    - "power_status in [normal, low_battery, critical, fault]"
+    - "0 <= remaining_capacity <= {battery_capacity}"
+  invariants:
+    - "nominal_voltage == {nominal_voltage}V"
+    - "capacity_update_rate == 1Hz"
+  fault_handling:
+    - "if battery_voltage < {nominal_voltage * 0.8}: set power_status = low_battery"
+    - "if battery_voltage < {nominal_voltage * 0.7}: set power_status = critical"
+    - "if current_draw > 80: trigger overcurrent protection"
+
+composability:
+  depends_on: []
+  provides: [power_status, remaining_capacity]
+  consumes: [voltage_sense, current_sense]
+  timing:
+    wcet: 1ms
+    period: 1000ms
 """
