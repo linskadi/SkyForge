@@ -10,10 +10,12 @@ import type {
   SimulationResult,
   RepairIteration,
   GenerateResult,
-} from "@/services/mockApi";
+} from "@/types/domain";
 
-export const useGenerateStore = defineStore("generate", () => {
-  // ---- State ----
+export const useGenerateStore = defineStore(
+  "generate",
+  () => {
+    // ---- State ----
 
   /** 当前需求文本 */
   const requirement = ref("");
@@ -177,4 +179,9 @@ export const useGenerateStore = defineStore("generate", () => {
     setScadeFile,
     reset,
   };
+},
+{
+  persist: {
+    pick: ["requirement", "contract", "generatedCode"],
+  },
 });

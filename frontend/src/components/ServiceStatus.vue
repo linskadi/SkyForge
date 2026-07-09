@@ -1,6 +1,20 @@
 <template>
   <div class="flex items-center gap-2">
     <div
+      class="flex items-center gap-1 px-2 py-1 rounded-md text-xs"
+      :class="
+        apiMode === 'real'
+          ? 'bg-blue-100 text-blue-800'
+          : 'bg-amber-100 text-amber-800'
+      "
+    >
+      <div
+        class="w-2 h-2 rounded-full"
+        :class="apiMode === 'real' ? 'bg-blue-500' : 'bg-amber-500'"
+      ></div>
+      <span>{{ apiMode === "real" ? "Real API" : "Mock Mode" }}</span>
+    </div>
+    <div
       v-for="(service, key) in services"
       :key="key"
       class="flex items-center gap-1 px-2 py-1 rounded-md text-xs"
@@ -17,6 +31,7 @@
 
 <script setup lang="ts">
 import { getServiceStatus } from "@/services/taskApi";
+import { apiMode } from "@/services/api";
 import { useToast } from "@/components/ui/toast/use-toast";
 import { onMounted, onUnmounted, ref } from "vue";
 

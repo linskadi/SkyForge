@@ -1,6 +1,7 @@
 """SkyForge (天锻) 应用入口，配置 FastAPI 应用和中间件。"""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -12,6 +13,7 @@ from app.api.routes import reports as reports_router
 from app.api.routes import composition as composition_router
 from app.api.routes import hil as hil_router
 from app.api.routes import models as models_router
+from app.config.setting import settings
 from app.utils.log_util import logger
 from fastapi.staticfiles import StaticFiles
 from app.utils.cli import get_ascii_banner, center_cli_str
@@ -46,23 +48,27 @@ app.include_router(hil_router.router)
 app.include_router(models_router.router)
 
 
-# 跨域 CORS
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+
+# 跨域 CORS（从 settings 读取，支持多环境配置）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=settings.CORS_ALLOW_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],  # 暴露所有响应头
+    expose_headers=["*"],
 )
 
 app.mount(
-    "/static",  # 这是访问时的前缀
-    StaticFiles(directory="project/work_dir"),  # 这是本地文件夹路径
+    "/static",
+    StaticFiles(directory="project/work_dir"),
     name="static",
 )

@@ -1,20 +1,28 @@
-FROM node:20-alpine
+# ---- Stage 1: Build ----
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 复制依赖文件
-COPY package.json pnpm-lock.yaml ./
-
 # 安装 pnpm
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@10.6.3 --activate
 
-# 清理 npm 缓存并安装依赖
+# 复制依赖文件并安装
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# 复制源代码
+# 复制源代码并构建
 COPY . .
+RUN pnpm build
 
-EXPOSE 5173
+# ---- Stage 2: Production ----
+FROM nginx:alpine
 
-# 运行开发服务器
-CMD ["pnpm", "run", "dev", "--host"]
+# 复制构建产物
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# 复制 nginx 配置
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

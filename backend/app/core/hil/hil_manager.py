@@ -4,10 +4,11 @@
 在 Agent 流水线关键检查点（需求评审 / 契约评审 / 代码评审 / 最终评审）
 创建审批请求，等待人工通过 REST API 确认或拒绝，超时自动批准。
 
-MVP 实现：
-- 审批请求存储在内存（进程内字典），不依赖数据库
+实现：
+- 审批请求持久化到 Redis（支持多 worker 和进程重启恢复）
 - request_approval 通过 asyncio.Event 协程等待，超时自动放行
 - approve / reject 通过 API 触发，set 对应 Event 唤醒等待协程
+- Redis 不可用时自动降级为纯内存模式
 - HIL_ENABLED=false 时 request_approval 直接返回 approved=True（跳过）
 
 使用方式：
@@ -22,6 +23,7 @@ MVP 实现：
 """
 
 import asyncio
+import json
 import os
 import uuid
 from dataclasses import dataclass, field
@@ -38,6 +40,11 @@ VALID_CHECKPOINTS: set[str] = {
     "code_review",
     "final_review",
 }
+
+# Redis key 前缀
+REDIS_PENDING_PREFIX = "hil:pending:"
+REDIS_HISTORY_KEY = "hil:history"
+REDIS_RESOLVE_CHANNEL = "hil:resolve"
 
 
 @dataclass
@@ -72,6 +79,29 @@ class ApprovalRequest:
             d["result"] = self._result
         return d
 
+    def to_redis_dict(self) -> dict[str, str]:
+        """转换为 Redis hash 可存储的字典（所有值为字符串）。"""
+        return {
+            "request_id": self.request_id,
+            "checkpoint": self.checkpoint,
+            "content": self.content,
+            "timeout": str(self.timeout),
+            "created_at": self.created_at,
+            "status": self.status,
+        }
+
+    @classmethod
+    def from_redis_dict(cls, data: dict[str, str]) -> "ApprovalRequest":
+        """从 Redis hash 字典重建 ApprovalRequest（不含 Event）。"""
+        return cls(
+            request_id=data["request_id"],
+            checkpoint=data["checkpoint"],
+            content=data["content"],
+            timeout=int(data["timeout"]),
+            created_at=data["created_at"],
+            status=data.get("status", "pending"),
+        )
+
 
 @dataclass
 class ApprovalResult:
@@ -101,9 +131,15 @@ class ApprovalResult:
 class HILManager:
     """HIL 人机协作管理器。
 
-    维护进程内审批请求队列，提供异步等待 + 手动批准/拒绝接口。
+    支持 Redis 持久化（多 worker / 进程重启恢复），Redis 不可用时降级为纯内存。
     线程/协程安全：通过 asyncio.Event 协调等待方与触发方。
     """
+
+    # 类级别：Redis 连接状态（所有实例共享，避免重复连接尝试）
+    _redis_checked: bool = False
+    _redis_client = None
+    _redis_ok: bool = False
+    _redis_listener_task: Optional[asyncio.Task] = None
 
     def __init__(
         self,
@@ -119,7 +155,7 @@ class HILManager:
         self.enabled = (
             enabled
             if enabled is not None
-            else (os.getenv("HIL_ENABLED", "false").lower() == "true")
+            else (os.getenv("HIL_ENABLED", "true").lower() == "true")
         )
         self.default_timeout = default_timeout or int(os.getenv("HIL_TIMEOUT", "300"))
         # request_id → ApprovalRequest
@@ -128,6 +164,141 @@ class HILManager:
         self._history: list[ApprovalResult] = []
         # 锁保护内部字典操作
         self._lock = asyncio.Lock()
+
+    # ------------------------------------------------------------------ #
+    # Redis 初始化
+    # ------------------------------------------------------------------ #
+
+    async def _ensure_redis(self) -> bool:
+        """确保 Redis 连接可用，首次调用时初始化并加载持久化数据。"""
+        if HILManager._redis_checked:
+            return HILManager._redis_ok
+        HILManager._redis_checked = True
+
+        try:
+            from app.services.redis_manager import redis_manager
+
+            HILManager._redis_client = await asyncio.wait_for(
+                redis_manager.get_client(), timeout=0.5
+            )
+            HILManager._redis_ok = True
+            logger.info("HILManager:Redis 连接建立成功，启用持久化模式")
+
+            # 加载历史记录
+            await self._load_history_from_redis()
+
+            # 启动 Redis pub/sub 监听（跨 worker 审批通知）
+            if HILManager._redis_listener_task is None:
+                HILManager._redis_listener_task = asyncio.create_task(
+                    self._listen_resolve_events()
+                )
+
+            return True
+        except Exception as e:
+            logger.debug(f"HILManager:Redis 不可用，降级为纯内存模式: {e}")
+            HILManager._redis_ok = False
+            return False
+
+    async def _load_history_from_redis(self) -> None:
+        """从 Redis 加载历史记录。"""
+        if not HILManager._redis_ok or HILManager._redis_client is None:
+            return
+        try:
+            data = await HILManager._redis_client.get(REDIS_HISTORY_KEY)
+            if data:
+                items = json.loads(data)
+                self._history = [
+                    ApprovalResult(
+                        request_id=item["request_id"],
+                        checkpoint=item["checkpoint"],
+                        approved=item["approved"],
+                        comments=item.get("comments", ""),
+                        reviewer=item.get("reviewer", ""),
+                        timestamp=item.get("timestamp", ""),
+                        status=item.get("status", "approved"),
+                    )
+                    for item in items
+                ]
+                logger.info(f"HILManager:从 Redis 加载 {len(self._history)} 条历史记录")
+        except Exception as e:
+            logger.warning(f"HILManager:加载 Redis 历史记录失败: {e}")
+
+    async def _save_history_to_redis(self) -> None:
+        """将历史记录保存到 Redis。"""
+        if not HILManager._redis_ok or HILManager._redis_client is None:
+            return
+        try:
+            data = [r.to_dict() for r in self._history]
+            await HILManager._redis_client.set(REDIS_HISTORY_KEY, json.dumps(data, ensure_ascii=False))
+        except Exception as e:
+            logger.warning(f"HILManager:保存历史记录到 Redis 失败: {e}")
+
+    async def _save_pending_to_redis(self, request: ApprovalRequest) -> None:
+        """将待审批请求保存到 Redis。"""
+        if not HILManager._redis_ok or HILManager._redis_client is None:
+            return
+        try:
+            key = f"{REDIS_PENDING_PREFIX}{request.request_id}"
+            await HILManager._redis_client.hset(key, mapping=request.to_redis_dict())
+            await HILManager._redis_client.expire(key, request.timeout + 60)  # 比审批超时多 60s
+        except Exception as e:
+            logger.warning(f"HILManager:保存待审批请求到 Redis 失败: {e}")
+
+    async def _remove_pending_from_redis(self, request_id: str) -> None:
+        """从 Redis 移除待审批请求。"""
+        if not HILManager._redis_ok or HILManager._redis_client is None:
+            return
+        try:
+            key = f"{REDIS_PENDING_PREFIX}{request_id}"
+            await HILManager._redis_client.delete(key)
+        except Exception as e:
+            logger.warning(f"HILManager:从 Redis 移除待审批请求失败: {e}")
+
+    async def _publish_resolve(self, result: dict[str, Any]) -> None:
+        """发布审批结果到 Redis pub/sub（通知其他 worker 的等待协程）。"""
+        if not HILManager._redis_ok or HILManager._redis_client is None:
+            return
+        try:
+            await HILManager._redis_client.publish(
+                REDIS_RESOLVE_CHANNEL, json.dumps(result, ensure_ascii=False)
+            )
+        except Exception as e:
+            logger.warning(f"HILManager:发布审批结果失败: {e}")
+
+    async def _listen_resolve_events(self) -> None:
+        """后台监听 Redis pub/sub，接收其他 worker 的审批通知。"""
+        if not HILManager._redis_ok or HILManager._redis_client is None:
+            return
+        try:
+            pubsub = HILManager._redis_client.pubsub()
+            await pubsub.subscribe(REDIS_RESOLVE_CHANNEL)
+            logger.info("HILManager:已订阅 Redis 审批通知频道")
+
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+                try:
+                    result = json.loads(message["data"])
+                    request_id = result.get("request_id")
+                    if not request_id:
+                        continue
+
+                    async with self._lock:
+                        request = self._requests.get(request_id)
+                        if request and request.status == "pending":
+                            request._result = result
+                            request.status = result.get("status", "approved")
+                            request._event.set()
+                            logger.info(
+                                f"HILManager:通过 Redis 收到审批通知 {request_id} "
+                                f"status={request.status}"
+                            )
+                except Exception as e:
+                    logger.warning(f"HILManager:处理 Redis 审批通知失败: {e}")
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.warning(f"HILManager:Redis 监听异常: {e}")
 
     # ------------------------------------------------------------------ #
     # 公共 API
@@ -182,7 +353,10 @@ class HILManager:
                 "checkpoint": checkpoint,
             }
 
-        # 3. 创建审批请求
+        # 3. 确保 Redis 可用
+        await self._ensure_redis()
+
+        # 4. 创建审批请求
         timeout_value = timeout if timeout is not None else self.default_timeout
         request_id = f"HIL-{uuid.uuid4().hex[:8]}"
         request = ApprovalRequest(
@@ -195,12 +369,16 @@ class HILManager:
 
         async with self._lock:
             self._requests[request_id] = request
+
+        # 持久化到 Redis
+        await self._save_pending_to_redis(request)
+
         logger.info(
             f"HILManager:创建审批请求 {request_id} checkpoint={checkpoint} "
             f"timeout={timeout_value}s"
         )
 
-        # 4. 等待人工审批或超时
+        # 5. 等待人工审批或超时
         try:
             await asyncio.wait_for(request._event.wait(), timeout=timeout_value)
             # 被 approve / reject 唤醒
@@ -224,7 +402,7 @@ class HILManager:
                 "status": "timeout",
             }
 
-        # 5. 补全请求元信息 + 移到历史
+        # 6. 补全请求元信息 + 移到历史
         result["request_id"] = request_id
         result["checkpoint"] = checkpoint
         request.status = (
@@ -253,6 +431,10 @@ class HILManager:
             # 从 pending 列表移除，加入历史
             self._requests.pop(request_id, None)
             self._history.append(approval_result)
+
+        # 持久化：移除 Redis 中的 pending，保存历史
+        await self._remove_pending_from_redis(request_id)
+        await self._save_history_to_redis()
 
         return approval_result.to_dict()
 
@@ -376,6 +558,9 @@ class HILManager:
             request.status = status
             # 唤醒等待协程
             request._event.set()
+
+        # 发布到 Redis pub/sub（通知其他 worker）
+        await self._publish_resolve(result)
 
         logger.info(
             f"HILManager:审批 {request_id} 已{status} "

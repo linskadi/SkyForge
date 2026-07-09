@@ -17,6 +17,18 @@ export default defineConfig({
 			"@": path.resolve(__dirname, "./src"),
 		},
 	},
+	build: {
+		rollupOptions: {
+			output: {
+				manualChunks: {
+					monaco: ["monaco-editor"],
+					echarts: ["echarts", "vue-echarts"],
+					vendor: ["vue", "vue-router", "pinia"],
+				},
+			},
+		},
+		chunkSizeWarningLimit: 1000,
+	},
 	test: {
 		environment: "jsdom",
 		globals: true,

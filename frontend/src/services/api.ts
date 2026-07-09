@@ -10,6 +10,7 @@
  * 4. 网络错误时静默降级到 mockApi，保证前端可用性。
  */
 
+import { ref } from "vue";
 import type {
   GenerateResult,
   SimulationResult,
@@ -50,8 +51,11 @@ import {
 
 import { API_BASE_URL, getJSON, postJSON, request } from "./client";
 
+/** 当前 API 模式：real = 使用真实后端，mock = 降级到 mock 数据 */
+export const apiMode = ref<"real" | "mock">("real");
+
 /**
- * 调用真实后端 API；网络错误时静默降级到 mockApi
+ * 调用真实后端 API；网络错误时降级到 mockApi 并更新 apiMode 状态
  *
  * @param realCall 真实 API 调用函数（返回 Promise<T>）
  * @param fallback 出错时的 mock 兜底函数
@@ -63,9 +67,11 @@ async function withFallback<T>(
   label: string,
 ): Promise<T> {
   try {
-    return await realCall();
+    const result = await realCall();
+    apiMode.value = "real";
+    return result;
   } catch (err) {
-    // 静默降级：仅在控制台输出警告，不向用户抛错
+    apiMode.value = "mock";
     console.warn(`[api] ${label} 真实 API 调用失败，降级到 mock：`, err);
     return fallback();
   }
