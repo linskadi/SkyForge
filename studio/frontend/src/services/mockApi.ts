@@ -747,11 +747,11 @@ export function mockGetFaultTypes(): Promise<FaultType[]> {
 
 /** mock 生成报告（接受 pipelineResult 任意对象） */
 export function mockGenerateReportByPipeline(
-	pipelineResult: Record<string, unknown>,
+	pipelineResult: GenerateResult,
 ): Promise<ReportResult> {
 	console.log("[mockApi] 调用 mockGenerateReportByPipeline");
 	if (pipelineResult?.contract && pipelineResult.code) {
-		return mockGenerateReport(pipelineResult as unknown as GenerateResult);
+		return mockGenerateReport(pipelineResult);
 	}
 	return mockGenerateReport({
 		contract: MOCK_CONTRACT,
