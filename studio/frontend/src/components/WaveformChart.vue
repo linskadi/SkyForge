@@ -16,7 +16,8 @@ import { Download, RotateCcw, ZoomIn, ZoomOut } from "lucide-vue-next";
  * 替换原有纯 Canvas 实现，提供更丰富的交互
  */
 import { computed, ref } from "vue";
-import type VChart from "vue-echarts";
+// biome-ignore lint/style/useImportType: VChart 在 <script setup> 中作为 <v-chart> 组件运行时使用，Biome 静态分析无法识别模板绑定
+import VChart from "vue-echarts";
 
 use([
 	CanvasRenderer,
