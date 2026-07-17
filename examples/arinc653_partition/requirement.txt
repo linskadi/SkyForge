@@ -1,0 +1,118 @@
+================================================================================
+REQ-A653-001  ARINC 653 分区调度器 (Partition Scheduler)
+DAL 等级: DAL-A
+模块名称: arinc653_partition_scheduler
+标准依据: ARINC 653 Part 1 (Avionics Application Software Standard Interface)
+           DO-178C / MISRA-C:2012
+================================================================================
+
+【1. 系统上下文 (System Context)】
+本模块实现一个符合 ARINC 653 标准的分区调度器 (Partition Scheduler)，
+部署于综合模块化航电系统 (Integrated Modular Avionics, IMA) 核心操作系统之上。
+调度器负责在主时间帧 (Main Time Frame, MTF) 内按预定时间片 (Time Slice)
+切换分区 (Partition) 的执行上下文，确保空间隔离 (Spatial Partitioning) 与
+时间隔离 (Temporal Partitioning)。
+
+分区清单:
+  - Partition 1 (P1): Display         显示分区，负责 HUD/EFIS 画面生成
+  - Partition 2 (P2): Navigation      导航分区，负责航位推算与航路管理
+  - Partition 3 (P3): Health Monitoring 健康监控分区，负责系统级故障检测与降级
+
+【2. 功能需求 (Functional Requirements)】
+
+REQ-A653-FUNC-001  主时间帧调度 (Main Time Frame Scheduling)
+  - 系统主时间帧 MTF 周期为 200 ms（固定，不可在运行时修改）。
+  - 在一个 MTF 内部依次执行三个分区，时间片分配如下:
+      * P1 (Display):           50 ms
+      * P2 (Navigation):        80 ms
+      * P3 (Health Monitoring): 70 ms
+    总时间片 = 50 + 80 + 70 = 200 ms，与 MTF 严格相等。
+  - MTF 结束后立即开始下一帧，严格周期性 (Strictly Periodic)。
+
+REQ-A653-FUNC-002  分区上下文切换 (Partition Context Switch)
+  - 当一个分区时间片耗尽或主动让出 CPU 时，调度器在 ≤ 1 ms 内完成
+    上下文切换 (Context Switch)，包括:
+      * 保存当前分区的寄存器集合 (General Purpose Registers, SP, PC)
+      * 刷新 MMU/MPU 内存访问权限表
+      * 加载下一分区的上下文
+      * 调用分区入口函数 (Entry Point)
+  - 切换期间所有中断必须关闭 (Interrupt Disabled)，避免竞争条件。
+
+REQ-A653-FUNC-003  分区生命周期管理 (Partition Lifecycle)
+  - 每个分区具有 5 个状态: IDLE / RUNNABLE / RUNNING / BLOCKED / TERMINATED。
+  - 分区入口函数原型: void <entry_point>(void)。
+  - 分区不允许在时间片外执行；超时由调度器强制挂起。
+
+REQ-A653-FUNC-004  错误检测与健康监控 (Error Detection & Health Monitoring)
+  - 若某分区的实际执行时间超过其分配时间片，则视为 Partition Overrun。
+  - 检测到 Overrun 时，调度器立即:
+      1) 强制挂起当前分区
+      2) 触发 Partition_HM_Handler 处理函数
+      3) 记录故障日志 (Fault Log)，包含分区 ID、时间戳、超时量
+      4) 将分区状态置为 TERMINATED，本 MTF 内不再调度
+  - Partition_HM_Handler 应在 ≤ 500 μs 内完成，避免影响后续分区调度。
+
+REQ-A653-FUNC-005  分区间通信 (Inter-Partition Communication)
+  - 支持 ARINC 653 三类端口:
+      * Sampling Port  采样端口 (最新值覆盖)
+      * Queuing Port    队列端口 (FIFO 缓存)
+      * Blackboard      黑板 (共享只读)
+  - 跨分区数据传输必须通过端口，禁止直接内存共享。
+
+REQ-A653-FUNC-006  时序约束 (Timing Constraints)
+  - 严格周期性调度 (Strictly Periodic Scheduling)，无抖动 (Jitter ≤ 100 μs)。
+  - 禁止动态优先级调整，避免优先级反转 (Priority Inversion)。
+  - 分区内部任务调度由分区私有调度器管理，与全局 MTF 调度解耦。
+
+【3. 性能指标 (Performance Metrics)】
+  - MTF 周期: 200 ms ± 100 μs
+  - 上下文切换时间: ≤ 1 ms (典型值 300 μs)
+  - 调度抖动 (Jitter): ≤ 100 μs
+  - Partition_HM_Handler 响应时间: ≤ 500 μs
+  - CPU 利用率 (调度器自身): ≤ 2%
+  - 内存占用 (调度器 + 元数据): ≤ 8 KB
+
+【4. 安全约束 (Safety Constraints)】
+  - 分区之间的内存访问必须通过 MMU/MPU 强制隔离，违例触发 Fault。
+  - 任一分区故障不得影响其他分区的时序与功能 (Fault Containment)。
+  - 调度器必须 Fail-Safe: 检测到致命错误时进入 SAFE_STATE，
+    停止所有分区执行并触发硬件看门狗复位。
+  - 所有调度决策必须可追溯到配置表 (Configuration Table)，禁止运行时
+    动态修改调度参数。
+
+【5. 输入输出 (Inputs / Outputs)】
+  Inputs:
+    - partition_id     : uint8_t   分区标识 [1, 3]
+    - command          : uint8_t   控制命令 (0=CREATE, 1=START, 2=STOP,
+                                              3=HM_REPORT, 4=QUERY_STATE)
+    - mtf_tick         : uint32_t  系统时钟 tick (1 tick = 1 ms)
+
+  Outputs:
+    - partition_state  : uint8_t   当前调度分区状态
+    - result_code      : uint8_t   操作结果 (0=OK, 1=INVALID_PARAM,
+                                              2=NO_RESOURCE, 3=TIMEOUT)
+    - hm_handler_event : uint8_t   健康监控事件码 (0=NONE, 1=OVERRUN,
+                                                     2=STACK_FAULT, 3=FATAL)
+
+【6. MISRA-C:2012 约束 (MISRA-C Compliance)】
+  - Rule 8.4: 所有外部可见函数必须有原型声明 (在头文件中)。
+  - Rule 8.7: 模块内部函数与变量使用 static 修饰。
+  - Rule 17.7: 函数返回值必须被检查 (尤其是 HM 处理函数)。
+  - Rule 18.1: 指针访问不得越界 (分区配置表索引必须检查)。
+  - Rule 20.4: 禁止动态内存分配 (malloc/free/calloc/realloc)。
+  - Rule 21.3: 禁止使用 <stdlib.h> 中的内存管理函数。
+  - Dir 4.1:  所有运行时故障必须经过显式错误处理路径。
+  - Rule 7.4: 字符串字面量不得赋值给非 const 的 char*。
+
+【7. 验证目标 (Verification Objectives)】
+  - MC/DC 覆盖率 ≥ 100% (针对调度器决策分支)
+  - 模型检查 (Model Checking): 确认无死锁、无优先级反转
+  - 故障注入测试: 注入 Partition Overrun，验证 HM Handler 触发
+  - 时序分析 (WCET): 上下文切换最坏情况 ≤ 1 ms
+
+【8. 验收准则 (Acceptance Criteria)】
+  - 单元测试通过率: 100%
+  - MC/DC 覆盖率: ≥ 100% (DAL-A 要求)
+  - 形式化契约 (contract.yaml) 通过 z3_verifier 验证
+  - 生成的 C 代码通过 cppcheck + MISRA-C:2012 必要规则检查
+================================================================================

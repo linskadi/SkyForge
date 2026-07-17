@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skyforge-core"
+version = "0.4.0"
+description = "SkyForge Core — AI 驱动的机载软件轻量化开发工具（核心引擎）"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "SkyForge Team"}]
+requires-python = ">=3.12"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Aerospace",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Aeronautics",
+]
+
+# 核心依赖（最小 6 个包，~50MB）
+dependencies = [
+    "pyyaml>=6.0",
+    "numpy>=2.2.5",
+    "loguru>=0.7.3",
+    "pydantic>=2.10.6",
+    "pydantic-settings>=2.8.0",
+]
+
+# 可选依赖组
+[project.optional-dependencies]
+# LLM 增强（启用 --use-llm 时需要）
+llm = [
+    "httpx[socks]>=0.28.1",
+    "openai>=1.65.4",
+]
+
+# 报告生成增强（启用 HTML 报告时需要，否则用纯文本）
+report = [
+    "jinja2>=3.1",
+]
+
+# 全量（所有可选功能）
+full = [
+    "skyforge-core[llm,report]",
+]
+
+[project.scripts]
+skyforge = "skyforge_core.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]

@@ -11,20 +11,39 @@ echo " SkyForge (天锻) Development Server Launcher"
 echo "=============================================="
 echo ""
 
+# ====================== Kill Residual Processes (MUST run first) ======================
+echo "[0/5] Cleaning up residual processes..."
+# Kill any leftover uvicorn/python on port 8000
+for pid in $(netstat -ano 2>/dev/null | grep ':8000 ' | grep LISTENING | awk '{print $5}' | sort -u); do
+    taskkill //F //PID $pid 2>/dev/null && echo "  Killed process on port 8000 (PID $pid)" || true
+done
+# Kill lingering uvicorn.exe/python.exe
+taskkill //F //IM uvicorn.exe 2>/dev/null | grep -q "SUCCESS" && echo "  Killed uvicorn.exe" || true
+taskkill //F //IM python.exe 2>/dev/null | grep -q "SUCCESS" && echo "  Killed python.exe" || true
+# Kill any vite/node on common frontend ports
+for port in 5173 5174 5175; do
+    for pid in $(netstat -ano 2>/dev/null | grep ":$port " | grep LISTENING | awk '{print $5}' | sort -u); do
+        taskkill //F //PID $pid 2>/dev/null && echo "  Killed process on port $port (PID $pid)" || true
+    done
+done
+# Wait briefly for sockets to release
+sleep 0.5
+echo ""
+
 # ====================== Check Dependencies ======================
 echo "[1/5] Checking dependencies..."
 
-# Check Python (Git Bash on Windows may not have python in PATH, try py launcher)
+# Check Python (Git Bash on Windows may not have python in PATH)
+# uv can find python even if it's not in PATH, so try uv first
 PYTHON_CMD=""
-if command -v python3 &> /dev/null; then
+if command -v uv &> /dev/null; then
+    PYTHON_CMD="uv run python"
+elif command -v python3 &> /dev/null; then
     PYTHON_CMD="python3"
-elif command -v python &> /dev/null; then
-    PYTHON_CMD="python"
 elif command -v py &> /dev/null; then
     PYTHON_CMD="py -3"
-elif command -v uv &> /dev/null; then
-    # uv can find python even if it's not in PATH
-    PYTHON_CMD="uv run python"
+elif command -v python &> /dev/null; then
+    PYTHON_CMD="python"
 else
     echo "[ERROR] Python not found. Please install Python 3.12+"
     echo "  Windows: install from https://www.python.org/downloads/"
@@ -62,7 +81,7 @@ echo ""
 
 # ====================== Setup Backend ======================
 echo "[2/5] Setting up backend..."
-BACKEND_DIR="$ROOT/backend"
+BACKEND_DIR="$ROOT/src"
 
 # Create virtual environment if not exists
 if [ ! -d "$BACKEND_DIR/.venv" ]; then
@@ -78,40 +97,26 @@ cd "$BACKEND_DIR"
 if [ -f "uv.lock" ]; then
     uv sync
 else
-    ./.venv/Scripts/python.exe -m pip install -r requirements.txt 2>/dev/null || \
-    ./.venv/bin/python -m pip install -r requirements.txt 2>/dev/null || \
-    echo "  [WARN] No requirements.txt found, skipping"
+    ./.venv/Scripts/python.exe -m pip install -e . 2>/dev/null || \
+    ./.venv/bin/python -m pip install -e . 2>/dev/null || \
+    echo "  [WARN] pip install failed, skipping"
 fi
 cd "$ROOT"
 
 # Create work directory
-mkdir -p "$BACKEND_DIR/project/work_dir"
+mkdir -p "$ROOT/project/work_dir"
 echo "  Backend ready"
 echo ""
 
 # ====================== Setup Frontend ======================
 echo "[3/5] Setting up frontend..."
-FRONTEND_DIR="$ROOT/frontend"
+FRONTEND_DIR="$ROOT/studio/frontend"
 
 cd "$FRONTEND_DIR"
 echo "  Installing Node.js dependencies..."
 pnpm install
 cd "$ROOT"
 echo "  Frontend ready"
-echo ""
-
-# ====================== Kill Residual Processes ======================
-echo "[4/5] Cleaning up residual processes..."
-# Kill any leftover uvicorn/python backend processes on port 8000
-for pid in $(netstat -ano 2>/dev/null | grep ':8000 ' | grep LISTENING | awk '{print $5}' | sort -u); do
-    taskkill //F //PID $pid 2>/dev/null && echo "  Killed residual process on port 8000 (PID $pid)" || true
-done
-# Kill any leftover vite/node frontend processes on common ports
-for port in 5173 5174 5175; do
-    for pid in $(netstat -ano 2>/dev/null | grep ":$port " | grep LISTENING | awk '{print $5}' | sort -u); do
-        taskkill //F //PID $pid 2>/dev/null && echo "  Killed residual process on port $port (PID $pid)" || true
-    done
-done
 echo ""
 
 # ====================== Start Redis (Optional) ======================
@@ -128,13 +133,15 @@ echo ""
 echo "[5/5] Starting backend and frontend..."
 
 # Get Python path based on OS
-if [ -f "$BACKEND_DIR/.venv/Scripts/python.exe" ]; then
-    VENV_PYTHON="$BACKEND_DIR/.venv/Scripts/python.exe"
+if [ -f "$ROOT/.venv/Scripts/python.exe" ]; then
+    VENV_PYTHON="$ROOT/.venv/Scripts/python.exe"
 else
-    VENV_PYTHON="$BACKEND_DIR/.venv/bin/python"
+    VENV_PYTHON="$ROOT/.venv/bin/python"
 fi
 
-(cd "$BACKEND_DIR" && ENV=DEV UVICORN_RELOAD_EXCLUDE="\.venv|node_modules|__pycache__|\.ruff_cache" "$VENV_PYTHON" -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 60 --ws-ping-timeout 120 --reload) &
+# PYTHONPATH: src/ → skyforge_engine/llm/core, studio/ → app/
+export PYTHONPATH="$ROOT/src:$ROOT/studio:$PYTHONPATH"
+(cd "$ROOT" && ENV=DEV UVICORN_RELOAD_EXCLUDE="\.venv|node_modules|__pycache__|\.ruff_cache" "$VENV_PYTHON" -m uvicorn studio.app.main:app --host 0.0.0.0 --port 8000 --ws-ping-interval 60 --ws-ping-timeout 120 --reload) &
 echo "  [OK] Backend started on http://localhost:8000"
 
 # Start frontend

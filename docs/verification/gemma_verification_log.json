@@ -1,0 +1,65 @@
+{
+  "start_time": "2026-07-17T18:17:30.393211",
+  "end_time": "2026-07-17T18:28:16.814149",
+  "model": "google/gemma-4-e4b",
+  "agents": {
+    "REQ-Parser": {
+      "status": "LLM",
+      "time_seconds": 41.7
+    },
+    "CON-Gen": {
+      "status": "LLM",
+      "time_seconds": 62.6
+    },
+    "CODE-Gen": {
+      "status": "LLM",
+      "time_seconds": 103.8
+    },
+    "Cppcheck": {
+      "status": "REAL_TOOL",
+      "time_seconds": 0.7,
+      "violations_count": 11
+    },
+    "REPAIR": {
+      "status": "LLM",
+      "time_seconds": 437.6,
+      "violations_before": 11,
+      "actions": 6
+    },
+    "Simulation": {
+      "status": "SUCCESS",
+      "time_seconds": 0.1,
+      "passed": true
+    },
+    "Report": {
+      "status": "SUCCESS",
+      "time_seconds": 0.0,
+      "html_length": 17115
+    }
+  },
+  "outputs": {
+    "requirement": {
+      "req_id": "REQ-001",
+      "desc": "实现一个低通滤波器，截止频率10Hz，符合MISRA-C标准与DAL-A级别要求",
+      "type": "filter",
+      "module_name": "lowpass_filter_10hz",
+      "safety_level": "DAL-A",
+      "params": {
+        "cutoff_hz": 10.0,
+        "sample_rate_hz": 100.0
+      },
+      "constraints": [
+        "MISRA-C 标准合规",
+        "WCET <= T_deterministic",
+        "禁止动态内存分配",
+        "WCET <= 1ms",
+        "禁止动态内存（MISRA Rule-21.3）",
+        "采样率固定 100.0Hz"
+      ]
+    },
+    "contract": "component: lowpass_filter_10hz\nversion: 1.0.0\nsafety_level: DAL-A\ntraceability: [REQ-001]\ninterface:\n  inputs:\n    - name: raw_input\n      type: double\n      range: [-20000, 20000]\n    - name: sample_rate\n      type: double\n      range: [99.0, 101.0] # Must be near 100Hz\n  outputs:\n    - name: filtered_output\n      type: double\ncontracts:\n  preconditions:\n    - \"raw_input != NULL\"\n    - \"sample_rate == 100.0\"\n    - \"filtered_output_state_valid()\" # Check previous state validity\n  postconditions:\n    - \"filtered_output >= -20000 && filtered_output <= 20000\"\n    - \"filter_coefficients_are_stable()\" # Internal check for coefficient integrity\n  invariants:\n    - \"sample_rate == 100.0\"\n    - \"internal_state_variable >= -20000 && internal_state_variable <= 20000\"\n  fault_handling:\n    - \"if (isnan(raw_input) || raw_input > 20000 || raw_input < -20000): set fault_detected = true; filtered_output = last_valid_output;\"",
+    "code": "/* [REQ-001] [MISRA-Rule-8.13] 低通滤波器模块实现 */\n#include <math.h>\n#include <stdbool.h>\n\n// 定义常量，确保所有关键参数固定且可追溯\n#define FILTER_CUTOFF_HZ 10.0 /* [REQ-001] [MISRA-Rule-20.1] */\n#define SAMPLE_RATE_HZ 100.0  /* [REQ-001] [MISRA-Rule-20.1] */\n\n// 计算滤波器系数 (一阶IIR LPF)\n// omega_c = 2 * pi * f_c / f_s\n// alpha = 1 - exp(-2 * PI * fc / fs)  (Approximation for simple filter)\n// For a first-order IIR: y[n] = (alpha * x[n]) + ((1 - alpha) * y[n-1])\nstatic double calculate_coefficient() { /* [REQ-001] [MISRA-Rule-25.1] */ }\n\n/* 滤波器状态结构体，用于维护内部状态和系数 */\ntypedef struct {\n    double last_output;  /* [REQ-001] [MISRA-Rule-8.9] 存储 y[n-1] */\n    double alpha;        /* [REQ-001] [MISRA-Rule-8.9] LPF 系数 a */\n} lowpass_filter_state_t;\n\n// 全局/静态状态变量，模拟硬件寄存器或持久化内存\nstatic lowpass_filter_state_t s_filter_state = { /* [REQ-001] [MISRA-Rule-8.9] */ };\n\n/* 模块初始化函数 */\nvoid lowpass_filter_init(void) { /* [REQ-001] [MISRA-Rule-15.7] */\n    // 初始化系数和状态，确保WCET可分析性\n    s_filter_state.alpha = calculate_coefficient(); /* [REQ-001] [MISRA-Rule-25.1] */\n    s_filter_state.last_output = 0.0;               /* [REQ-001] [MISRA-Rule-8.9] */\n}\n\n/**\n * @brief 应用低通滤波器进行信号处理。\n * @param raw_input 输入原始数据。\n * @param sample_rate 当前采样率（应为 100.0 Hz）。\n * @return 滤波后的输出值。\n */\ndouble lowpass_filter_apply(double raw_input, double sample_rate) { /* [REQ-001] [MISRA-Rule-15.7] */\n    double filtered_output; /* [REQ-001] [MISRA-Rule-8.9] */\n\n    // 1. 契约检查 (Precondition/Invariant Check)\n    if (sample_rate != SAMPLE_RATE_HZ) { /* [REQ-001] [MISRA-Rule-15.7] */\n        /* 如果采样率不匹配，返回上次有效输出并标记错误状态（简化处理）*/\n        return s_filter_state.last_output; /* [REQ-001] [MISRA-Rule-15.7] */\n    }\n\n    // 2. 输入范围和有效性检查 (Fault Handling)\n    if (isnan(raw_input) || raw_input > 20000.0 || raw_input < -20000.0) { /* [REQ-001] [MISRA-Rule-15.7] */\n        /* 发生故障，返回上次有效输出 */\n        return s_filter_state.last_output; /* [REQ-001] [MISRA-Rule-15.7] */\n    }\n\n    // 3. LPF 计算 (一阶 IIR)\n    // y[n] = alpha * x[n] + (1 - alpha) * y[n-1]\n    filtered_output = s_filter_state.alpha * raw_input + ((1.0 - s_filter_state.alpha) * s_filter_state.last_output); /* [REQ-001] [MISRA-Rule-25.1] */\n\n    // 4. 更新状态\n    s_filter_state.last_output = filtered_output; /* [REQ-001] [MISRA-Rule-8.9] */\n\n    return filtered_output; /* [REQ-001] [MISRA-Rule-15.7] */\n}\n\n/**\n * @brief 计算 LPF 的系数 alpha。\n * 采用一阶 IIR 滤波器，alpha = exp(-2 * PI * fc / fs)。\n * 此函数应在初始化时调用一次。\n */\nstatic double calculate_coefficient() { /* [REQ-001] [MISRA-Rule-15.7] */\n    /* 计算参数: -2 * PI * 10.0 / 100.0 = -PI/5 */\n    double exponent = -(M_PI * FILTER_CUTOFF_HZ) / SAMPLE_RATE_HZ; /* [REQ-001] [MISRA-Rule-25.1] */\n    return exp(exponent); /* [REQ-001] [MISRA-Rule-25.1] */\n}\n\n/* 模块结束 */",
+    "repaired_code": "/* ===== [REQ-001] MISRA-C 自动修复总览 =====\n * 共 6 处修复：\n *   L13 [MISRA-C:2012-8.4] Added forward declaration for 'calculate_coefficient' to ensure visibility before use in lowpass_filter_init.\n *   L34 [MISRA-C:2012-15.7] Refactored function 'lowpass_filter_apply' to ensure a single exit point by using conditional logic and local variable assignment (Addressing L13 [missingReturn] and multiple return paths).\n *   L47 [MISRA-C:2012-12.1] Explicitly grouped boolean comparisons using parentheses to clarify operator precedence (Fixing L47 violation).\n *   L34 [MISRA-C:2012-15.5] Refactored function 'lowpass_filter_apply' to ensure a single exit point by using conditional logic and local variable assignment (Addressing L43 violation).\n *   L34 [MISRA-C:2012-15.7] Refactored function 'lowpass_filter_apply' to ensure a single exit point by using conditional logic and local variable assignment (Addressing L49 violation).\n *   L54 [MISRA-C:2012-12.1] Explicitly grouped the arithmetic expression terms using parentheses to clarify operator precedence (Fixing L54 violation).\n */\n\n/* [REQ-001] [MISRA-Rule-8.13] 低通滤波器模块实现 */\n#include <math.h>\n#include <stdbool.h>\n\n// 定义常量，确保所有关键参数固定且可追溯\n#define FILTER_CUTOFF_HZ 10.0 /* [REQ-001] [MISRA-Rule-20.1] */\n#define SAMPLE_RATE_HZ 100.0  /* [REQ-001] [MISRA-Rule-20.1] */\n\n// 计算滤波器系数 (一阶IIR LPF)\n// omega_c = 2 * pi * f_c / f_s\n// alpha = 1 - exp(-2 * PI * fc / fs)  (Approximation for simple filter)\n// For a first-order IIR: y[n] = (alpha * x[n]) + ((1 - alpha) * y[n-1])\nstatic double calculate_coefficient(); /* [REQ-001] [MISRA-Rule-8.4] Forward declaration to ensure visibility */\n\n/* 滤波器状态结构体，用于维护内部状态和系数 */\ntypedef struct {\n    double last_output;  /* [REQ-001] [MISRA-Rule-8.9] 存储 y[n-1] */\n    double alpha;        /* [REQ-001] [MISRA-Rule-8.9] LPF 系数 a */\n} lowpass_filter_state_t;\n\n// 全局/静态状态变量，模拟硬件寄存器或持久化内存\nstatic lowpass_filter_state_t s_filter_state = { /* [REQ-001] [MISRA-Rule-8.9] */ };\n\n/* 模块初始化函数 */\nvoid lowpass_filter_init(void) {\n    // 初始化系数和状态，确保WCET可分析性\n    s_filter_state.alpha = calculate_coefficient(); /* [REQ-001] [MISRA-Rule-25.1] */\n    s_filter_state.last_output = 0.0;               /* [REQ-001] [MISRA-Rule-8.9] */\n}\n\n/**\n * @brief 应用低通滤波器进行信号处理。\n * @param raw_input 输入原始数据。\n * @param sample_rate 当前采样率（应为 100.0 Hz）。\n * @return 滤波后的输出值。\n */\ndouble lowpass_filter_apply(double raw_input, double sample_rate) {\n    double filtered_output = 0.0; /* [REQ-001] [MISRA-Rule-8.9] */\n    double result;\n    bool is_valid_data = true;\n\n    // 1. 契约检查 (Precondition/Invariant Check)\n    if (sample_rate != SAMPLE_RATE_HZ) { /* [REQ-001] [MISRA-Rule-15.7] */\n        /* 如果采样率不匹配，返回上次有效输出并标记错误状态（简化处理）*/\n        result = s_filter_state.last_output; /* [REQ-001] [MISRA-Rule-15.7] */\n        is_valid_data = false;\n    }\n\n    // 2. 输入范围和有效性检查 (Fault Handling)\n    if (is_valid_data && (isnan(raw_input) || ((raw_input > 20000.0) || (raw_input < -20000.0)))) { /* [REQ-001] [MISRA-Rule-15.7] */\n        /* 发生故障，返回上次有效输出 */\n        result = s_filter_state.last_output; /* [REQ-001] [MISRA-Rule-15.7] */\n        is_valid_data = false;\n    }\n\n    // 3. LPF 计算 (一阶 IIR)\n    if (is_valid_data) {\n        /* y[n] = alpha * x[n] + (1 - alpha) * y[n-1] */\n        filtered_output = ((s_filter_state.alpha * raw_input) + (((1.0 - s_filter_state.alpha) * s_filter_state.last_output))); /* [REQ-001] [MISRA-Rule-25.1] */\n\n        // 4. 更新状态\n        s_filter_state.last_output = filtered_output; /* [REQ-001] [MISRA-Rule-8.9] */\n        result = filtered_output;\n    }\n\n    return result; /* [REQ-001] [MISRA-Rule-15.7] */\n}\n\n/**\n * @brief 计算 LPF 的系数 alpha。\n * 采用一阶 IIR 滤波器，alpha = exp(-2 * PI * fc / fs)。\n * 此函数应在初始化时调用一次。\n */\nstatic double calculate_coefficient() {\n    /* 计算参数: -2 * PI * 10.0 / 100.0 = -PI/5 */\n    double exponent = -(M_PI * FILTER_CUTOFF_HZ) / SAMPLE_RATE_HZ; /* [REQ-001] [MISRA-Rule-25.1] */\n    return exp(exponent); /* [REQ-001] [MISRA-Rule-25.1] */\n}\n\n/* 模块结束 */"
+  },
+  "errors": []
+}

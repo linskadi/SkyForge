@@ -1,0 +1,141 @@
+================================================================================
+REQ-FRTOS-001  FreeRTOS 任务调度器 (Task Scheduler)
+DAL 等级: DAL-B
+模块名称: freertos_task_scheduler
+标准依据: FreeRTOS V10.x / DO-178C DAL-B / MISRA-C:2012
+================================================================================
+
+【1. 系统上下文 (System Context)】
+本模块基于 FreeRTOS 实时操作系统实现多任务飞行控制系统 (Flight Control System)
+的任务调度与同步。系统运行于 ARM Cortex-M4 MCU 之上，使用 FreeRTOS 抢占式
+调度器 (Preemptive Scheduler)，支持优先级继承 (Priority Inheritance)、
+队列通信 (Queue Communication)、看门狗监控 (Watchdog) 与 CPU 利用率监控。
+
+任务清单 (Task List):
+  - Sensor_Reader     传感器采集任务，周期读取 IMU/ADC 数据
+  - Control_Law       控制律计算任务，执行 PID/姿态控制算法
+  - Telemetry_Output  遥测输出任务，通过 UART/CAN 上报数据
+
+数据流 (Data Flow):
+  Sensor_Reader  --[Queue: sensor_data]-->  Control_Law
+  Control_Law    --[Queue: control_cmd]-->  Telemetry_Output
+
+【2. 功能需求 (Functional Requirements)】
+
+REQ-FRTOS-FUNC-001  核心任务配置 (Core Task Configuration)
+  系统包含 3 个核心周期任务:
+
+  | 任务名             | 优先级 | 周期   | 执行预算 | 栈大小 |
+  |:------------------|:------:|:------:|:--------:|:------:|
+  | Sensor_Reader     | 5      | 10 ms  | 2 ms     | 1024   |
+  | Control_Law       | 4      | 20 ms  | 5 ms     | 2048   |
+  | Telemetry_Output  | 3      | 100 ms | 10 ms    | 1024   |
+
+  说明:
+  - 优先级数值越大优先级越高 (FreeRTOS约定)。
+  - 周期 (Period): 任务两次激活之间的标称时间间隔。
+  - 执行预算 (Budget): 任务单次执行的最大允许时间 (WCET 估计)。
+  - 栈大小单位: 字 (Word, 4 bytes on ARM Cortex-M)。
+  - 执行预算必须 ≤ 周期 (Budget <= Period)。
+
+REQ-FRTOS-FUNC-002  队列通信 (Queue Communication)
+  - Sensor_Reader 通过 xQueueSend() 将传感器数据 (SensorData_t) 发送到
+    sensor_data 队列 (长度 10)，Control_Law 通过 xQueueReceive() 接收。
+  - Control_Law 通过 xQueueSend() 将控制指令 (ControlCmd_t) 发送到
+    control_cmd 队列 (长度 10)，Telemetry_Output 通过 xQueueReceive() 接收。
+  - 队列发送超时 0 ms (非阻塞)，若队列满则丢弃数据并记录统计计数。
+  - 队列接收超时 = 任务周期，超时则使用上一拍缓存值 (Hold Last Value)。
+
+REQ-FRTOS-FUNC-003  看门狗监控 (Watchdog Monitoring)
+  - 每个任务在每次执行结束时通过 vTaskDelay() 主动让出 CPU。
+  - 系统配置独立看门狗任务 (Watchdog Task, 优先级 7)，
+    周期 50 ms 检查各任务是否在 (周期 + 预算) 时间内完成执行。
+  - 若任务超时未完成 (Overrun)，看门狗任务:
+      1) 触发 watchdog_reset 回调函数
+      2) 记录故障日志 (任务名、超时量、时间戳)
+      3) 重启超时任务 (xTaskNotifyGive + 任务复位)
+  - 硬件看门狗超时 500 ms 触发系统复位 (Last Resort)。
+
+REQ-FRTOS-FUNC-004  优先级继承 (Priority Inheritance)
+  - 共享资源 (Shared Resource) 必须使用 FreeRTOS 互斥量 (Mutex) 保护，
+    互斥量创建时启用优先级继承选项 (xSemaphoreCreateMutex())。
+  - 防止优先级反转 (Priority Inversion):
+      * 低优先级任务持有 Mutex 时，被提升至等待该 Mutex 的最高优先级任务的优先级
+      * 优先级提升自动完成，应用代码无感知
+  - Mutex 持有时间 ≤ 100 μs (避免长时间阻塞高优先级任务)。
+  - 禁止在中断服务程序 (ISR) 中使用 Mutex (只能用 Binary Semaphore)。
+
+REQ-FRTOS-FUNC-005  CPU 利用率监控 (CPU Utilization Monitoring)
+  - 系统配置 idle task hook (vApplicationIdleHook)，统计空闲任务运行时间。
+  - CPU 利用率 = 1 - (idle_time / total_time)，每 1 秒采样一次。
+  - CPU 利用率阈值:
+      * 70% 以下: 正常 (NORMAL)
+      * 70% - 85%: 警告 (WARNING)，记录日志
+      * 85% 以上: 告警 (ALARM)，触发 cpu_load_alarm 回调
+  - ALARM 状态下系统应降级运行 (如降低 Telemetry_Output 频率)。
+
+REQ-FRTOS-FUNC-006  时序约束 (Timing Constraints)
+  - 任务调度抖动 (Jitter) ≤ 200 μs。
+  - 高优先级任务响应延迟 ≤ 100 μs (从就绪到运行)。
+  - 中断延迟 (Interrupt Latency) ≤ 50 μs。
+  - 任务切换时间 (Context Switch) ≤ 10 μs (FreeRTOS 优化配置)。
+  - 队列操作 (Send/Receive) ≤ 20 μs。
+
+【3. 性能指标 (Performance Metrics)】
+  - 系统 tick 频率: 1000 Hz (1 tick = 1 ms)
+  - 任务调度抖动: ≤ 200 μs
+  - 上下文切换时间: ≤ 10 μs
+  - 看门狗任务响应延迟: ≤ 50 ms
+  - CPU 利用率采样周期: 1 s
+  - 内存占用 (任务栈 + 队列 + TCB): ≤ 32 KB
+
+【4. 安全约束 (Safety Constraints)】
+  - 所有任务栈必须静态分配 (configSUPPORT_STATIC_ALLOCATION = 1)，
+    禁止动态内存分配 (configSUPPORT_DYNAMIC_ALLOCATION = 0)。
+  - 任务栈溢出检测: configCHECK_FOR_STACK_OVERFLOW = 2
+    (Method 2: 指针比较 + 哨兵字节检测)。
+  - 任一任务超时不得影响其他任务的执行 (Fault Isolation)。
+  - 看门狗任务自身必须具有最高优先级 (7)，且栈大小充足 (≥ 512 字)。
+  - 系统启动顺序: 队列创建 → Mutex 创建 → 任务创建 → 调度器启动。
+
+【5. 输入输出 (Inputs / Outputs)】
+  Inputs:
+    - task_name        : string    任务名称 (Sensor_Reader / Control_Law / Telemetry_Output)
+    - command          : uint8_t   控制命令 (0=CREATE, 1=DELETE, 2=SUSPEND,
+                                              3=RESUME, 4=QUERY_STATE, 5=WD_RESET)
+    - priority         : uint8_t   任务优先级 (0..7)
+    - period_ms        : uint32_t  任务周期 (ms)
+    - budget_ms        : uint32_t  执行预算 (ms)
+
+  Outputs:
+    - task_state       : uint8_t   任务状态 (0=DELETED, 1=READY, 2=RUNNING,
+                                                  3=BLOCKED, 4=SUSPENDED)
+    - result_code      : uint8_t   操作结果 (0=OK, 1=NO_RESOURCE, 2=TIMEOUT,
+                                                  3=INVALID_PARAM)
+    - cpu_load_percent : uint8_t   CPU 利用率 (0..100%)
+    - watchdog_event   : uint8_t   看门狗事件 (0=NONE, 1=OVERRUN, 2=RESET,
+                                                 3=ALARM)
+
+【6. MISRA-C:2012 约束 (MISRA-C Compliance)】
+  - Rule 8.4: 外部函数原型声明。
+  - Rule 8.7: 模块内部函数/变量使用 static。
+  - Rule 17.7: 函数返回值必须被检查 (xQueueSend/xSemaphoreTake 等)。
+  - Rule 18.1: 数组索引不得越界。
+  - Rule 20.4: 禁止动态内存分配 (使用静态分配版本 FreeRTOS API)。
+  - Rule 21.3: 禁止 <stdlib.h> 内存管理函数。
+  - Dir 4.1:  所有运行时故障显式处理。
+  - Rule 11.5: 避免从 void* 到其他类型的强制转换 (FreeRTOS API 例外需文档化)。
+
+【7. 验证目标 (Verification Objectives)】
+  - MC/DC 覆盖率 ≥ 100% (针对任务调度决策分支)
+  - 形式化验证: 优先级反转场景不可能发生 (使用优先级继承)
+  - 故障注入测试: 注入任务超时，验证 watchdog_reset 触发
+  - 压力测试: CPU 利用率注入到 90%，验证 ALARM 触发与降级运行
+
+【8. 验收准则 (Acceptance Criteria)】
+  - 单元测试通过率: 100%
+  - MC/DC 覆盖率: ≥ 100% (DAL-B 要求)
+  - 形式化契约 (contract.yaml) 通过 z3_verifier 验证
+  - 生成的 C 代码通过 cppcheck + MISRA-C:2012 必要规则检查
+  - 任务调度抖动实测 ≤ 200 μs
+================================================================================

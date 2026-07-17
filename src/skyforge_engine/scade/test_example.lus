@@ -1,0 +1,30 @@
+(* 示例 Lustre 文件 *)
+(* 测试新解析器的功能 *)
+
+node TestNode(
+    input1: real;
+    input2: int;
+    input3: bool
+) returns (
+    output1: real;
+    output2: int;
+    output3: bool
+)
+var
+    temp1: real;
+    temp2: int;
+    temp3: bool;
+    arr: array[5] of real;
+    record: struct { x: real; y: real }
+let
+    temp1 = input1 + 1.0;
+    temp2 = input2 * 2;
+    temp3 = not input3;
+    arr[0] = input1;
+    record.x = input1;
+    record.y = input2;
+    output1 = if input3 then temp1 else 0.0;
+    output2 = temp2 + 1;
+    output3 = temp3 or input3;
+    assert output1 >= 0.0;
+tel

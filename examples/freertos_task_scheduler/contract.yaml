@@ -1,0 +1,148 @@
+# FreeRTOS 任务调度器形式化契约
+# 符合 SkyForge 契约规范 (component / interface / preconditions / postconditions / invariants / fault_handling)
+# 标准依据: FreeRTOS V10.x, DO-178C DAL-B, MISRA-C:2012
+component: FreeRTOSTaskScheduler
+version: "1.0.0"
+description: >-
+  FreeRTOS 任务调度器，管理 3 个核心飞行控制任务 (Sensor_Reader / Control_Law /
+  Telemetry_Output)，支持队列通信、看门狗监控、优先级继承与 CPU 利用率告警，
+  符合 DO-178C DAL-B 与 MISRA-C:2012 规范。
+safety_level: DAL-B
+assumptions:
+  - "FreeRTOS 配置 configSUPPORT_STATIC_ALLOCATION=1, configSUPPORT_DYNAMIC_ALLOCATION=0"
+  - "系统 tick 频率 1 kHz (1 tick = 1 ms)"
+  - "硬件看门狗已启用，超时 500 ms 触发系统复位"
+  - "所有任务栈静态分配，启动后不再创建/删除任务"
+  - "ARM Cortex-M4 平台，4 字节对齐"
+
+interface:
+  inputs:
+    - name: task_name
+      type: string
+      description: "任务名: Sensor_Reader / Control_Law / Telemetry_Output"
+    - name: command
+      type: uint8_t
+      range: [0, 5]
+      description: "控制命令: 0=CREATE, 1=DELETE, 2=SUSPEND, 3=RESUME, 4=QUERY_STATE, 5=WD_RESET"
+    - name: priority
+      type: uint8_t
+      range: [0, 7]
+      description: "任务优先级 (0=最低, 7=最高; 数值越大优先级越高)"
+    - name: period_ms
+      type: uint32_t
+      range: [1, 1000]
+      unit: ms
+      description: "任务周期 (1..1000 ms)"
+    - name: budget_ms
+      type: uint32_t
+      range: [1, 100]
+      unit: ms
+      description: "任务执行预算 (单次最大执行时间)"
+
+  outputs:
+    - name: task_state
+      type: uint8_t
+      range: [0, 4]
+      description: "任务状态: 0=DELETED, 1=READY, 2=RUNNING, 3=BLOCKED, 4=SUSPENDED"
+    - name: result_code
+      type: uint8_t
+      range: [0, 3]
+      description: "操作结果: 0=OK, 1=NO_RESOURCE, 2=TIMEOUT, 3=INVALID_PARAM"
+    - name: cpu_load_percent
+      type: uint8_t
+      range: [0, 100]
+      unit: percent
+      description: "CPU 利用率 (0..100%)"
+    - name: watchdog_event
+      type: uint8_t
+      range: [0, 3]
+      description: "看门狗事件: 0=NONE, 1=OVERRUN, 2=RESET, 3=ALARM"
+
+preconditions:
+  - id: CON-FRTOS-PRE-000
+    expression: "priority >= 0 && priority <= 7"
+    description: "任务优先级必须在 [0, 7] 范围内 (FreeRTOS 8 级优先级)"
+  - id: CON-FRTOS-PRE-001
+    expression: "period_ms >= 1 && period_ms <= 1000"
+    description: "任务周期必须在 [1 ms, 1000 ms] 范围内"
+  - id: CON-FRTOS-PRE-002
+    expression: "budget_ms >= 1 && budget_ms <= 100"
+    description: "执行预算必须在 [1 ms, 100 ms] 范围内"
+  - id: CON-FRTOS-PRE-003
+    expression: "budget_ms <= period_ms"
+    description: "执行预算必须 ≤ 任务周期 (利用率 < 100%)"
+  - id: CON-FRTOS-PRE-004
+    expression: "task_name in {Sensor_Reader, Control_Law, Telemetry_Output}"
+    description: "任务名必须在合法枚举集合内"
+  - id: CON-FRTOS-PRE-005
+    expression: "command >= 0 && command <= 5"
+    description: "控制命令必须在有效枚举范围内"
+
+postconditions:
+  - id: CON-FRTOS-POST-000
+    expression: "task_state >= 0 && task_state <= 4"
+    description: "任务状态必须在有效枚举范围内"
+  - id: CON-FRTOS-POST-001
+    expression: "result_code >= 0 && result_code <= 3"
+    description: "结果码必须在有效范围内"
+  - id: CON-FRTOS-POST-002
+    expression: "cpu_load_percent >= 0 && cpu_load_percent <= 100"
+    description: "CPU 利用率在 [0%, 100%] 范围内"
+  - id: CON-FRTOS-POST-003
+    expression: "context_switch_time_us <= 10"
+    description: "任务切换耗时 ≤ 10 μs (FreeRTOS 优化配置)"
+
+invariants:
+  - id: CON-FRTOS-INV-000
+    expression: "tick_rate_hz == 1000"
+    description: "系统 tick 频率固定 1 kHz (1 tick = 1 ms)"
+  - id: CON-FRTOS-INV-001
+    expression: "num_core_tasks == 3"
+    description: "核心任务数量固定为 3 (Sensor_Reader / Control_Law / Telemetry_Output)"
+  - id: CON-FRTOS-INV-002
+    expression: "sensor_reader_priority == 5 && sensor_reader_period_ms == 10 && sensor_reader_budget_ms == 2"
+    description: "Sensor_Reader: 优先级 5, 周期 10ms, 预算 2ms"
+  - id: CON-FRTOS-INV-003
+    expression: "control_law_priority == 4 && control_law_period_ms == 20 && control_law_budget_ms == 5"
+    description: "Control_Law: 优先级 4, 周期 20ms, 预算 5ms"
+  - id: CON-FRTOS-INV-004
+    expression: "telemetry_output_priority == 3 && telemetry_output_period_ms == 100 && telemetry_output_budget_ms == 10"
+    description: "Telemetry_Output: 优先级 3, 周期 100ms, 预算 10ms"
+  - id: CON-FRTOS-INV-005
+    expression: "budget_ms <= period_ms for all core tasks"
+    description: "所有核心任务的执行预算 ≤ 周期 (无超载)"
+  - id: CON-FRTOS-INV-006
+    expression: "queue_length_sensor_data == 10 && queue_length_control_cmd == 10"
+    description: "两个队列长度均为 10 (sensor_data, control_cmd)"
+  - id: CON-FRTOS-INV-007
+    expression: "priority_inheritance_enabled == true"
+    description: "互斥量优先级继承已启用 (防止优先级反转)"
+  - id: CON-FRTOS-INV-008
+    expression: "static_allocation_only == true"
+    description: "仅使用静态内存分配 (configSUPPORT_DYNAMIC_ALLOCATION=0)"
+  - id: CON-FRTOS-INV-009
+    expression: "cpu_load_threshold_percent == 85"
+    description: "CPU 利用率告警阈值 85%"
+  - id: CON-FRTOS-INV-010
+    expression: "watchdog_timeout_ms == 500"
+    description: "硬件看门狗超时 500 ms"
+
+fault_handling:
+  - id: CON-FRTOS-FLT-000
+    expression: "if task_overrun then trigger watchdog_reset"
+    description: "任务超时 (执行时间 > 预算) 触发 watchdog_reset 回调"
+  - id: CON-FRTOS-FLT-001
+    expression: "if watchdog_timeout then system_reset"
+    description: "硬件看门狗超时 (500ms) 触发系统复位"
+  - id: CON-FRTOS-FLT-002
+    expression: "if cpu_load_percent > 85 then trigger cpu_load_alarm"
+    description: "CPU 利用率 > 85% 触发 ALARM 事件，系统降级运行"
+  - id: CON-FRTOS-FLT-003
+    expression: "if stack_overflow then trigger vApplicationStackOverflowHook"
+    description: "栈溢出触发 FreeRTOS 钩子函数 (configCHECK_FOR_STACK_OVERFLOW=2)"
+  - id: CON-FRTOS-FLT-004
+    expression: "if queue_full then drop_message_and_increment_counter"
+    description: "队列满时丢弃新消息并递增丢包计数器"
+  - id: CON-FRTOS-FLT-005
+    expression: "if mutex_deadlock then release_mutex_and_log"
+    description: "互斥锁超时 (死锁检测) 释放并记录日志"

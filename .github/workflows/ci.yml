@@ -65,3 +65,54 @@ jobs:
 
       - name: Unit tests
         run: uv run python -m unittest discover -s app/tests -p "test_*.py"
+
+  do178c-check:
+    name: DO-178C Compliance Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Check DO-178C documents
+        run: |
+          echo "=== DO-178C 文档完整性检查 ==="
+          missing=0
+          for doc in PSAC SDP SVP SCMP SQAP TQP TOR TAS; do
+            path="../docs/compliance/${doc}.md"
+            if [ -f "$path" ]; then
+              echo "✅ ${doc}.md"
+            else
+              echo "❌ ${doc}.md (缺失)"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            echo "❌ DO-178C 文档不完整！"
+            exit 1
+          fi
+          echo "✅ 全部 DO-178C 文档完整"
+
+      - name: Run tool chain validator
+        run: uv run python -m app.core.tools.tool_chain_validator --project-root ..
+
+      - name: Run DO-178C objectives test
+        run: uv run python -c "
+from app.schemas.dal_objectives import DAL, get_objectives_for_dal
+for dal in DAL:
+    objs = get_objectives_for_dal(dal)
+    print(f'{dal.value}: {len(objs)} 项目标')
+print('✅ DAL 目标定义完整')
+        "

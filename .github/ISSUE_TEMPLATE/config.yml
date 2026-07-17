@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 项目文档
+    url: https://github.com/ch-onboard/SkyForge/tree/main/docs
+    about: 查看项目文档获取更多信息
+  - name: 使用教程
+    url: https://github.com/ch-onboard/SkyForge/blob/main/docs/user/使用教程.md
+    about: 了解如何使用 SkyForge

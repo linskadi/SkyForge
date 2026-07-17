@@ -1,0 +1,35 @@
+[project]
+name = "skyforge"
+version = "0.4.0"
+description = "SkyForge（天锻）— AI智能体驱动的机载软件轻量化开发工具"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [{name = "SkyForge Team"}]
+
+dependencies = [
+    # Layer 0 — Engine
+    "skyforge-engine==0.4.0",
+    # Layer 1 — LLM (optional)
+    "skyforge-llm==0.4.0",
+    # Layer 2 — CLI
+    "skyforge-core==0.4.0",
+    # Layer 3 — Web
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "websockets>=12.0",
+    "redis>=5.0.0",
+    "httpx>=0.28.0",
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "markdown>=3.6",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.5",
+]
+
+[tool.setuptools.packages.find]
+include = ["skyforge_engine*", "skyforge_llm*", "skyforge_core*", "app*"]

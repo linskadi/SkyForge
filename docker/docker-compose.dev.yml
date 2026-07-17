@@ -1,0 +1,51 @@
+# docker-compose.dev.yml - 开发环境（热重载）
+
+services:
+  redis:
+    image: redis:alpine
+    container_name: skyforge_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: skyforge_backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./config/.env.dev
+    environment:
+      - ENV=DEV
+    volumes:
+      - .:/app
+      - ./project/work_dir:/app/project/work_dir
+      - backend_venv:/app/.venv
+    depends_on:
+      - redis
+    stdin_open: true
+    tty: true
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: skyforge_frontend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./frontend/.env.development
+    volumes:
+      - ./studio/frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+
+volumes:
+  redis_data:
+  backend_venv:

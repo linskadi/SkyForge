@@ -1,0 +1,16 @@
+[project]
+name = "skyforge-engine"
+version = "0.4.0"
+description = "SkyForge Engine — 机载软件代码生成核心引擎（零LLM，零Web）"
+requires-python = ">=3.12"
+dependencies = [
+    "pyyaml>=6.0",
+    "numpy>=2.2.5",
+    "loguru>=0.7.3",
+    "packaging>=21.0",
+]
+
+[project.optional-dependencies]
+plugins = [
+    "packaging>=21.0",
+]

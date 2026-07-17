@@ -1,58 +1,89 @@
-.PHONY: dev dev-up dev-down build test lint lint-fix clean help
+.PHONY: dev dev-up dev-down build test lint lint-fix clean benchmark help
 
 help: ## 显示帮助信息
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # ---- 开发 ----
 
-dev: ## 启动本地开发环境（前端 + 后端 + Redis）
+dev: ## 启动本地开发环境
 	@bash start.sh
 
-dev-up: ## 使用 Docker Compose 启动开发环境
-	docker compose -f docker-compose.dev.yml up --build
+dev-up: ## Docker Compose 启动
+	docker compose -f docker/docker-compose.dev.yml up --build
 
-dev-down: ## 停止 Docker 开发环境
-	docker compose -f docker-compose.dev.yml down
+dev-down: ## 停止 Docker
+	docker compose -f docker/docker-compose.dev.yml down
 
 # ---- 构建 ----
 
-build: build-frontend build-backend ## 构建全部
+build: build-frontend ## 构建全部
 
 build-frontend: ## 构建前端
-	cd frontend && pnpm install --frozen-lockfile && pnpm build
-
-build-backend: ## 构建后端（检查依赖）
-	cd backend && uv sync
+	cd studio/frontend && pnpm install --frozen-lockfile && pnpm build
 
 # ---- 测试 ----
 
 test: test-frontend test-backend ## 运行全部测试
 
-test-frontend: ## 运行前端测试
-	cd frontend && pnpm vitest run
+test-frontend: ## 前端测试
+	cd studio/frontend && pnpm vitest run
 
-test-backend: ## 运行后端测试
-	cd backend && uv run python -m unittest discover -s app/tests -p "test_*.py"
+test-backend: ## 后端测试
+	cd src && PYTHONPATH=.. uv run python -m unittest discover -s ../studio/app/tests -p "test_*.py"
+
+# ---- 性能基准 ----
+
+benchmark: ## 运行性能基准测试
+	cd tools/benchmark && python run_benchmark.py
 
 # ---- 代码质量 ----
 
-lint: lint-frontend lint-backend ## 检查全部代码质量
+lint: lint-frontend lint-backend ## 检查代码质量
 
-lint-frontend: ## 前端 Biome 检查
-	cd frontend && pnpm biome ci ./src
+lint-frontend: ## 前端 Biome
+	cd studio/frontend && pnpm biome ci ./src
 
-lint-backend: ## 后端 Ruff 检查
-	cd backend && uv run ruff check app/
+lint-backend: ## 后端 Ruff
+	cd src && uv run ruff check .
 
-lint-fix: ## 自动修复代码格式
-	cd frontend && pnpm biome check --write ./src
-	cd backend && uv run ruff check --fix app/
+lint-fix: ## 自动修复
+	cd studio/frontend && pnpm biome check --write ./src
+	cd src && uv run ruff check --fix .
 
 typecheck: ## TypeScript 类型检查
-	cd frontend && pnpm vue-tsc -b
+	cd studio/frontend && pnpm vue-tsc -b
 
-# ---- 清理 ----
+# ---- DO-178C 合规 ----
+
+do178c-check: ## DO-178C 合规检查
+	@echo "=== DO-178C 文档完整性检查 ==="
+	@missing=0; \
+	for doc in PSAC SDP SVP SCMP SQAP TQP TOR TAS; do \
+		path="docs/compliance/$${doc}.md"; \
+		if [ -f "$$path" ]; then \
+			echo "  ✅ $${doc}.md"; \
+		else \
+			echo "  ❌ $${doc}.md (缺失)"; \
+			missing=1; \
+		fi; \
+	done; \
+	if [ $$missing -eq 1 ]; then \
+		echo "❌ DO-178C 文档不完整！"; \
+		exit 1; \
+	fi; \
+	echo "✅ 全部 DO-178C 文档完整"
+	@cd src && PYTHONPATH=.. uv run python -m skyforge_engine.tools.tool_chain_validator --project-root ..
+
+do178c-docs: ## 列出 DO-178C 文档状态
+	@for doc in PSAC SDP SVP SCMP SQAP TQP TOR TAS; do \
+		path="docs/compliance/$${doc}.md"; \
+		if [ -f "$$path" ]; then \
+			echo "  ✅ docs/compliance/$${doc}.md"; \
+		else \
+			echo "  ❌ docs/compliance/$${doc}.md (缺失)"; \
+		fi; \
+	done
 
 clean: ## 清理构建产物
-	cd frontend && rm -rf dist node_modules
-	cd backend && rm -rf .venv __pycache__ .pytest_cache
+	cd studio/frontend && rm -rf dist node_modules
+	rm -rf .venv __pycache__ .pytest_cache .ruff_cache

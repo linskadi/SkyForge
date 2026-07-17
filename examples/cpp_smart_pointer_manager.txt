@@ -1,0 +1,30 @@
+C++ 智能指针资源管理器需求文档
+
+需求编号: REQ-CPP-001
+需求描述: 实现一个基于 RAII 的智能指针资源管理器，管理航电系统中的动态分配资源
+DAL 等级：DAL-A
+模块名称：cpp_resource_manager
+
+功能需求：
+1. 使用 std::unique_ptr 管理独占资源（DataBuffer），确保自动释放
+2. 使用 std::shared_ptr 实现资源共享（SignalHandler），支持多处理器共享同一数据源
+3. 定义 ResourceBase 抽象基类，派生类实现具体资源行为（虚析构、纯虚函数）
+4. 提供工厂函数（make_unique/make_shared）创建资源实例
+5. 实现 ResourceManager 管理类，限制最大资源数量，防止资源泄漏
+
+性能指标：
+- 资源创建时间 < 10us
+- 资源销毁时间 < 5us
+- 最大并发资源数 >= 32
+
+安全约束：
+- 禁止裸指针（raw pointer）直接管理资源生命周期
+- unique_ptr 不可拷贝，只能移动（move semantics）
+- shared_ptr 引用计数线程安全
+- 资源创建失败时抛出 std::runtime_error
+
+C++ 特性要求：
+- 使用 C++17 标准（std::unique_ptr, std::shared_ptr, std::make_unique, std::make_shared）
+- 虚析构函数保证正确释放
+- 移动语义减少不必要的拷贝
+- RAII 模式确保异常安全
