@@ -94,7 +94,7 @@ def _fix_rule_8_4(code: str, v: "Violation") -> tuple[str, RepairAction]:
         action = RepairAction(
             rule_id=v.rule_id,
             line=v.line,
-            description=f"Rule 8.4: 全局变量转为 static 限定文件作用域",
+            description="Rule 8.4: 全局变量转为 static 限定文件作用域",
             before=target_line,
             after=new_line.strip(),
         )

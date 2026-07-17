@@ -30,7 +30,6 @@
 """
 
 import abc
-import asyncio
 import json
 import os
 import re
@@ -408,7 +407,7 @@ class SerialHilAdapter(HilAdapter):
 
         try:
             # 检查固件格式
-            ext = os.path.splitext(firmware_path)[1].lower()
+            os.path.splitext(firmware_path)[1].lower()
             with open(firmware_path, "rb") as f:
                 firmware_data = f.read()
 
@@ -523,7 +522,7 @@ class SerialHilAdapter(HilAdapter):
                 time.sleep(0.01)
 
             # 等待 ACK
-            ack = self._serial.read(4)
+            self._serial.read(4)
             return True, f"已烧录 {len(data)} 字节"
         except Exception as e:
             return False, f"二进制传输失败: {e}"
@@ -634,7 +633,7 @@ class JtagHilAdapter(HilAdapter):
 
     def flash_firmware(self, firmware_path: str) -> tuple[bool, str]:
         """通过 OpenOCD 烧录固件。"""
-        ext = os.path.splitext(firmware_path)[1].lower()
+        os.path.splitext(firmware_path)[1].lower()
 
         try:
             # GDB 命令烧录

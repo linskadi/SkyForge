@@ -476,11 +476,10 @@ async def run_pipeline(
         }
 
     # ---- P0-3 修复：契约形式化验证 (Z3 + CBMC) ----
-    formal_verify_result: dict[str, Any] = {}
     try:
         from skyforge_engine.tools.contract_formal_verifier import verify_contract
         formal_result = verify_contract(contract, code=None)
-        formal_verify_result = formal_result.to_dict()
+        formal_result.to_dict()
         if not formal_result.is_consistent:
             await hook(
                 "SYSTEM",

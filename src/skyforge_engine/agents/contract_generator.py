@@ -8,7 +8,8 @@ from typing import Any
 try:
     from skyforge_llm.parser import safe_parse_llm_json
 except ImportError:
-    safe_parse_llm_json = lambda x: {} 
+    def safe_parse_llm_json(x):
+        return {} 
 try:
     from skyforge_llm.client import get_lmstudio_client
 except ImportError:

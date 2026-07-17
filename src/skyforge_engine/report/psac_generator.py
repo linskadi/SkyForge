@@ -66,7 +66,7 @@ class PSACDocument:
     def to_markdown(self) -> str:
         """将 PSAC 文档渲染为 Markdown 字符串。"""
         lines: list[str] = []
-        lines.append(f"# PSAC — 软件审定计划摘要")
+        lines.append("# PSAC — 软件审定计划摘要")
         lines.append("")
         lines.append("> 本文档由 psac_generator.py 自动生成")
         lines.append("")

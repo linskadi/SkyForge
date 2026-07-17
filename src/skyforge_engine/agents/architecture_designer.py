@@ -26,7 +26,8 @@ except ImportError:
 try:
     from skyforge_llm.parser import safe_parse_llm_json
 except ImportError:
-    safe_parse_llm_json = lambda x: {}  # type: ignore[assignment]
+    def safe_parse_llm_json(x):
+        return {}  # type: ignore[assignment]
 
 
 @dataclass
@@ -70,14 +71,8 @@ def design_architecture(
     Returns:
         ArchitectureResult: 架构设计结果。
     """
-    # 优先使用 LLM
-    client = None
-    if get_lmstudio_client:
-        client = get_lmstudio_client()
-
-    if client and client.is_available() if hasattr(client, 'is_available') else False:
-        return _design_with_llm(hlr_list, llr_list, module_name, safety_level, client)
-
+    # LLM 增强路径未接入：当前架构设计仅由规则引擎生成。
+    # 后续 _design_with_llm 实现后，可在 client.is_available() 时切换。
     return _design_with_rules(hlr_list, llr_list, module_name, safety_level)
 
 

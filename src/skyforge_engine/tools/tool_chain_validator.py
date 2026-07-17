@@ -139,12 +139,17 @@ def _check_gcc() -> ToolCheckResult:
 
 
 def _check_cppcheck() -> ToolCheckResult:
-    """检查 Cppcheck 可用性。"""
+    """检查 Cppcheck 可用性。
+
+    注：CI 环境通常不预装 Cppcheck，此处标记为可选；本地或专用
+    验证环境应安装 Cppcheck 以启用真实 MISRA-C 扫描，缺失时
+    SkyForge 自动回退到 Mock 模式。
+    """
     version = _get_version(["cppcheck", "--version"])
     available = bool(version)
     return ToolCheckResult(
         tool="Cppcheck",
-        required=True,
+        required=False,
         available=available,
         version=version,
         message="MISRA-C 扫描" if available else "Cppcheck 不可用，将使用模拟模式",
@@ -174,7 +179,7 @@ def _check_do178c_docs(project_root: str) -> list[DocCheckResult]:
         "TOR.md",
         "TAS.md",
     ]
-    doc_dir = os.path.join(project_root, "docs", "do178c")
+    doc_dir = os.path.join(project_root, "docs", "compliance")
     results: list[DocCheckResult] = []
     for doc in required_docs:
         path = os.path.join(doc_dir, doc)
@@ -258,18 +263,18 @@ def main() -> None:
     if args.json:
         print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
     else:
-        print(f"SkyForge 工具链验证报告")
-        print(f"=" * 50)
+        print("SkyForge 工具链验证报告")
+        print("=" * 50)
         for r in report.tool_results:
             icon = "✅" if r.available else "❌" if r.required else "⚠️"
             req = "[必须]" if r.required else "[可选]"
             print(f"  {icon} {r.tool} {req}: {r.version or r.message}")
-        print(f"-" * 50)
-        print(f"  文档完整性:")
+        print("-" * 50)
+        print("  文档完整性:")
         for d in report.doc_results:
             icon = "✅" if d.exists else "❌"
             print(f"  {icon} {d.doc}")
-        print(f"-" * 50)
+        print("-" * 50)
         print(f"  总结: {report.summary}")
         print(f"  结论: {'✅ 全部通过' if report.all_passed else '❌ 存在问题'}")
 

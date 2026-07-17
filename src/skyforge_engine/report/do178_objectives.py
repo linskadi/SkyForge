@@ -83,7 +83,6 @@ def check_objectives(
         list[ObjectiveResult]：当前 DAL 等级适用的所有目标检查结果。
     """
     # 延迟导入，避免循环依赖
-    from .traceability_matrix import build_matrix
 
     # ---- 推断 DAL 等级 ----
     resolved_dal = _resolve_dal(dal, pipeline_result)

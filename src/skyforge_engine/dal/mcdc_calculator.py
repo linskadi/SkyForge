@@ -15,8 +15,7 @@ MC/DC 定义 (DO-178C Table A-7.8):
 from __future__ import annotations
 
 import re
-from collections import Counter
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import Any
 
 from skyforge_engine.utils.log_util import logger
@@ -275,7 +274,6 @@ def _generate_test_vectors(dp: DecisionPoint) -> list[str]:
         return []
 
     vectors: list[str] = []
-    n = dp.condition_count
 
     for i, cond in enumerate(dp.conditions, start=1):
         # 简化的测试向量生成

@@ -2008,7 +2008,7 @@ uint8_t                 {module}_task_get_count(void);
     def _gen_cpp_smart_pointer_code(self, req: dict[str, Any]) -> str:
         """生成 C++ 智能指针管理器代码（RAII 模式，unique_ptr/shared_ptr）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "resource_manager")
+        req.get("module_name", "resource_manager")
         params = req.get("params", {})
         max_resources = params.get("max_resources", 32)
 
@@ -2129,9 +2129,9 @@ namespace factory {{
     def _gen_cpp_template_code(self, req: dict[str, Any]) -> str:
         """生成 C++ 模板编程代码（类型安全容器与算法）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "template_engine")
+        req.get("module_name", "template_engine")
         params = req.get("params", {})
-        max_size = params.get("max_size", 1024)
+        params.get("max_size", 1024)
 
         return f"""// [{req_id}] C++ 模板编程示例：类型安全环形缓冲区
 #pragma once
@@ -2237,7 +2237,7 @@ public:
     def _gen_cpp_stl_container_code(self, req: dict[str, Any]) -> str:
         """生成 C++ STL 容器管理器代码（vector/map/set 等）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "stl_container_mgr")
+        req.get("module_name", "stl_container_mgr")
         params = req.get("params", {})
         max_items = params.get("max_items", 100)
 
@@ -2328,7 +2328,7 @@ private:
     def _gen_cpp_exception_code(self, req: dict[str, Any]) -> str:
         """生成 C++ 异常处理代码（自定义异常层次）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "exception_handler")
+        req.get("module_name", "exception_handler")
         params = req.get("params", {})
         max_retries = params.get("max_retries", 3)
 
@@ -2450,7 +2450,7 @@ private:
     def _gen_cpp_inheritance_code(self, req: dict[str, Any]) -> str:
         """生成 C++ 类继承与多态代码（虚函数表与 RTTI）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "polymorphic_system")
+        req.get("module_name", "polymorphic_system")
         params = req.get("params", {})
         max_handlers = params.get("max_handlers", 16)
 
@@ -2580,9 +2580,9 @@ private:
     def _gen_rust_ownership_code(self, req: dict[str, Any]) -> str:
         """生成 Rust 所有权与借用代码（资源管理器）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "ownership_manager")
+        req.get("module_name", "ownership_manager")
         params = req.get("params", {})
-        max_resources = params.get("max_resources", 32)
+        params.get("max_resources", 32)
 
         return f"""//! [{req_id}] Rust 所有权与借用示例：资源管理器
 //! 特性: 所有权转移、不可变借用、可变借用、Clone/Copy trait
@@ -2685,9 +2685,9 @@ impl ResourceManager {{
     def _gen_rust_lifetime_code(self, req: dict[str, Any]) -> str:
         """生成 Rust 生命周期代码（引用有效性保证）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "lifetime_demo")
+        req.get("module_name", "lifetime_demo")
         params = req.get("params", {})
-        max_entries = params.get("max_entries", 64)
+        params.get("max_entries", 64)
 
         return f"""//! [{req_id}] Rust 生命周期示例：数据缓存与借用链
 //! 特性: 显式生命周期标注、结构体持有引用、生命周期省略规则
@@ -2770,9 +2770,9 @@ impl<'a> TelemetryRecord<'a> {{
     def _gen_rust_result_code(self, req: dict[str, Any]) -> str:
         """生成 Rust Result 错误处理代码（自定义错误类型）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "error_handler")
+        req.get("module_name", "error_handler")
         params = req.get("params", {})
-        max_retries = params.get("max_retries", 3)
+        params.get("max_retries", 3)
 
         return f"""//! [{req_id}] Rust Result 错误处理示例
 //! 特性: 自定义错误类型、? 运算符、错误传播链
@@ -2877,9 +2877,9 @@ pub fn read_sensor_data(path: &str) -> AppResult<Vec<f64>> {{
     def _gen_rust_option_code(self, req: dict[str, Any]) -> str:
         """生成 Rust Option 空值安全代码。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "option_handler")
+        req.get("module_name", "option_handler")
         params = req.get("params", {})
-        max_items = params.get("max_items", 64)
+        params.get("max_items", 64)
 
         return f"""//! [{req_id}] Rust Option 空值安全示例
 //! 特性: Option<T>、map/and_then/unwrap_or、模式匹配
@@ -2999,9 +2999,9 @@ impl SensorStore {{
     def _gen_rust_async_code(self, req: dict[str, Any]) -> str:
         """生成 Rust tokio 异步代码（异步 I/O 与任务调度）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "async_runtime")
+        req.get("module_name", "async_runtime")
         params = req.get("params", {})
-        max_workers = params.get("max_workers", 8)
+        params.get("max_workers", 8)
 
         return f"""//! [{req_id}] Rust tokio 异步运行时示例
 //! 特性: async/await、tokio::spawn、通道通信、异步 I/O
@@ -3129,7 +3129,7 @@ impl AsyncTaskScheduler {{
     def _gen_rust_concurrency_code(self, req: dict[str, Any]) -> str:
         """生成 Rust 并发代码（std::sync + tokio 混合）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "concurrency_handler")
+        req.get("module_name", "concurrency_handler")
         params = req.get("params", {})
         max_threads = params.get("max_threads", 8)
 
@@ -3259,9 +3259,9 @@ impl WorkerPool {{
     def _gen_rust_struct_code(self, req: dict[str, Any]) -> str:
         """生成 Rust 结构体代码（字段可见性、方法、关联函数）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "struct_system")
+        req.get("module_name", "struct_system")
         params = req.get("params", {})
-        max_fields = params.get("max_fields", 32)
+        params.get("max_fields", 32)
 
         return f"""//! [{req_id}] Rust 结构体示例：机载系统配置
 //! 特性: 字段可见性、impl 块、关联函数、Builder 模式、Display trait
@@ -3376,9 +3376,9 @@ pub struct Marker;
     def _gen_rust_enum_code(self, req: dict[str, Any]) -> str:
         """生成 Rust 枚举代码（模式匹配、枚举方法）。"""
         req_id = req.get("req_id", "REQ-001")
-        module = req.get("module_name", "enum_system")
+        req.get("module_name", "enum_system")
         params = req.get("params", {})
-        max_variants = params.get("max_variants", 16)
+        params.get("max_variants", 16)
 
         return f"""//! [{req_id}] Rust 枚举示例：命令与状态机
 //! 特性: 带数据枚举、模式匹配、枚举方法、From/Into trait

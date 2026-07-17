@@ -42,7 +42,6 @@
 import hashlib
 import json
 import os
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -674,12 +673,12 @@ class EvidenceCollector:
         coverage = index.get("do178c_coverage", {})
 
         lines = [
-            f"# SkyForge DO-178C 合规证据摘要",
-            f"",
-            f"## 会话信息",
-            f"",
-            f"| 项目 | 值 |",
-            f"|------|-----|",
+            "# SkyForge DO-178C 合规证据摘要",
+            "",
+            "## 会话信息",
+            "",
+            "| 项目 | 值 |",
+            "|------|-----|",
             f"| 会话 ID | `{pkg.get('session_id', 'N/A')}` |",
             f"| Pipeline 版本 | {pkg.get('pipeline_version', 'N/A')} |",
             f"| 开始时间 | {pkg.get('start_time', 'N/A')} |",
@@ -687,14 +686,14 @@ class EvidenceCollector:
             f"| 状态 | {pkg.get('status', 'N/A')} |",
             f"| 证据总条目 | **{pkg.get('total_items', 0)}** |",
             f"| 证据类别数 | {pkg.get('category_count', 0)} |",
-            f"",
-            f"## DO-178C 目标覆盖",
-            f"",
+            "",
+            "## DO-178C 目标覆盖",
+            "",
             f"**覆盖率: {coverage.get('coverage_percentage', 0)}%** "
             f"({coverage.get('covered', 0)}/{coverage.get('total_objectives', 17)} 项目标)",
-            f"",
-            f"| DO-178C 引用 | 目标 | 状态 | 证据数 |",
-            f"|-------------|------|------|--------|",
+            "",
+            "| DO-178C 引用 | 目标 | 状态 | 证据数 |",
+            "|-------------|------|------|--------|",
         ]
 
         for ref, obj in coverage.get("objectives", {}).items():
@@ -704,24 +703,24 @@ class EvidenceCollector:
             )
 
         lines.extend([
-            f"",
-            f"## 证据类别分布",
-            f"",
-            f"| 类别 | 条目数 |",
-            f"|------|--------|",
+            "",
+            "## 证据类别分布",
+            "",
+            "| 类别 | 条目数 |",
+            "|------|--------|",
         ])
 
         for cat, items in sorted(categories.items()):
             lines.append(f"| {cat} | {len(items)} |")
 
         lines.extend([
-            f"",
-            f"## 证据完整性声明",
-            f"",
-            f"本证据包由 SkyForge Evidence Collector 自动生成，"
-            f"包含流水线运行期间的所有合规证据。",
-            f"所有证据条目均附带 SHA-256 哈希以确保完整性。",
-            f"",
+            "",
+            "## 证据完整性声明",
+            "",
+            "本证据包由 SkyForge Evidence Collector 自动生成，"
+            "包含流水线运行期间的所有合规证据。",
+            "所有证据条目均附带 SHA-256 哈希以确保完整性。",
+            "",
             f"**生成工具**: SkyForge v{pkg.get('pipeline_version', 'N/A')}",
             f"**生成时间**: {datetime.now(timezone.utc).isoformat()}",
         ])

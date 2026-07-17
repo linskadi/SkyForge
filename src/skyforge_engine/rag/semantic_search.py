@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from skyforge_engine.rag.rule_parser import MisraRule, parse_misra_rules

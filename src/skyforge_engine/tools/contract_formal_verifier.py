@@ -36,7 +36,6 @@ Level 3 — 有界模型检查 (CBMC，可选):
         logger.warning(f"契约形式化验证失败，建议手动审查: {result}")
 """
 
-import json
 import os
 import re
 import subprocess
@@ -112,9 +111,9 @@ class Z3ContractVerifier:
     def _check_z3() -> bool:
         """检查 Z3 是否可用。"""
         try:
-            import z3
-            return True
-        except ImportError:
+            import importlib.util
+            return importlib.util.find_spec("z3") is not None
+        except Exception:
             return False
 
     def is_available(self) -> bool:
@@ -222,7 +221,7 @@ class Z3ContractVerifier:
 
             interface = contract.get("interface", {})
             inputs = interface.get("inputs", [])
-            outputs = interface.get("outputs", [])
+            interface.get("outputs", [])
 
             if not inputs:
                 return []
@@ -230,8 +229,8 @@ class Z3ContractVerifier:
             test_cases = []
             preconditions = self._extract_conditions(contract, "preconditions")
             postconditions = self._extract_conditions(contract, "postconditions")
-            all_conditions = preconditions + postconditions
-            condition_texts = self._extract_conditions(contract, "preconditions")
+            preconditions + postconditions
+            self._extract_conditions(contract, "preconditions")
 
             for inp in inputs[:3]:  # 限制变量数
                 name = inp.get("name", "unknown")

@@ -18,7 +18,6 @@ import asyncio
 import enum
 import os
 import platform
-import struct
 import subprocess
 import tempfile
 import time
@@ -228,6 +227,7 @@ HARNESS_TEMPLATE = r"""/* test_harness.c - 由 VirtualMCU 自动生成 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <stdbool.h>
 
 /* === AI 生成的用户代码 === */
 /* USER_CODE_BEGIN */

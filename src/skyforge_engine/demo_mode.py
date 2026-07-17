@@ -20,7 +20,6 @@ Mock 模式成为了本体。本模块解决此问题：
 
 import asyncio
 import json
-import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -572,7 +571,7 @@ class DemoRunner:
         try:
             log_path = self.config.demo_log_path
             with open(log_path, "w", encoding="utf-8") as f:
-                f.write(f"# SkyForge 演示运行日志\n")
+                f.write("# SkyForge 演示运行日志\n")
                 f.write(f"时间: {report['timestamp']}\n")
                 f.write(f"模型: {report['config']['model']}\n")
                 f.write(f"状态: {report['summary']}\n\n")

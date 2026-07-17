@@ -59,7 +59,7 @@ def verify_contract_constraints(
         return Z3Result(satisfiable=True, tool_available=False)
 
     try:
-        from z3 import Real, Solver, And, Or, Not, sat, unsat
+        from z3 import Real, Solver, sat
 
         solver = Solver()
 
@@ -223,7 +223,6 @@ def check_component_compatibility_z3(
 
 def _add_expr(solver, variables: dict, expr: str) -> None:
     """简化表达式解析并添加到求解器。"""
-    from z3 import Real, And, Or, Not
 
     # 简单表达式解析：x <= 100, x >= 0, x == 42
     expr = expr.strip()
