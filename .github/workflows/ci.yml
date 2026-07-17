@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: frontend
+        working-directory: studio/frontend
     steps:
       - uses: actions/checkout@v4
 
@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: studio/frontend/pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
 
@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: src
     steps:
       - uses: actions/checkout@v4
 
@@ -61,17 +61,17 @@ jobs:
         run: uv sync
 
       - name: Ruff lint
-        run: uv run ruff check app/
+        run: uv run ruff check skyforge_engine/
 
       - name: Unit tests
-        run: uv run python -m unittest discover -s app/tests -p "test_*.py"
+        run: uv run python -m unittest discover -s ../studio/app/tests -p "test_*.py"
 
   do178c-check:
     name: DO-178C Compliance Check
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: src
     steps:
       - uses: actions/checkout@v4
 
@@ -106,13 +106,14 @@ jobs:
           echo "✅ 全部 DO-178C 文档完整"
 
       - name: Run tool chain validator
-        run: uv run python -m app.core.tools.tool_chain_validator --project-root ..
+        run: uv run python -m skyforge_engine.tools.tool_chain_validator --project-root ..
 
       - name: Run DO-178C objectives test
-        run: uv run python -c "
-from app.schemas.dal_objectives import DAL, get_objectives_for_dal
-for dal in DAL:
-    objs = get_objectives_for_dal(dal)
-    print(f'{dal.value}: {len(objs)} 项目标')
-print('✅ DAL 目标定义完整')
-        "
+        run: |
+          uv run python -c "
+          from skyforge_engine.schemas.dal_objectives import DAL, get_objectives_for_dal
+          for dal in DAL:
+              objs = get_objectives_for_dal(dal)
+              print(f'{dal.value}: {len(objs)} 项目标')
+          print('✅ DAL 目标定义完整')
+          "

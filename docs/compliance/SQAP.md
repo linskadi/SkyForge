@@ -108,6 +108,7 @@
 | 数字孪生仿真 | 每次生成运行 | `simulation_engine.py` | 无断言失败 | 验证团队 | 仿真报告 |
 | 编译验证 | 每次生成运行 | GCC | 编译成功 | 开发团队 | 编译日志 |
 | 追溯完整性 | 每次生成运行 | `traceability_matrix.py` | HLR↔CODE↔TST 100% | QA团队 | 追溯矩阵 |
+| 结构覆盖率 (V3.3) | 每次生成运行 | `coverage_analyzer.py` + `mcdc_calculator.py` | 语句/判定/MC/DC 达标 | 验证团队 | 覆盖率报告 |
 
 ### 3.3 问题管理
 
@@ -151,6 +152,8 @@
 | 契约通过率 | 100% | contract_checker.py | 开发团队 | 每次生成 |
 | 仿真通过率 | 100% | simulation_engine.py | 验证团队 | 每次生成 |
 | 追溯完整率 | >= 90% | traceability_matrix.py | QA团队 | 每次生成 |
+| 结构覆盖率 (DAL-C) | 100% 语句 | coverage_analyzer.py | 验证团队 | 每次生成 |
+| 结构覆盖率 (DAL-A) | 100% MC/DC | mcdc_calculator.py | 验证团队 | 每次生成 |
 | DO-178C 目标满足率 | >= 80% (Level C) | do178_objectives.py | QA团队 | 每次生成 |
 | 编译成功率 | 100% | GCC | 开发团队 | 每次生成 |
 

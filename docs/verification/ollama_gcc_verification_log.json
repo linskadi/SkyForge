@@ -1,0 +1,64 @@
+{
+  "start_time": "2026-07-17T21:04:05.212488",
+  "end_time": "2026-07-17T21:16:19.201611",
+  "model": "qwen3:8b (Ollama)",
+  "use_real_gcc": true,
+  "agents": {
+    "REQ-Parser": {
+      "status": "LLM",
+      "time_seconds": 101.3
+    },
+    "CON-Gen": {
+      "status": "LLM",
+      "time_seconds": 79.9
+    },
+    "CODE-Gen": {
+      "status": "LLM",
+      "time_seconds": 105.6
+    },
+    "Cppcheck": {
+      "status": "REAL_TOOL",
+      "time_seconds": 0.6,
+      "violations_count": 4
+    },
+    "REPAIR": {
+      "status": "LLM",
+      "time_seconds": 444.2,
+      "violations_before": 4,
+      "actions": 4
+    },
+    "Simulation": {
+      "status": "SUCCESS",
+      "time_seconds": 0.3,
+      "passed": true,
+      "used_mock": true
+    },
+    "Report": {
+      "status": "SUCCESS",
+      "time_seconds": 0.0,
+      "html_length": 15670
+    }
+  },
+  "outputs": {
+    "requirement": {
+      "req_id": "REQ-001",
+      "desc": "实现一个低通滤波器，截止频率10Hz，符合MISRA-C标准与DAL-A级别要求",
+      "type": "filter",
+      "module_name": "lowpass_filter_10hz",
+      "safety_level": "DAL-A",
+      "params": {
+        "cutoff_hz": 10.0,
+        "sample_rate_hz": 100.0
+      },
+      "constraints": [
+        "禁止动态内存（MISRA Rule-21.3）",
+        "WCET <= 1ms",
+        "采样率固定 100.0Hz"
+      ]
+    },
+    "contract": "component: lowpass_filter_10hz\nversion: 1.0.0\nsafety_level: DAL-A\ntraceability: [REQ-001]\ninterface:\n  inputs:\n    - name: raw_input\n      type: double\n      range: [0, 20000]\n  outputs:\n    - name: filtered_output\n      type: double\ncontracts:\n  preconditions:\n    - \"raw_input != NULL\"\n  postconditions:\n    - \"filtered_output >= 0\"\n  invariants:\n    - \"sample_rate_hz == 100.0\"\n  fault_handling:\n    - \"if raw_input > 20000.0 || raw_input < 0.0: set fault_detected = true\"",
+    "code": "/* [REQ-001] [MISRA-Rule-8.13] 低通滤波器实现 */\n#include \"lowpass_filter_10hz.h\"\nstatic double s_prev = 0.0;  /* [REQ-001] [MISRA-Rule-8.9] 保持前一次输出值 */\nstatic bool s_fault_detected = false;  /* [REQ-001] [MIS/RULE-8.9] 故障标志 */\n\nvoid lowpass_filter_10hz_init(void) {\n    /* [REQ-001] [MISRA-Rule-14.3] 初始化前一次输出为0.0 */\n    s_prev = 0.0;\n    s_fault_detected = false;  /* [REQ-001] [MISRA-Rule-14.3] 清除故障标志 */\n}\n\ndouble lowpass_filter_10hz_apply(double raw_input) {\n    /* [REQ-001] [MISRA-Rule-15.7] 输入范围检查 */\n    if (raw_input > 20000.0 || raw_input < 0.0) {\n        s_fault_detected = true;  /* [REQ-001] [MISRA-Rule-14.3] 设置故障标志 */\n    }\n    \n    /* [REQ-001] [MISRA-Rule-11.3] 常量表达式计算alpha系数 */\n    const double alpha = 1.0 / (1.0 + (2.0 * 3.14159265358979323846 * 10.0 / 100.0));\n    \n    /* [REQ-001] [MISRA-Rule-14.3] 计算滤波输出 */\n    s_prev = alpha * raw_input + (1.0 - alpha) * s_prev;\n    \n    /* [REQ-001] [MISRA-Rule-15.7] 返回非负值 */\n    return (s_prev >= 0.0) ? s_prev : 0.0;\n}",
+    "repaired_code": "/* ===== [REQ-001] MISRA-C 自动修复总览 =====\n * 共 4 处修复：\n *   L6 [MISRA-C:2012-Rule-8.4] 添加函数原型声明以满足外部链接可见性要求 [REQ-001]\n *   L11 [MISRA-C:2012-Rule-8.4] 将静态变量定义移至函数原型之后以符合外部链接规则 [REQ-001]\n *   L14 [MISRA-C:2012-Rule-12.1] 添加括号明确运算符优先级 [REQ-001]\n *   L22 [MISRA-C:2012-Rule-12.1] 添加括号明确条件表达式优先级 [REQ-001]\n */\n\n/* [REQ-001] [MISRA-Rule-8.13] 低通滤波器实现 */\n#include \"lowpass_filter_10hz.h\"\n\n/* [REQ-001] [MISRA-Rule-8.4] 声明函数原型 */\nvoid lowpass_filter_10hz_init(void);\n\ndouble lowpass_filter_10hz_apply(double raw_input);\n\n/* [REQ-001] [MISRA-Rule-8.4] 定义静态变量 */\nstatic double s_prev = 0.0;  /* [REQ-001] [MISRA-Rule-8.9] 保持前一次输出值 */\nstatic bool s_fault_detected = false;  /* [REQ-001] [MISRA-Rule-8.9] 故障标志 */\n\nvoid lowpass_filter_10hz_init(void) {\n    /* [REQ-001] [MISRA-Rule-14.3] 初始化前一次输出为0.0 */\n    s_prev = 0.0;\n    s_fault_detected = false;  /* [REQ-001] [MISRA-Rule-14.3] 清除故障标志 */\n}\n\ndouble lowpass_filter_10hz_apply(double raw_input) {\n    /* [REQ-001] [MISRA-Rule-15.7] 输入范围检查 */\n    if (raw_input > 20000.0 || raw_input < 0.0) {\n        s_fault_detected = true;  /* [REQ-001] [MISRA-Rule-14.3] 设置故障标志 */\n    }\n\n    /* [REQ-001] [MISRA-Rule-11.3] 常量表达式计算alpha系数 */\n    const double alpha = 1.0 / (1.0 + ((2.0 * 3.14159265358979323846 * 10.0) / 100.0));\n\n    /* [REQ-001] [MISRA-Rule-14.3] 计算滤波输出 */\n    s_prev = alpha * raw_input + (1.0 - alpha) * s_prev;\n\n    /* [REQ-001] [MISRA-Rule-15.7] 返回非负值 */\n    return ((s_prev >= 0.0) ? s_prev : 0.0);\n}\n"
+  },
+  "errors": []
+}

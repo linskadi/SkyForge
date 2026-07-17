@@ -135,10 +135,10 @@ Iteration 1 ──── Iteration 2 ──── Iteration 3
 
 | 工具 | 用途 | 当前覆盖 |
 |------|------|---------|
-| **unittest** | Python 后端测试 | 201 用例 |
-| **Vitest** | 前端测试 | 3 测试文件 |
+| **unittest** | Python 后端测试 | 204 用例 (13 文件) |
+| **Vitest** | 前端测试 | 116 用例 (8 文件) |
 | **数字孪生仿真** | C 代码运行时验证 | 5 类故障注入 |
-| **契约校验器** | 契约前后置条件验证 | 语义分析 |
+| **契约校验器** | 契约前后置条件验证 | 语义分析 (pre/post/inv/fh) |
 
 ---
 
@@ -181,8 +181,8 @@ Iteration 1 ──── Iteration 2 ──── Iteration 3
 
 | 交付物 | 格式 | 说明 |
 |--------|------|------|
-| 后端源代码 | Python | `backend/app/` 全部模块 |
-| 前端源代码 | Vue 3 / TypeScript | `frontend/src/` 全部组件 |
+| 后端源代码 | Python | `src/skyforge_engine/` + `src/skyforge_llm/` + `src/skyforge_core/` + `studio/app/` 全部模块 |
+| 前端源代码 | Vue 3 / TypeScript | `studio/frontend/src/` 全部组件 |
 | 生成 C 代码样例 | C | `examples/` 目录 |
 | Docker 配置 | YAML | `docker-compose.yml` |
 
@@ -201,7 +201,7 @@ Iteration 1 ──── Iteration 2 ──── Iteration 3
 
 | 交付物 | 格式 | 说明 |
 |--------|------|------|
-| MISRA-C 规则库 | TXT | `backend/app/rag/data/misra_rules.txt` |
+| MISRA-C 规则库 | TXT | `src/skyforge_engine/rag/data/misra_rules.txt` |
 | DO-178C 合规报告 | HTML | 生成工具自动产出 |
 | 追溯矩阵 | HTML/JSON | 生成工具自动产出 |
 | 仿真波形数据 | JSON | 数字孪生引擎产出 |
@@ -216,8 +216,8 @@ Iteration 1 ──── Iteration 2 ──── Iteration 3
 |------|------|---------|---------|
 | V3.0 | 2026-07-07 | 全流程 MVP (6 Agent + 数字孪生 + 报告) | 需求→代码→报告全流程可运行 |
 | V3.1 | 2026-07-10 | 查改解耦 + 契约→断言 + RAG 增强 + HIL | 契约校验通过，HIL审批可用 |
-| V3.2 | 2026-07-16 | SkyForge 重命名 + DO-178C 文档 + DAL 自适应 | 6份计划文档发布，DAL自适应可用 |
-| V3.3 | 2026-08-01 | MC/DC + 正式 PR 系统 + 工具鉴定 | 覆盖率分析器可用，PR系统正式化 |
+| V3.2 | 2026-07-16 | SkyForge 重命名 + DO-178C 文档 + DAL 自适应 | 8份计划文档发布，DAL自适应可用 |
+| V3.3 | 2026-07-17 | MC/DC + 正式 PR 系统 + 工具鉴定 + 合规矩阵 | V3.3-Enhanced 覆盖率分析器可用，PR系统正式化，工具鉴定草案完成 |
 
 ### 6.2 里程碑
 
@@ -225,8 +225,9 @@ Iteration 1 ──── Iteration 2 ──── Iteration 3
 |--------|------|---------|--------|------|
 | M1: 核心链路 | 2026-07-07 | 需求→代码→合规报告全流程 | 开发团队 | ✅ 完成 |
 | M2: 合规增强 | 2026-07-10 | MISRA 自动修复 + 契约断言 + HIL | 开发团队 | ✅ 完成 |
-| M3: DO-178C 文档 | 2026-07-18 | 6 份计划文档 + DAL 自适应 | 项目负责人 | 🔄 进行中 |
-| M4: 比赛交付 | 2026-07-20 | 全量开源 + 演示视频 + PPT | 全体成员 | ⏳ 待开始 |
+| M3: DO-178C 文档 | 2026-07-16 | 8 份计划文档 + DAL 自适应 | 项目负责人 | ✅ 完成 |
+| M4: V3.3-Enhanced | 2026-07-17 | 覆盖率分析器 + PR 系统 + 工具鉴定草案 + 合规矩阵 | 项目负责人 | ✅ 完成 |
+| M5: 比赛交付 | 2026-07-20 | 全量开源 + 演示视频 + PPT | 全体成员 | ⏳ 待开始 |
 
 ### 6.3 详细实施计划
 
