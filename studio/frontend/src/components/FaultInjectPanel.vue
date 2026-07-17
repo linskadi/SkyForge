@@ -62,7 +62,7 @@ interface FaultState {
 /** 组件 emit 事件 */
 const emit = defineEmits<{
 	/** 注入故障：传递所有已启用的故障列表 */
-	inject: (faults: { type: FaultType; params: FaultParams }[]) => void;
+	inject: [faults: { type: FaultType; params: FaultParams }[]];
 }>();
 
 /** 各故障类型的启用状态和参数（多选） */

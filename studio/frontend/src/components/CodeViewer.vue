@@ -32,7 +32,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
 	/** 点击代码中的 Tag 徽章时触发，null 表示取消激活 */
-	tagClick: (value: string | null) => void;
+	tagClick: [value: string | null];
 }>();
 
 /** 内部激活的 Tag（组件内点击驱动），null 表示未激活 */

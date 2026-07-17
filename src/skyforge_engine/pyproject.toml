@@ -20,4 +20,5 @@ plugins = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = [".."]
+include = ["skyforge_engine*"]

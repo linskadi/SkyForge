@@ -3,7 +3,6 @@ import { useProviderStore } from "@/stores/providerStore";
 import {
 	Check,
 	Cpu,
-	Globe,
 	Key,
 	RefreshCw,
 	Settings2,

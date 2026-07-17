@@ -49,4 +49,5 @@ full = [
 skyforge = "skyforge_core.cli:main"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = [".."]
+include = ["skyforge_core*"]

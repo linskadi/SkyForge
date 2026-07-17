@@ -90,7 +90,7 @@ describe("AgentTerminal", () => {
 
 	it("exposes start/stop/clear/push/finish methods", () => {
 		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
-		const vm = wrapper.vm as Record<string, unknown>;
+		const vm = wrapper.vm as unknown as Record<string, unknown>;
 		expect(typeof vm.start).toBe("function");
 		expect(typeof vm.stop).toBe("function");
 		expect(typeof vm.clear).toBe("function");
@@ -100,7 +100,7 @@ describe("AgentTerminal", () => {
 
 	it("push method does not throw when adding a log entry", () => {
 		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
-		const vm = wrapper.vm as Record<string, unknown>;
+		const vm = wrapper.vm as unknown as Record<string, unknown>;
 		expect(() => {
 			(vm.push as Function)({
 				agent: "SYSTEM",
@@ -113,7 +113,7 @@ describe("AgentTerminal", () => {
 
 	it("push then clear restores empty state", () => {
 		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
-		const vm = wrapper.vm as Record<string, unknown>;
+		const vm = wrapper.vm as unknown as Record<string, unknown>;
 		(vm.push as Function)({
 			agent: "SYSTEM",
 			level: "info",
@@ -128,7 +128,7 @@ describe("AgentTerminal", () => {
 		const wrapper = mount(AgentTerminal, {
 			props: { useMock: true, maxLogs: 3 },
 		});
-		const vm = wrapper.vm as Record<string, unknown>;
+		const vm = wrapper.vm as unknown as Record<string, unknown>;
 		expect(() => {
 			for (let i = 0; i < 5; i++) {
 				(vm.push as Function)({
@@ -156,7 +156,7 @@ describe("AgentTerminal", () => {
 
 	it("calls finish on unmount to clean up typing timer", () => {
 		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
-		const vm = wrapper.vm as Record<string, unknown>;
+		const vm = wrapper.vm as unknown as Record<string, unknown>;
 		(vm.push as Function)({
 			agent: "SYSTEM",
 			level: "info",

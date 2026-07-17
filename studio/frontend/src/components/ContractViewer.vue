@@ -20,7 +20,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
 	/** 点击契约 CON 标签时触发，null 表示取消激活 */
-	tagClick: (value: string | null) => void;
+	tagClick: [value: string | null];
 }>();
 
 /** 点击契约条件 ID 徽章（CON-xxx），联动代码区高亮 */

@@ -18,4 +18,5 @@ dependencies = [
 skyforge-engine = { workspace = true }
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = [".."]
+include = ["skyforge_llm*"]
