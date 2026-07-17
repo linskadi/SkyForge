@@ -26,7 +26,12 @@ vi.mock("monaco-editor", () => ({
 			OverviewRulerLane: { Left: 1 },
 		},
 		Range: vi.fn(
-			(startLine: number, startCol: number, endLine: number, endCol: number) => ({
+			(
+				startLine: number,
+				startCol: number,
+				endLine: number,
+				endCol: number,
+			) => ({
 				startLine,
 				startCol,
 				endLine,
@@ -92,7 +97,11 @@ describe("MonacoCodeEditor", () => {
 		await flushPromises();
 		const monaco = await import("monaco-editor");
 		expect(
-			(monaco as ReturnType<typeof vi.fn> & { editor: { create: ReturnType<typeof vi.fn> } }).editor.create,
+			(
+				monaco as ReturnType<typeof vi.fn> & {
+					editor: { create: ReturnType<typeof vi.fn> };
+				}
+			).editor.create,
 		).toHaveBeenCalled();
 	});
 
@@ -103,7 +112,11 @@ describe("MonacoCodeEditor", () => {
 		await flushPromises();
 		const monaco = await import("monaco-editor");
 		expect(
-			(monaco as ReturnType<typeof vi.fn> & { editor: { create: ReturnType<typeof vi.fn> } }).editor.create,
+			(
+				monaco as ReturnType<typeof vi.fn> & {
+					editor: { create: ReturnType<typeof vi.fn> };
+				}
+			).editor.create,
 		).toHaveBeenCalledWith(
 			expect.anything(),
 			expect.objectContaining({
@@ -121,7 +134,11 @@ describe("MonacoCodeEditor", () => {
 		await flushPromises();
 		const monaco = await import("monaco-editor");
 		expect(
-			(monaco as ReturnType<typeof vi.fn> & { editor: { create: ReturnType<typeof vi.fn> } }).editor.create,
+			(
+				monaco as ReturnType<typeof vi.fn> & {
+					editor: { create: ReturnType<typeof vi.fn> };
+				}
+			).editor.create,
 		).toHaveBeenCalledWith(
 			expect.anything(),
 			expect.objectContaining({ language: "python" }),
@@ -133,7 +150,11 @@ describe("MonacoCodeEditor", () => {
 		await flushPromises();
 		const monaco = await import("monaco-editor");
 		expect(
-			(monaco as ReturnType<typeof vi.fn> & { editor: { create: ReturnType<typeof vi.fn> } }).editor.create,
+			(
+				monaco as ReturnType<typeof vi.fn> & {
+					editor: { create: ReturnType<typeof vi.fn> };
+				}
+			).editor.create,
 		).toHaveBeenCalledWith(
 			expect.anything(),
 			expect.objectContaining({ readOnly: true }),
@@ -147,7 +168,11 @@ describe("MonacoCodeEditor", () => {
 		await flushPromises();
 		const monaco = await import("monaco-editor");
 		expect(
-			(monaco as ReturnType<typeof vi.fn> & { editor: { create: ReturnType<typeof vi.fn> } }).editor.create,
+			(
+				monaco as ReturnType<typeof vi.fn> & {
+					editor: { create: ReturnType<typeof vi.fn> };
+				}
+			).editor.create,
 		).toHaveBeenCalledWith(
 			expect.anything(),
 			expect.objectContaining({ readOnly: false }),
@@ -159,7 +184,11 @@ describe("MonacoCodeEditor", () => {
 		await flushPromises();
 		const monaco = await import("monaco-editor");
 		expect(
-			(monaco as ReturnType<typeof vi.fn> & { editor: { defineTheme: ReturnType<typeof vi.fn> } }).editor.defineTheme,
+			(
+				monaco as ReturnType<typeof vi.fn> & {
+					editor: { defineTheme: ReturnType<typeof vi.fn> };
+				}
+			).editor.defineTheme,
 		).toHaveBeenCalledWith(
 			"skyforge-dark",
 			expect.objectContaining({ base: "vs-dark" }),

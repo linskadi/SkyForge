@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 /**
  * FormalVerificationResult 形式化验证结果组件（Task 5.5）
  *
@@ -14,10 +17,10 @@
  * 使用 shadcn-vue Card / Skeleton / Button 组件 + 内联徽章样式
  * （与 ContractCheckResult.vue 风格保持一致）。
  */
-import type { VerificationCheck, VerificationResult } from "@/types/verification";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import type {
+	VerificationCheck,
+	VerificationResult,
+} from "@/types/verification";
 import {
 	AlertTriangle,
 	CheckCircle2,

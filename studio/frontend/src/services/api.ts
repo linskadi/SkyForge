@@ -27,10 +27,7 @@ import type {
 	ScadeParseResult,
 	SimulationResult,
 } from "@/types/domain";
-import type {
-	VerifyRequest,
-	VerificationResult,
-} from "@/types/verification";
+import type { VerificationResult, VerifyRequest } from "@/types/verification";
 import { ref } from "vue";
 
 import {

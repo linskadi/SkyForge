@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import AgentTerminal from "@/components/AgentTerminal.vue";
+import type AgentTerminal from "@/components/AgentTerminal.vue";
 import ChatArea from "@/components/ChatArea.vue";
 import MonacoCodeEditor from "@/components/MonacoCodeEditor.vue";
 import TaskStatusBar from "@/components/task/TaskStatusBar.vue";

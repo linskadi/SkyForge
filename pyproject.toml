@@ -33,3 +33,16 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["skyforge_engine*", "skyforge_llm*", "skyforge_core*", "app*"]
+
+# uv workspace 配置 — 本地子包
+[tool.uv.workspace]
+members = [
+    "src/skyforge_engine",
+    "src/skyforge_llm",
+    "src/skyforge_core",
+]
+
+[tool.uv.sources]
+skyforge-engine = { workspace = true }
+skyforge-llm = { workspace = true }
+skyforge-core = { workspace = true }

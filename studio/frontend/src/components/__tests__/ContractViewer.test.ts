@@ -1,7 +1,7 @@
+import type { Contract } from "@/services/mockApi";
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ContractViewer from "../ContractViewer.vue";
-import type { Contract } from "@/services/mockApi";
 
 vi.mock("@/utils/tagParser", () => ({
 	parseConTags: vi.fn((text: string) => {
@@ -285,9 +285,7 @@ describe("ContractViewer", () => {
 	it("does not render condition description when absent", () => {
 		const contractNoDesc: Contract = {
 			...mockContract,
-			fault_handling: [
-				{ id: "CON-FH-001", expression: "x == 0" },
-			],
+			fault_handling: [{ id: "CON-FH-001", expression: "x == 0" }],
 		};
 		const wrapper = mount(ContractViewer, {
 			props: { contract: contractNoDesc },

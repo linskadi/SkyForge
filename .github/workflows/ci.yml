@@ -43,9 +43,6 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src
     steps:
       - uses: actions/checkout@v4
 
@@ -61,17 +58,14 @@ jobs:
         run: uv sync
 
       - name: Ruff lint
-        run: uv run ruff check skyforge_engine/
+        run: uv run ruff check src/skyforge_engine/
 
       - name: Unit tests
-        run: uv run python -m unittest discover -s ../studio/app/tests -p "test_*.py"
+        run: uv run python -m unittest discover -s studio/app/tests -p "test_*.py"
 
   do178c-check:
     name: DO-178C Compliance Check
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src
     steps:
       - uses: actions/checkout@v4
 
@@ -91,7 +85,7 @@ jobs:
           echo "=== DO-178C 文档完整性检查 ==="
           missing=0
           for doc in PSAC SDP SVP SCMP SQAP TQP TOR TAS; do
-            path="../docs/compliance/${doc}.md"
+            path="docs/compliance/${doc}.md"
             if [ -f "$path" ]; then
               echo "✅ ${doc}.md"
             else
@@ -106,7 +100,7 @@ jobs:
           echo "✅ 全部 DO-178C 文档完整"
 
       - name: Run tool chain validator
-        run: uv run python -m skyforge_engine.tools.tool_chain_validator --project-root ..
+        run: uv run python -m skyforge_engine.tools.tool_chain_validator --project-root .
 
       - name: Run DO-178C objectives test
         run: |

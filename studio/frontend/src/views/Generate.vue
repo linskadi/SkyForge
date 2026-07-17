@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import AgentTerminal from "@/components/AgentTerminal.vue";
+import type AgentTerminal from "@/components/AgentTerminal.vue";
 import CodeViewer from "@/components/CodeViewer.vue";
 import ContractCheckResult from "@/components/ContractCheckResult.vue";
 import ContractViewer from "@/components/ContractViewer.vue";
 import FaultInjectPanel from "@/components/FaultInjectPanel.vue";
 import FormalVerificationResult from "@/components/FormalVerificationResult.vue";
 import HILPanel from "@/components/HILPanel.vue";
-import ProviderPanel from "@/components/ProviderPanel.vue";
 import MisraSearch from "@/components/MisraSearch.vue";
+import ProviderPanel from "@/components/ProviderPanel.vue";
 import RepairTimeline from "@/components/RepairTimeline.vue";
 import ReportDownload from "@/components/ReportDownload.vue";
 import ScadeUpload from "@/components/ScadeUpload.vue";
@@ -89,12 +89,7 @@ const activeTag = ref<string | null>(null);
 
 /** 当前激活的 tab：result / repair / contract / simulation / verify / report */
 const activeTab = ref<
-	| "result"
-	| "repair"
-	| "contract"
-	| "simulation"
-	| "verify"
-	| "report"
+	"result" | "repair" | "contract" | "simulation" | "verify" | "report"
 >("result");
 
 /** 聚焦面板：null=三栏均显示，'code'/'contract'/'misra'=聚焦某一个 */

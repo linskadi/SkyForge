@@ -14,9 +14,7 @@ vi.mock("vue-echarts", () => ({
 						dataZoom: [{ start: 0, end: 100 }],
 					})),
 					dispatchAction: vi.fn(),
-					getDataURL: vi.fn(
-						() => "data:image/png;base64,mockbase64data",
-					),
+					getDataURL: vi.fn(() => "data:image/png;base64,mockbase64data"),
 				},
 			};
 		},
@@ -53,7 +51,7 @@ vi.mock("lucide-vue-next", () => ({
 vi.mock("@/components/ui/button", () => ({
 	Button: {
 		name: "Button",
-		template: '<button @click="$emit(\'click\')"><slot /></button>',
+		template: "<button @click=\"$emit('click')\"><slot /></button>",
 		props: ["variant", "size"],
 		emits: ["click"],
 	},

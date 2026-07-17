@@ -16,7 +16,7 @@ import { Download, RotateCcw, ZoomIn, ZoomOut } from "lucide-vue-next";
  * 替换原有纯 Canvas 实现，提供更丰富的交互
  */
 import { computed, ref } from "vue";
-import VChart from "vue-echarts";
+import type VChart from "vue-echarts";
 
 use([
 	CanvasRenderer,

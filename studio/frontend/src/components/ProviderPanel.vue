@@ -1,4 +1,16 @@
 <script setup lang="ts">
+import { useProviderStore } from "@/stores/providerStore";
+import {
+	Check,
+	Cpu,
+	Globe,
+	Key,
+	RefreshCw,
+	Settings2,
+	Wifi,
+	WifiOff,
+	X,
+} from "lucide-vue-next";
 /**
  * ProviderPanel — OpenCode 风格的多供应商切换面板。
  *
@@ -9,45 +21,40 @@
  *  - 本地模型标注 + 连接测试
  *  - Glass 风格，匹配航空主题
  */
-import { ref, watch, onMounted } from 'vue'
-import { useProviderStore } from '@/stores/providerStore'
-import { 
-  Settings2, Key, Cpu, Globe, Check, X, RefreshCw, 
-  Wifi, WifiOff 
-} from 'lucide-vue-next'
+import { onMounted, ref, watch } from "vue";
 
-const store = useProviderStore()
-const isOpen = ref(false)
-const activeTab = ref(store.selectedProviderId)
-const showKey = ref<Record<string, boolean>>({})
-const testing = ref<Record<string, boolean>>({})
-const testStatus = ref<Record<string, 'idle' | 'testing' | 'ok' | 'fail'>>({})
+const store = useProviderStore();
+const isOpen = ref(false);
+const activeTab = ref(store.selectedProviderId);
+const showKey = ref<Record<string, boolean>>({});
+const testing = ref<Record<string, boolean>>({});
+const testStatus = ref<Record<string, "idle" | "testing" | "ok" | "fail">>({});
 
 onMounted(() => {
-  activeTab.value = store.selectedProviderId
-})
+	activeTab.value = store.selectedProviderId;
+});
 
 function selectProvider(id: string) {
-  store.setProvider(id)
-  activeTab.value = id
+	store.setProvider(id);
+	activeTab.value = id;
 }
 
 watch(isOpen, (val) => {
-  if (val) activeTab.value = store.selectedProviderId
-})
+	if (val) activeTab.value = store.selectedProviderId;
+});
 
 function testConnection(id: string) {
-  const provider = store.providers.find(p => p.id === id)
-  if (!provider || !provider.apiKey) return
-  
-  testing.value[id] = true
-  testStatus.value[id] = 'testing'
-  
-  // Simulate connection test
-  setTimeout(() => {
-    testStatus.value[id] = Math.random() > 0.3 ? 'ok' : 'fail'
-    testing.value[id] = false
-  }, 2000)
+	const provider = store.providers.find((p) => p.id === id);
+	if (!provider || !provider.apiKey) return;
+
+	testing.value[id] = true;
+	testStatus.value[id] = "testing";
+
+	// Simulate connection test
+	setTimeout(() => {
+		testStatus.value[id] = Math.random() > 0.3 ? "ok" : "fail";
+		testing.value[id] = false;
+	}, 2000);
 }
 </script>
 

@@ -855,23 +855,24 @@ class VirtualMCU:
 
         Returns:
             完整的 test_harness.c 源码字符串。
-
-        Note:
-            contract_to_assert 生成的函数名形如 `__check_contract_step_<cid>`，
-            若 cid 含连字符（如 "CON-001"）则不是合法 C 标识符。
-            这里做净化处理：将连字符替换为下划线，确保 GCC 能编译。
         """
-        # 若用户代码中没有 double filter(double) 函数定义，
+        # 清理用户代码：移除不存在的本地头文件引用
+        # 保留系统头文件（如 <stdio.h>），只移除自定义头文件（如 "lowpass_filter_10hz.h"）
+        import re
+        cleaned_code = re.sub(r'#include\s+"[^"]+\.h"\s*\n?', '', user_code)
+        cleaned_code = re.sub(r'#include\s+"[^"]+\.h"', '', cleaned_code)
+        
+        # 若清理后代码中没有 double filter(double) 函数定义，
         # 自动添加一个示例 filter（避免编译失败）
-        if "double filter(double" not in user_code and "filter(double" not in user_code:
-            user_code = (
+        if "double filter(double" not in cleaned_code and "filter(double" not in cleaned_code:
+            cleaned_code = (
                 "double filter(double input) {\n"
                 "    static double last = 0.0;\n"
                 "    double out = 0.9 * last + 0.1 * input;\n"
                 "    last = out;\n"
                 "    return out;\n"
                 "}\n"
-            ) + user_code
+            ) + cleaned_code
 
         # 处理断言代码：若非空，则在每步 filter 调用后调用 __check_contract_step_<cid>
         if assert_code.strip():
@@ -900,7 +901,7 @@ class VirtualMCU:
             assert_code_final = "/* 无契约断言 */"
 
         return HARNESS_TEMPLATE.format(
-            user_code=user_code,
+            user_code=cleaned_code,
             assert_code=assert_code_final,
             assert_call=assert_call,
         )

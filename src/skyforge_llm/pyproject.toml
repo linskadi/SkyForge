@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "skyforge-llm"
 version = "0.4.0"
@@ -9,3 +13,9 @@ dependencies = [
     "openai>=1.65.4",
     "anthropic>=0.40.0",
 ]
+
+[tool.uv.sources]
+skyforge-engine = { workspace = true }
+
+[tool.setuptools.packages.find]
+where = ["."]

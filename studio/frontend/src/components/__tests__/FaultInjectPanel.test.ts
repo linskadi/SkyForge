@@ -57,7 +57,7 @@ vi.mock("@/components/ui/input", () => ({
 vi.mock("@/components/ui/label", () => ({
 	Label: {
 		name: "Label",
-		template: '<label><slot /></label>',
+		template: "<label><slot /></label>",
 	},
 }));
 
@@ -124,9 +124,9 @@ describe("FaultInjectPanel", () => {
 
 	it("inject button is disabled when no faults are enabled", () => {
 		const wrapper = mount(FaultInjectPanel);
-		const injectBtn = wrapper.findAll("button").find((btn) =>
-			btn.text().includes("注入故障"),
-		);
+		const injectBtn = wrapper
+			.findAll("button")
+			.find((btn) => btn.text().includes("注入故障"));
 		expect(injectBtn?.attributes("disabled")).toBeDefined();
 	});
 
@@ -141,9 +141,9 @@ describe("FaultInjectPanel", () => {
 		if (switches.length > 0) {
 			await switches[0].trigger("click");
 			expect(wrapper.text()).toContain("已选择");
-			const resetBtn = wrapper.findAll("button").find((btn) =>
-				btn.text().includes("重置参数"),
-			);
+			const resetBtn = wrapper
+				.findAll("button")
+				.find((btn) => btn.text().includes("重置参数"));
 			await resetBtn?.trigger("click");
 			expect(wrapper.text()).toContain("可同时选择多种故障类型");
 		}
@@ -163,9 +163,9 @@ describe("FaultInjectPanel", () => {
 		const switches = wrapper.findAll(".switch");
 		if (switches.length > 0) {
 			await switches[0].trigger("click");
-			const injectBtn = wrapper.findAll("button").find((btn) =>
-				btn.text().includes("注入故障"),
-			);
+			const injectBtn = wrapper
+				.findAll("button")
+				.find((btn) => btn.text().includes("注入故障"));
 			expect(injectBtn?.attributes("disabled")).toBeUndefined();
 		}
 	});
@@ -175,9 +175,9 @@ describe("FaultInjectPanel", () => {
 		const switches = wrapper.findAll(".switch");
 		if (switches.length > 0) {
 			await switches[0].trigger("click");
-			const injectBtn = wrapper.findAll("button").find((btn) =>
-				btn.text().includes("注入故障"),
-			);
+			const injectBtn = wrapper
+				.findAll("button")
+				.find((btn) => btn.text().includes("注入故障"));
 			await injectBtn?.trigger("click");
 			expect(wrapper.emitted("inject")).toBeTruthy();
 			expect(wrapper.emitted("inject")![0][0]).toEqual(
@@ -203,9 +203,9 @@ describe("FaultInjectPanel", () => {
 
 	it("does not emit inject when no faults enabled", async () => {
 		const wrapper = mount(FaultInjectPanel);
-		const injectBtn = wrapper.findAll("button").find((btn) =>
-			btn.text().includes("注入故障"),
-		);
+		const injectBtn = wrapper
+			.findAll("button")
+			.find((btn) => btn.text().includes("注入故障"));
 		await injectBtn?.trigger("click");
 		expect(wrapper.emitted("inject")).toBeUndefined();
 	});

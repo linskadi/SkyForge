@@ -30,9 +30,9 @@ import type {
 	SimulationResult,
 } from "@/types/domain";
 import type {
-	VerifyRequest,
 	VerificationCheck,
 	VerificationResult,
+	VerifyRequest,
 } from "@/types/verification";
 
 // Re-export all types for backward compatibility

@@ -625,7 +625,8 @@ const HMI_OVERLAY_TEMPLATE: ContractTemplate = {
 	faultHandling: [
 		{
 			id: "CON-HMI-FLT-000",
-			expression: "if display_value < min_val or display_value > max_val then warn_level = 3",
+			expression:
+				"if display_value < min_val or display_value > max_val then warn_level = 3",
 			description: "输入超量程时告警等级设为危急",
 		},
 		{
@@ -726,7 +727,8 @@ const SENSOR_FUSION_TEMPLATE: ContractTemplate = {
 	name: "SensorFusionKalman",
 	category: "sensor_fusion",
 	categoryLabel: "传感器融合",
-	description: "扩展卡尔曼滤波器，融合 IMU 加速度计与 GPS 位置数据，输出最优状态估计",
+	description:
+		"扩展卡尔曼滤波器，融合 IMU 加速度计与 GPS 位置数据，输出最优状态估计",
 	safetyLevel: "DAL-A",
 	inputs: [
 		{
@@ -799,7 +801,8 @@ const SENSOR_FUSION_TEMPLATE: ContractTemplate = {
 		},
 		{
 			id: "CON-SF-FLT-001",
-			expression: "if estimation_variance > threshold then trigger_degraded_mode",
+			expression:
+				"if estimation_variance > threshold then trigger_degraded_mode",
 			description: "估计方差超阈值时触发传感器降级",
 		},
 	],
@@ -890,7 +893,8 @@ const MISSION_PLANNER_TEMPLATE: ContractTemplate = {
 	name: "MissionPlanner",
 	category: "mission_planning",
 	categoryLabel: "任务规划",
-	description: "航点列表管理与任务状态机，支持 Haversine 距离判定与任务暂停/恢复/中止",
+	description:
+		"航点列表管理与任务状态机，支持 Haversine 距离判定与任务暂停/恢复/中止",
 	safetyLevel: "DAL-B",
 	inputs: [
 		{
@@ -1089,7 +1093,8 @@ const ARINC653_PARTITION_TEMPLATE: ContractTemplate = {
 	name: "Arinc653Partition",
 	category: "arinc653",
 	categoryLabel: "航空分区",
-	description: "ARINC 653 分区操作系统，支持空间/时间隔离、分区间通信与健康监控",
+	description:
+		"ARINC 653 分区操作系统，支持空间/时间隔离、分区间通信与健康监控",
 	safetyLevel: "DAL-A",
 	inputs: [
 		{
@@ -1102,7 +1107,8 @@ const ARINC653_PARTITION_TEMPLATE: ContractTemplate = {
 			name: "command",
 			type: "uint8_t",
 			range: [0, 5],
-			description: "控制命令: 0=创建分区, 1=创建端口, 2=启动调度, 3=健康监控, 4=查询状态, 5=停止",
+			description:
+				"控制命令: 0=创建分区, 1=创建端口, 2=启动调度, 3=健康监控, 4=查询状态, 5=停止",
 		},
 	],
 	outputs: [
@@ -1269,7 +1275,8 @@ const FREERTOS_SCHEDULER_TEMPLATE: ContractTemplate = {
 	name: "FreeRTOSScheduler",
 	category: "freertos",
 	categoryLabel: "实时调度",
-	description: "FreeRTOS 任务调度器，支持多级优先级、信号量/互斥锁同步、队列通信与软件定时器",
+	description:
+		"FreeRTOS 任务调度器，支持多级优先级、信号量/互斥锁同步、队列通信与软件定时器",
 	safetyLevel: "DAL-B",
 	inputs: [
 		{
@@ -1282,7 +1289,8 @@ const FREERTOS_SCHEDULER_TEMPLATE: ContractTemplate = {
 			name: "command",
 			type: "uint8_t",
 			range: [0, 8],
-			description: "控制命令: 0=创建任务, 1=删除, 2=挂起, 3=恢复, 4=获取信号量, 5=释放, 6=队列发送, 7=队列接收, 8=定时器控制",
+			description:
+				"控制命令: 0=创建任务, 1=删除, 2=挂起, 3=恢复, 4=获取信号量, 5=释放, 6=队列发送, 7=队列接收, 8=定时器控制",
 		},
 	],
 	outputs: [
@@ -1457,7 +1465,8 @@ const CPP_SMART_POINTER_TEMPLATE: ContractTemplate = {
 	name: "CppSmartPointerManager",
 	category: "cpp",
 	categoryLabel: "C++ RAII",
-	description: "基于 RAII 的智能指针资源管理器，使用 std::unique_ptr/shared_ptr 管理航电系统动态资源",
+	description:
+		"基于 RAII 的智能指针资源管理器，使用 std::unique_ptr/shared_ptr 管理航电系统动态资源",
 	safetyLevel: "DAL-A",
 	inputs: [
 		{
@@ -1923,7 +1932,8 @@ const RUST_OWNERSHIP_TEMPLATE: ContractTemplate = {
 	name: "RustOwnershipManager",
 	category: "rust",
 	categoryLabel: "Rust 所有权",
-	description: "Rust 所有权与借用规则示例：航电资源管理器，演示所有权转移、不可变/可变借用",
+	description:
+		"Rust 所有权与借用规则示例：航电资源管理器，演示所有权转移、不可变/可变借用",
 	safetyLevel: "DAL-A",
 	inputs: [
 		{
@@ -2219,7 +2229,8 @@ const RUST_ASYNC_TEMPLATE: ContractTemplate = {
 	name: "RustAsyncPipeline",
 	category: "rust",
 	categoryLabel: "Rust async",
-	description: "Rust tokio 异步并发管道，支持 Arc<Mutex> 共享状态、mpsc 通道、并发工作池",
+	description:
+		"Rust tokio 异步并发管道，支持 Arc<Mutex> 共享状态、mpsc 通道、并发工作池",
 	safetyLevel: "DAL-B",
 	inputs: [
 		{
@@ -2393,7 +2404,8 @@ const ARINC653_PARTITION_SCHEDULER_TEMPLATE: ContractTemplate = {
 		{
 			name: "partition_name",
 			type: "string",
-			description: "分区名 (默认 Partition_1，如 Display/Navigation/Health Monitoring)",
+			description:
+				"分区名 (默认 Partition_1，如 Display/Navigation/Health Monitoring)",
 		},
 		{
 			name: "partition_period_ms",
@@ -2425,7 +2437,8 @@ const ARINC653_PARTITION_SCHEDULER_TEMPLATE: ContractTemplate = {
 			name: "partition_state",
 			type: "uint8_t",
 			range: [0, 4],
-			description: "分区状态: 0=IDLE, 1=RUNNABLE, 2=RUNNING, 3=BLOCKED, 4=TERMINATED",
+			description:
+				"分区状态: 0=IDLE, 1=RUNNABLE, 2=RUNNING, 3=BLOCKED, 4=TERMINATED",
 		},
 		{
 			name: "result_code",
@@ -2628,7 +2641,8 @@ const FREERTOS_TASK_SCHEDULER_TEMPLATE: ContractTemplate = {
 		{
 			name: "task_name",
 			type: "string",
-			description: "任务名 (默认 Control_Law，如 Sensor_Reader/Control_Law/Telemetry_Output)",
+			description:
+				"任务名 (默认 Control_Law，如 Sensor_Reader/Control_Law/Telemetry_Output)",
 		},
 		{
 			name: "priority",
@@ -2669,7 +2683,8 @@ const FREERTOS_TASK_SCHEDULER_TEMPLATE: ContractTemplate = {
 			name: "task_state",
 			type: "uint8_t",
 			range: [0, 4],
-			description: "任务状态: 0=DELETED, 1=READY, 2=RUNNING, 3=BLOCKED, 4=SUSPENDED",
+			description:
+				"任务状态: 0=DELETED, 1=READY, 2=RUNNING, 3=BLOCKED, 4=SUSPENDED",
 		},
 		{
 			name: "result_code",
