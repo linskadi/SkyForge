@@ -121,6 +121,28 @@ class StreamManager:
         """返回当前活跃连接数。"""
         return len(self._connections)
 
+    async def close(self) -> None:
+        """关闭 StreamManager，清理所有 WebSocket 连接。
+
+        本类自身不持有 Redis pubsub 资源（仅管理 WebSocket 连接池），
+        但提供统一的 close() 入口供 FastAPI lifespan / atexit 调用，
+        避免进程退出时残留连接。Redis pubsub 连接的关闭由 RedisManager.close()
+        负责，在 main.py 的 lifespan shutdown 中一并调用。
+        """
+        async with self._lock:
+            items = list(self._connections.items())
+            self._connections.clear()
+        # 主动关闭残留 WebSocket（忽略发送失败）
+        for ws_id, ws in items:
+            try:
+                await ws.close()
+            except Exception as e:
+                logger.debug(f"StreamManager:关闭连接 {ws_id} 时异常: {e}")
+        if items:
+            logger.info(
+                f"StreamManager:close 完成，已关闭 {len(items)} 个残留连接"
+            )
+
 
 # 全局单例
 _stream_manager: StreamManager | None = None

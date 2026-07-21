@@ -16,6 +16,9 @@ from typing import Any
 
 from skyforge_engine.utils.log_util import logger
 
+import warnings
+from skyforge_engine.core.verifiers.z3_verifier import Z3Verifier as _Z3Verifier
+
 
 @dataclass
 class Z3Result:
@@ -44,8 +47,8 @@ def verify_contract_constraints(
 ) -> Z3Result:
     """验证契约约束是否一致。
 
-    检查前置条件 + 不变式 + 后置条件的组合是否可满足。
-    如果不可满足 (unsat)，说明契约条件自相矛盾。
+    .. deprecated::
+        使用 ``Z3Verifier().verify(preconditions=..., postconditions=...)`` 替代。
 
     Args:
         preconditions: 前置条件列表 [{expr, domain}, ...]
@@ -55,6 +58,11 @@ def verify_contract_constraints(
     Returns:
         Z3Result: 约束验证结果。
     """
+    warnings.warn(
+        "verify_contract_constraints is deprecated, use Z3Verifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not _has_z3():
         return Z3Result(satisfiable=True, tool_available=False)
 
@@ -129,7 +137,8 @@ def generate_boundary_test_cases(
 ) -> list[dict[str, float]]:
     """基于约束求解生成边界测试用例。
 
-    例如：传感器输出范围 0-4095，按阈值/边界/步长生成测试向量。
+    .. deprecated::
+        使用 ``Z3Verifier`` 的边界测试生成能力替代。
 
     Args:
         variable: 变量名。
@@ -139,6 +148,11 @@ def generate_boundary_test_cases(
     Returns:
         测试用例列表 [{variable: value}, ...]。
     """
+    warnings.warn(
+        "generate_boundary_test_cases is deprecated, use Z3Verifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not _has_z3():
         return [{"value": (domain[0] + domain[1]) / 2, "type": "default"}]
 
@@ -184,6 +198,9 @@ def check_component_compatibility_z3(
 ) -> dict[str, Any]:
     """用 Z3 验证组件输入/输出兼容性。
 
+    .. deprecated::
+        使用 ``Z3Verifier`` 替代。
+
     Args:
         input_range: 输入范围 (min, max)。
         output_range: 输出范围 (min, max)。
@@ -192,6 +209,11 @@ def check_component_compatibility_z3(
     Returns:
         兼容性结果字典。
     """
+    warnings.warn(
+        "check_component_compatibility_z3 is deprecated, use Z3Verifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not _has_z3():
         return {"compatible": True, "method": "default"}
 
@@ -258,11 +280,37 @@ def _add_expr(solver, variables: dict, expr: str) -> None:
 
 # 便捷函数
 def verify(counts: list[dict], conditions: list[dict]) -> dict:
-    """便捷函数: 验证契约约束并返回字典。"""
-    result = verify_contract_constraints(counts, conditions)
-    return {
-        "satisfiable": result.satisfiable,
-        "model": result.model,
-        "violations": result.violations,
-        "tool_available": result.tool_available,
-    }
+    """便捷函数: 验证契约约束并返回字典。
+
+    .. deprecated::
+        使用 ``Z3Verifier().verify(preconditions=..., postconditions=...)`` 替代。
+    """
+    warnings.warn(
+        "verify is deprecated, use Z3Verifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    verifier = _Z3Verifier()
+    if not verifier.is_available():
+        return {
+            "satisfiable": True,
+            "model": {},
+            "violations": [],
+            "tool_available": False,
+        }
+    try:
+        result = verifier.verify(preconditions=counts, postconditions=conditions)
+        return {
+            "satisfiable": result.passed,
+            "model": {},
+            "violations": [v.get("message", "") for v in result.violations],
+            "tool_available": result.tool_available,
+        }
+    except Exception as e:
+        logger.error(f"Z3:验证异常: {e}")
+        return {
+            "satisfiable": True,
+            "model": {},
+            "violations": [str(e)],
+            "tool_available": verifier.is_available(),
+        }

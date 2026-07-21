@@ -30,5 +30,23 @@ class TestCommonUtils(unittest.TestCase):
             ensure_safe_task_id("")
 
 
+class TestCreateTaskIdSecurity(unittest.TestCase):
+    def test_task_id_unique_under_concurrency(self):
+        """1000 次快速调用生成的 task_id 必须唯一。"""
+        import concurrent.futures
+        ids = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
+            ids = list(pool.map(lambda _: create_task_id(), range(1000)))
+        self.assertEqual(len(set(ids)), 1000, "task_id 重复")
+
+    def test_task_id_not_predictable(self):
+        """task_id 不应完全基于时间戳（不可预测）。"""
+        id1 = create_task_id()
+        id2 = create_task_id()
+        rand1 = id1.split("-")[-1]
+        rand2 = id2.split("-")[-1]
+        self.assertNotEqual(rand1, rand2, "随机部分可预测")
+
+
 if __name__ == "__main__":
     unittest.main()

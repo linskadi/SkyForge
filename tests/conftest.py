@@ -1,14 +1,21 @@
-# -*- coding: utf-8 -*-
-"""pytest 配置：将 src/ 加入 sys.path，使 skyforge_engine 包可被导入。
+"""Repository-wide test safety defaults.
 
-运行方式:
-    cd SkyForge
-    .venv\\Scripts\\python.exe -m pytest tests/test_arinc653_adapter.py -v
+Tests must never spend a configured cloud API balance unless a dedicated test
+explicitly replaces these values with a fake transport.
 """
 
-import sys
-from pathlib import Path
+import pytest
 
-_SRC = Path(__file__).resolve().parent.parent / "src"
-if str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
+
+@pytest.fixture(autouse=True)
+def disable_paid_llm_by_default(monkeypatch):
+    monkeypatch.setenv("SKYFORGE_LLM_MODE", "mock")
+    monkeypatch.setenv("USE_LLM", "false")
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+
+    from skyforge_engine.config import settings
+
+    monkeypatch.setattr(settings, "SKYFORGE_LLM_MODE", "mock")
+    monkeypatch.setattr(settings, "SKYFORGE_LLM_PROVIDER", None)
+    monkeypatch.setattr(settings, "LLM_API_KEY", None)
+    monkeypatch.setattr(settings, "USE_LLM", False)

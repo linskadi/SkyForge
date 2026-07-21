@@ -495,6 +495,160 @@ class EvidenceCollector:
             },
         )
 
+    def record_compile_result(
+        self,
+        compiler: str,
+        compiler_version: str,
+        source_file: str,
+        exit_code: int,
+        warnings: list[str] | None = None,
+    ) -> EvidenceItem:
+        """记录编译验证证据 (DO-178C A-5.3 编译验证)。
+
+        Args:
+            compiler: 编译器名称 (gcc/clang)
+            compiler_version: 编译器版本
+            source_file: 源文件路径
+            exit_code: 编译退出码 (0=成功)
+            warnings: 编译警告列表
+        """
+        return self._add_item(
+            category="verification",
+            do178c_ref="A-5.3",
+            description=f"编译验证: {compiler} {compiler_version} → exit={exit_code}",
+            data={
+                "compiler": compiler,
+                "compiler_version": compiler_version,
+                "source_file": source_file,
+                "exit_code": exit_code,
+                "passed": exit_code == 0,
+                "warnings": warnings or [],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def record_pr_created(
+        self,
+        pr_id: str,
+        title: str,
+        branch: str,
+        status: str = "open",
+    ) -> EvidenceItem:
+        """记录正式 PR 系统证据 (DO-178C A-8.2 正式 PR)。
+
+        Args:
+            pr_id: PR 编号 (PR-YYYY-NNNN)
+            title: PR 标题
+            branch: 分支名
+            status: 状态 (open/merged/closed)
+        """
+        return self._add_item(
+            category="configuration",
+            do178c_ref="A-8.2",
+            description=f"PR 创建: {pr_id} — {title}",
+            data={
+                "pr_id": pr_id,
+                "title": title,
+                "branch": branch,
+                "status": status,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def record_contract_breach(
+        self,
+        contract_id: str,
+        failed_step: int,
+        assertion_message: str,
+        breach_type: str = "postcondition",
+        stderr_output: str = "",
+    ) -> EvidenceItem:
+        """记录契约违约检测证据 (OBJ-12 契约违约处理)。
+
+        Args:
+            contract_id: 违约的契约 ID
+            failed_step: 违约发生的仿真步骤
+            assertion_message: 断言失败消息
+            breach_type: 违约类型 (postcondition/invariant/precondition/fault_handling)
+            stderr_output: 标准错误输出
+        """
+        return self._add_item(
+            category="verification",
+            do178c_ref="OBJ-12",
+            description=f"契约违约检测: {contract_id} step={failed_step} ({breach_type})",
+            data={
+                "contract_id": contract_id,
+                "failed_step": failed_step,
+                "assertion_message": assertion_message,
+                "breach_type": breach_type,
+                "stderr_output": stderr_output[:500],
+                "detected_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def record_breach_resolution(
+        self,
+        contract_id: str,
+        resolution_method: str,
+        repair_iteration: int = 0,
+    ) -> EvidenceItem:
+        """记录契约违约解决证据 (OBJ-12 契约违约处理)。
+
+        Args:
+            contract_id: 违约的契约 ID
+            resolution_method: 解决方式 (code_repair/contract_relaxation/false_positive/no_breach)
+            repair_iteration: 修复迭代次数
+        """
+        return self._add_item(
+            category="verification",
+            do178c_ref="OBJ-12",
+            description=f"契约违约解决: {contract_id} → {resolution_method}",
+            data={
+                "contract_id": contract_id,
+                "resolution_method": resolution_method,
+                "repair_iteration": repair_iteration,
+                "resolved_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+    def record_independent_review(
+        self,
+        reviewer_id: str,
+        reviewer_role: str,
+        is_author: bool,
+        scope: str,
+        findings: list[str] | None = None,
+        approved: bool = True,
+        comments: str = "",
+    ) -> EvidenceItem:
+        """记录独立审查证据 (OBJ-17 独立验证)。
+
+        Args:
+            reviewer_id: 审查者标识
+            reviewer_role: 审查者角色 (tool/automated_tool/human_reviewer/ci_system)
+            is_author: 是否为代码作者 (False = 真正独立)
+            scope: 审查范围 (code_review/contract_review/simulation_review/static_analysis)
+            findings: 审查发现
+            approved: 是否通过
+            comments: 审查意见
+        """
+        return self._add_item(
+            category="review",
+            do178c_ref="OBJ-17",
+            description=f"独立审查: {reviewer_id} ({reviewer_role}) scope={scope} → {'通过' if approved else '未通过'}",
+            data={
+                "reviewer_id": reviewer_id,
+                "reviewer_role": reviewer_role,
+                "is_author": is_author,
+                "independent": not is_author,
+                "scope": scope,
+                "findings": findings or [],
+                "approved": approved,
+                "comments": comments,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
     def record_formal_verification(
         self,
         verifier_type: str,
@@ -636,6 +790,8 @@ class EvidenceCollector:
             "A-8.3": "问题报告",
             "A-9.1": "独立性",
             "DO-330 §12.2": "工具鉴定",
+            "OBJ-12": "契约违约处理",
+            "OBJ-17": "独立验证",
         }
 
         covered = {}

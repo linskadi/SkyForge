@@ -1,0 +1,35 @@
+实现一个多传感器数据融合模块，使用卡尔曼滤波算法融合加速度计、陀螺仪和磁力计数据。
+
+功能需求：
+- 传感器输入：
+  - 加速度计：三轴加速度（ax, ay, az），范围±16g，噪声0.005g
+  - 陀螺仪：三轴角速度（gx, gy, gz），范围±2000°/s，噪声0.01°/s
+  - 磁力计：三轴磁场（mx, my, mz），范围±1300μT，噪声0.3μT
+- 输出：融合后的姿态四元数（q0, q1, q2, q3）
+- 算法：扩展卡尔曼滤波（EKF）
+  - 状态向量：9维（位置3+速度3+姿态3）
+  - 预测步骤：基于加速度计和陀螺仪
+  - 更新步骤：基于磁力计
+- 融合频率：100Hz
+
+安全需求：
+- 符合DO-178C DAL-A级别要求
+- 符合MISRA-C:2012编码标准
+- 禁止动态内存分配
+- 所有矩阵运算使用固定大小数组
+
+性能需求：
+- 单次融合时间 < 1ms
+- CPU占用率 < 5%
+- 内存占用 < 10KB
+
+接口定义：
+- 初始化函数：void sensor_fusion_init(void)
+- 更新函数：void sensor_fusion_update(float ax, float ay, float az, float gx, float gy, float gz, float mx, float my, float mz)
+- 获取姿态：void sensor_fusion_get_quaternion(float* q0, float* q1, float* q2, float* q3)
+- 获取置信度：float sensor_fusion_get_confidence(void)
+
+故障处理：
+- 传感器超范围：标记为无效，使用预测值
+- NaN/Inf检测：使用上一次有效值
+- 传感器失效：降级到纯积分模式

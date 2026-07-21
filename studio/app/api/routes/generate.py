@@ -1,126 +1,143 @@
-"""WebSocket 流式推送路由：Agent 思考过程实时推送到前端。
+"""Legacy WebSocket compatibility endpoint (DEPRECATED).
 
-WebSocket /ws/agent-stream
+.. deprecated::
+    ``/ws/agent-stream`` is deprecated as of V1.0 and will be removed in V2.0.
+    New clients should use the V1 TaskService flow:
+
+    1. ``POST /api/v1/tasks`` to create a task and obtain ``task_id``.
+    2. ``WS /api/v1/tasks/{task_id}/events`` to subscribe to its event stream.
+
+    This endpoint is preserved for one release to keep existing clients
+    working. It still creates a task via the V1 ``TaskService`` (single owner
+    of pipeline execution) and streams events through the shared
+    ``TaskStreamRegistry``; it just does both in one socket call.
+
+    New clients use POST /api/v1/tasks and the subscribe-only V1 socket.
 """
 
-from dataclasses import asdict
 from datetime import datetime
+from uuid import uuid4
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from skyforge_engine.pipeline import run_full_pipeline
-from app.core.streaming import get_stream_manager
+from app.core.streaming import get_task_stream_registry
+from app.db import SessionLocal
+from app.repositories import task_history_repo, task_repo
+from app.services.task_service import get_task_service
 from app.utils.log_util import logger
+from skyforge_engine.config import settings
 
 router = APIRouter()
+
+DEPRECATION_MIGRATION_URL = "/api/v1/tasks/{task_id}/events"
+
+
+def _resolve_legacy_profile_id(data: dict) -> str:
+    profile_id = data.get("profile_id")
+    if profile_id in {"cloud", "local"}:
+        return str(profile_id)
+    return "cloud" if settings.SKYFORGE_LLM_MODE == "api" else "local"
 
 
 @router.websocket("/ws/agent-stream")
 async def agent_stream(websocket: WebSocket) -> None:
-    """Agent 流式推送 WebSocket。
-
-    协议：
-    1. 前端连接后发送 JSON：{"requirement": "...", "scade_file": "..."}
-    2. 后端运行 run_full_pipeline，通过 log_hook 逐条推送 Agent 思考消息
-    3. 流水线完成后推送 {"level": "complete", "result": {...}}
-    4. 连接保持，可继续接收下一个生成请求
-
-    消息格式（与前端 AgentTerminal.vue 对齐）：
-    {
-        "agent": "REQ-Parser" | "CON-Gen" | "CODE-Gen" | "REPAIR" |
-                 "SYSTEM" | "TERMINAL",
-        "level": "info" | "success" | "warn" | "error" | "complete",
-        "thought": "消息内容",
-        "time": "ISO 8601 时间戳"
-    }
-    """
     await websocket.accept()
-    stream_manager = get_stream_manager()
-    ws_id = await stream_manager.register(websocket)
-    logger.info(f"WebSocket /ws/agent-stream 连接建立 id={ws_id}")
-
+    # Phase 5: notify legacy clients about the V2 channel so they can migrate.
+    # We send a deprecation warning immediately on connect, but still process
+    # subsequent messages to preserve the one-release compatibility contract.
+    await websocket.send_json({
+        "type": "deprecation_warning",
+        "level": "warn",
+        "agent": "SYSTEM",
+        "thought": "/ws/agent-stream is deprecated, use /api/v1/tasks/{task_id}/events instead",
+        "message": "/ws/agent-stream is deprecated, use /api/v1/tasks/{task_id}/events instead",
+        "time": datetime.now().isoformat(),
+        "migration": DEPRECATION_MIGRATION_URL,
+    })
+    registry = get_task_stream_registry()
+    active_subscriptions: set[str] = set()
     try:
         while True:
-            try:
-                data = await websocket.receive_json()
-            except WebSocketDisconnect:
-                break
-            except Exception as e:
-                logger.warning(f"WebSocket 接收消息异常: {e}")
-                break
-
+            data = await websocket.receive_json()
             if not isinstance(data, dict):
                 data = {"requirement": str(data)}
 
-            requirement = data.get("requirement", "") or ""
-            scade_file = data.get("scade_file", "") or ""
-
-            if not requirement and not scade_file:
-                await websocket.send_json(
-                    {
-                        "agent": "SYSTEM",
-                        "level": "error",
-                        "thought": "必须提供 requirement 或 scade_file 至少一项",
-                        "time": datetime.now().isoformat(),
-                    }
-                )
+            task_id = str(data.get("task_id") or "")
+            if data.get("action") == "subscribe" and task_id:
+                if await _subscribe_existing(websocket, task_id):
+                    active_subscriptions.add(task_id)
                 continue
 
-            req_preview = (
-                requirement[:50] if requirement else f"<scade_file {len(scade_file)}B>"
+            requirement = str(data.get("requirement") or "")
+            scade_file = str(data.get("scade_file") or "")
+            if not requirement and not scade_file:
+                await websocket.send_json(_message(
+                    "error", "必须提供 requirement 或 scade_file 至少一项"
+                ))
+                continue
+
+            service = get_task_service()
+            created = await service.create(
+                requirement=requirement or f"SCADE input ({len(scade_file)} bytes)",
+                scade_file=scade_file or None,
+                language=str(data.get("language") or "c"),
+                profile_id=_resolve_legacy_profile_id(data),
+                idempotency_key=str(data.get("idempotency_key") or f"legacy-ws-{uuid4().hex}"),
             )
-            logger.info(f"WebSocket /ws/agent-stream 收到请求: {req_preview}...")
-
-            async def log_hook(agent_name: str, level: str, message: str) -> None:
-                try:
-                    await websocket.send_json(
-                        {
-                            "agent": agent_name,
-                            "level": level,
-                            "thought": message,
-                            "time": datetime.now().isoformat(),
-                        }
-                    )
-                except (WebSocketDisconnect, RuntimeError, ConnectionError):
-                    pass
-
-            try:
-                result = await run_full_pipeline(
-                    requirement=requirement or None,
-                    scade_file=scade_file or None,
-                    log_hook=log_hook,
-                )
-                serializable_result = dict(result)
-                if "cppcheck_result" in serializable_result:
-                    serializable_result["cppcheck_result"] = [
-                        asdict(v) for v in serializable_result["cppcheck_result"]
-                    ]
-                await websocket.send_json(
-                    {
-                        "agent": "SYSTEM",
-                        "level": "complete",
-                        "thought": "全流程完成",
-                        "result": serializable_result,
-                        "time": datetime.now().isoformat(),
-                    }
-                )
-            except Exception as e:
-                logger.error(f"WebSocket pipeline 异常: {e}")
-                try:
-                    await websocket.send_json(
-                        {
-                            "agent": "SYSTEM",
-                            "level": "error",
-                            "thought": f"流水线异常: {e}",
-                            "time": datetime.now().isoformat(),
-                        }
-                    )
-                except (WebSocketDisconnect, RuntimeError, ConnectionError):
-                    pass
+            task_id = created["id"]
+            if await registry.add_subscriber(task_id, websocket):
+                active_subscriptions.add(task_id)
+            # Execution and persistence are owned by TaskService; this await
+            # never invokes run_full_pipeline a second time.
+            await service.wait(task_id)
     except WebSocketDisconnect:
-        logger.info(f"WebSocket /ws/agent-stream 断开 id={ws_id}")
-    except Exception as e:
-        logger.error(f"WebSocket /ws/agent-stream 异常: {e}")
+        pass
+    except Exception as exc:
+        logger.warning(f"legacy agent-stream closed: {exc}")
     finally:
-        await stream_manager.unregister(ws_id)
-        logger.info(f"WebSocket /ws/agent-stream 连接清理 id={ws_id}")
+        for task_id in active_subscriptions:
+            await registry.remove_subscriber(task_id, websocket)
+
+
+def _message(level: str, thought: str, **extra):
+    return {
+        "agent": "SYSTEM",
+        "level": level,
+        "thought": thought,
+        "message": thought,
+        "time": datetime.now().isoformat(),
+        **extra,
+    }
+
+
+async def _subscribe_existing(websocket: WebSocket, task_id: str) -> bool:
+    registry = get_task_stream_registry()
+    if await registry.add_subscriber(task_id, websocket):
+        return True
+
+    with SessionLocal() as db:
+        task = task_repo.get(db, task_id)
+        if task is not None:
+            if task.status in {"queued", "running"}:
+                await websocket.send_json(_message(
+                    "warn", f"任务 {task_id} 无活跃执行器，可能已被中断"
+                ))
+            else:
+                detail = task_repo.serialize_task(task)
+                await websocket.send_json(_message(
+                    "complete", f"任务 {task_id} 已完成（status={task.status}）",
+                    type="complete", result=detail.get("result"),
+                ))
+            return False
+
+        legacy = task_history_repo.get(db, task_id)
+        if legacy is not None:
+            await websocket.send_json(_message(
+                "complete", f"legacy 任务 {task_id} 仅保留摘要",
+                type="complete",
+                result={"requirement": legacy.requirement, "final_code": ""},
+            ))
+            return False
+
+    await websocket.send_json(_message("error", f"任务 {task_id} 不存在或已过期"))
+    return False

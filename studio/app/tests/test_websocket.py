@@ -19,11 +19,11 @@ from fastapi.testclient import TestClient
 
 # ---- 在导入 app 之前设置环境变量，避免触发真实 LM Studio 调用 ----
 os.environ["USE_LLM"] = "false"
-os.environ["LMSTUDIO_BASE_URL"] = "http://localhost:9999/v1"
+os.environ["LOCAL_LLM_BASE_URL"] = "http://localhost:9999/v1"
 os.environ["HIL_ENABLED"] = "false"
 os.environ["HIL_TIMEOUT"] = "300"
 
-from app.core.llm import lmstudio_client as lmstudio_module  # noqa: E402
+from app.core.llm import local_llm_client as lmstudio_module  # noqa: E402
 from app.core.llm.model_router import reset_model_router  # noqa: E402
 from app.core.hil.hil_manager import reset_hil_manager  # noqa: E402
 from app.core.streaming import StreamManager, get_stream_manager  # noqa: E402
@@ -31,7 +31,7 @@ from app.main import app  # noqa: E402
 
 
 def _reset_singletons() -> None:
-    """重置 HIL / ModelRouter / LMStudio / StreamManager 单例。"""
+    """重置 HIL / ModelRouter / LMStudio / StreamManager / TaskStreamRegistry 单例。"""
     reset_hil_manager()
     reset_model_router()
     lmstudio_module._unified_client = None
@@ -39,6 +39,10 @@ def _reset_singletons() -> None:
     import app.core.streaming.stream_manager as sm_module
 
     sm_module._stream_manager = None
+    # 重置 TaskStreamRegistry 单例，避免测试间 task 状态污染
+    import app.core.streaming.task_stream_registry as tsr_module
+
+    tsr_module._task_stream_registry = None
 
 
 class TestWebSocketConnection(unittest.TestCase):
@@ -153,6 +157,136 @@ class TestWebSocketStreamPipeline(unittest.TestCase):
         # 连接断开后 StreamManager 应无残留
         sm = get_stream_manager()
         self.assertEqual(sm.count(), 0)
+
+
+class TestWebSocketSubscribeMode(unittest.TestCase):
+    """WebSocket 订阅模式测试：订阅已有运行中的 task，不启动新 pipeline。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        _reset_singletons()
+        cls.client = TestClient(app)
+        cls.client.__enter__()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.client.__exit__(None, None, None)
+
+    def setUp(self) -> None:
+        _reset_singletons()
+
+    def tearDown(self) -> None:
+        _reset_singletons()
+
+    def test_subscribe_nonexistent_task_returns_error(self) -> None:
+        """订阅不存在的 task_id 应推送 error 消息（fallback 路径）。"""
+        with self.client.websocket_connect("/ws/agent-stream") as websocket:
+            # Phase 5: 旧通道会在 accept 后立即推送一条 deprecation_warning
+            # （level=warn），先消费掉这条以保持向后兼容契约。
+            first = websocket.receive_json()
+            self.assertEqual(first.get("type"), "deprecation_warning")
+            websocket.send_json(
+                {"task_id": "REQ-nonexistent-9999", "action": "subscribe"}
+            )
+            # 应该收到一条 error 消息（task 不存在）
+            msg = websocket.receive_json()
+            self.assertIsInstance(msg, dict)
+            self.assertEqual(msg.get("level"), "error")
+            self.assertIn("不存在", msg.get("thought", ""))
+
+
+class TestTaskStreamRegistry(unittest.TestCase):
+    """TaskStreamRegistry 单元测试：register / subscribe / broadcast / replay。"""
+
+    def setUp(self) -> None:
+        _reset_singletons()
+
+    def tearDown(self) -> None:
+        _reset_singletons()
+
+    def test_register_subscribe_broadcast_replay(self) -> None:
+        """完整流程：注册 task → 主 WS 广播日志 → 订阅者加入并回放历史。"""
+        from app.core.streaming import get_task_stream_registry
+
+        registry = get_task_stream_registry()
+        task_id = "REQ-test-001"
+
+        # 1. 注册 task
+        asyncio.run(registry.register_task(task_id))
+        self.assertTrue(asyncio.run(registry.is_active(task_id)))
+
+        # 2. 主 WS（mock）广播 3 条日志
+        ws_main = AsyncMock()
+        asyncio.run(registry.add_subscriber(task_id, ws_main))
+        for i in range(3):
+            asyncio.run(
+                registry.broadcast(
+                    task_id,
+                    {"agent": "SYSTEM", "level": "info", "thought": f"msg-{i}"},
+                )
+            )
+        # 主 WS 应收到 3 条消息
+        self.assertEqual(ws_main.send_json.await_count, 3)
+
+        # 3. 订阅者加入：应回放 3 条历史日志
+        ws_sub = AsyncMock()
+        asyncio.run(registry.add_subscriber(task_id, ws_sub))
+        # ws_sub 应收到 3 条回放
+        self.assertEqual(ws_sub.send_json.await_count, 3)
+        # 校验回放顺序与内容
+        for i in range(3):
+            args = ws_sub.send_json.await_args_list[i]
+            self.assertEqual(args.args[0]["thought"], f"msg-{i}")
+
+        # 4. 后续广播应同时送达主 WS 和订阅者
+        asyncio.run(
+            registry.broadcast(
+                task_id,
+                {"agent": "SYSTEM", "level": "complete", "thought": "done"},
+            )
+        )
+        # 主 WS 累计 4 条
+        self.assertEqual(ws_main.send_json.await_count, 4)
+        # 订阅者累计 4 条（3 回放 + 1 实时）
+        self.assertEqual(ws_sub.send_json.await_count, 4)
+
+        # 5. 完成 task，is_active 变 False
+        asyncio.run(registry.finish_task(task_id))
+        self.assertFalse(asyncio.run(registry.is_active(task_id)))
+
+    def test_broadcast_to_unregistered_task_drops_message(self) -> None:
+        """广播到未注册的 task_id 应静默丢弃（不抛异常）。"""
+        from app.core.streaming import get_task_stream_registry
+
+        registry = get_task_stream_registry()
+        # 不应抛异常
+        asyncio.run(
+            registry.broadcast("REQ-nonexistent", {"level": "info"})
+        )
+
+    def test_cleanup_expired(self) -> None:
+        """完成的 task 历史日志超过 TTL 后应被清理。"""
+        from app.core.streaming import get_task_stream_registry
+        import app.core.streaming.task_stream_registry as tsr_module
+
+        # 临时把 TTL 调小到 0.1s 加速测试
+        original_ttl = tsr_module._TASK_HISTORY_TTL_SEC
+        tsr_module._TASK_HISTORY_TTL_SEC = 0.1
+        try:
+            registry = get_task_stream_registry()
+            asyncio.run(registry.register_task("REQ-ttl-001"))
+            asyncio.run(registry.finish_task("REQ-ttl-001"))
+            # 立即清理：不应清理（TTL 未到）
+            n = asyncio.run(registry.cleanup_expired())
+            self.assertEqual(n, 0)
+            # 等待 TTL 过期
+            import time as _time
+
+            _time.sleep(0.2)
+            n = asyncio.run(registry.cleanup_expired())
+            self.assertEqual(n, 1)
+        finally:
+            tsr_module._TASK_HISTORY_TTL_SEC = original_ttl
 
 
 class TestStreamManager(unittest.TestCase):

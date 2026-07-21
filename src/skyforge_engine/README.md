@@ -23,9 +23,19 @@ pip install skyforge-engine
 # 仅引擎（6 个依赖，零 LLM）
 pip install skyforge-engine
 
+# 形式化验证（可选，z3-solver 纯 Python 包，纯 SMT 求解）
+pip install z3-solver
+
+# CBMC C 有界模型检查器（可选，外部二进制工具）
+# Linux:   apt install cbmc
+# macOS:   brew install cbmc
+# Windows: 官方 msi 安装到 C:\Program Files\cbmc\bin\
+
 # 嵌入式编译（远期目标）
 nuitka skyforge_engine → <15MB 单文件
 ```
+
+> **Windows 注意**：cppcheck MISRA addon 使用 `sys.executable`（venv 内 Python）调用，避免 Windows Store python stub（exitcode 9009）问题；z3 通过 Python 包检测而非命令行二进制；cbmc 额外检测 `C:\Program Files\cbmc\bin\cbmc.exe` 默认路径。
 
 ## 运行
 

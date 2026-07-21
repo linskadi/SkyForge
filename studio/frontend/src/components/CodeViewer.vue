@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { type InlineToken, parseInlineTags } from "@/utils/tagParser";
 /**
  * CodeViewer 代码展示组件（含高亮追溯 Patch 3 + 双向联动）
  *
@@ -14,6 +13,7 @@ import { type InlineToken, parseInlineTags } from "@/utils/tagParser";
  * - 通过 tagClick emit 通知父组件代码中点击的 Tag（联动需求/契约区）
  */
 import { computed, ref } from "vue";
+import { type InlineToken, parseInlineTags } from "@/utils/tagParser";
 
 interface Props {
 	/** C 代码内容 */

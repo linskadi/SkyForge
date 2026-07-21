@@ -3,7 +3,7 @@ import path from "node:path";
 import vue from "@vitejs/plugin-vue";
 import autoprefixer from "autoprefixer";
 import tailwind from "tailwindcss";
-import { defineConfig } from "vite";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
 	css: {
@@ -20,10 +20,17 @@ export default defineConfig({
 	build: {
 		rollupOptions: {
 			output: {
-				manualChunks: {
-					monaco: ["monaco-editor"],
-					echarts: ["echarts", "vue-echarts"],
-					vendor: ["vue", "vue-router", "pinia"],
+				manualChunks(id) {
+					if (id.includes("monaco-editor")) return "monaco";
+					if (id.includes("echarts") || id.includes("vue-echarts"))
+						return "echarts";
+					if (
+						id.includes("node_modules/vue") ||
+						id.includes("node_modules/vue-router") ||
+						id.includes("node_modules/pinia")
+					) {
+						return "vendor";
+					}
 				},
 			},
 		},

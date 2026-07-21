@@ -12,9 +12,9 @@ import os
 import unittest
 
 from skyforge_engine.agents.requirement_parser import RequirementParserAgent
-from app.core.llm import lmstudio_client as lmstudio_module
-from app.core.llm.json_parser import safe_parse_llm_json
-from app.core.llm.lmstudio_client import get_lmstudio_client
+from app.core.llm import local_llm_client as lmstudio_module
+from app.core.llm.json_parser import JSONParseError, safe_parse_llm_json
+from app.core.llm.local_llm_client import get_local_llm_client as get_lmstudio_client
 
 
 def _reset_lmstudio_singleton() -> None:
@@ -54,12 +54,16 @@ class TestSafeParseJson(unittest.TestCase):
         self.assertEqual(result["safety_level"], "DAL-A")
 
     def test_safe_parse_json_invalid(self) -> None:
-        """无效输入返回 None。"""
-        self.assertIsNone(safe_parse_llm_json("这根本不是 JSON"))
-        self.assertIsNone(safe_parse_llm_json(""))
-        self.assertIsNone(safe_parse_llm_json("   "))
+        """无效输入抛出 JSONParseError。"""
+        with self.assertRaises(JSONParseError):
+            safe_parse_llm_json("这根本不是 JSON")
+        with self.assertRaises(JSONParseError):
+            safe_parse_llm_json("")
+        with self.assertRaises(JSONParseError):
+            safe_parse_llm_json("   ")
         # 只有花括号但内容非法
-        self.assertIsNone(safe_parse_llm_json("{invalid json content}"))
+        with self.assertRaises(JSONParseError):
+            safe_parse_llm_json("{invalid json content}")
 
 
 class TestAgentWithMock(unittest.TestCase):
@@ -95,10 +99,10 @@ class TestAgentLlmUnavailable(unittest.TestCase):
     def setUp(self) -> None:
         # 保存原环境变量
         self._orig_use_llm = os.environ.get("USE_LLM")
-        self._orig_base_url = os.environ.get("LMSTUDIO_BASE_URL")
+        self._orig_base_url = os.environ.get("LOCAL_LLM_BASE_URL")
         # 模拟 USE_LLM=true 但 LM Studio 不可达（指向不存在的端口）
         os.environ["USE_LLM"] = "true"
-        os.environ["LMSTUDIO_BASE_URL"] = "http://localhost:9999/v1"
+        os.environ["LOCAL_LLM_BASE_URL"] = "http://localhost:9999/v1"
         _reset_lmstudio_singleton()
 
     def tearDown(self) -> None:
@@ -108,9 +112,9 @@ class TestAgentLlmUnavailable(unittest.TestCase):
         else:
             os.environ.pop("USE_LLM", None)
         if self._orig_base_url is not None:
-            os.environ["LMSTUDIO_BASE_URL"] = self._orig_base_url
+            os.environ["LOCAL_LLM_BASE_URL"] = self._orig_base_url
         else:
-            os.environ.pop("LMSTUDIO_BASE_URL", None)
+            os.environ.pop("LOCAL_LLM_BASE_URL", None)
         _reset_lmstudio_singleton()
 
     def test_agent_llm_unavailable(self) -> None:

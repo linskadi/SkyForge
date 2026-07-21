@@ -2258,7 +2258,9 @@ const RUST_ASYNC_TEMPLATE: ContractTemplate = {
 		{
 			name: "counter",
 			type: "u64",
-			range: [0, 18446744073709551615],
+			// uint64 实际上界为 2^64-1 (18446744073709551615)，
+			// 但 JS Number 精度上限为 2^53-1，用 MAX_SAFE_INTEGER 近似表示。
+			range: [0, Number.MAX_SAFE_INTEGER],
 			description: "原子计数器",
 		},
 	],

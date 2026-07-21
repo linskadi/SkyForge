@@ -1,7 +1,9 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
 import { ref } from "vue";
 import AgentTerminal from "../AgentTerminal.vue";
+import { useExecutionStore } from "@/stores/executionStore";
 
 vi.mock("@tanstack/vue-virtual", () => ({
 	useVirtualizer: vi.fn(() =>
@@ -18,6 +20,11 @@ vi.mock("@tanstack/vue-virtual", () => ({
 vi.mock("@/services/mockApi", () => ({
 	mockAgentStream: vi.fn(() => vi.fn()),
 	connectAgentStream: vi.fn(() => vi.fn()),
+	connectV1TaskEvents: vi.fn(() => vi.fn()),
+	createTaskAndSubscribeV1: vi.fn(() =>
+		Promise.resolve({ taskId: null, stop: () => {} }),
+	),
+	DEFAULT_WS_URL: "ws://localhost:8000/ws/agent-stream",
 }));
 
 vi.mock("@/utils/colors", () => ({
@@ -39,6 +46,8 @@ vi.mock("@/utils/colors", () => ({
 
 describe("AgentTerminal", () => {
 	beforeEach(() => {
+		setActivePinia(createPinia());
+		localStorage.clear();
 		vi.clearAllMocks();
 		vi.useFakeTimers();
 	});
@@ -102,7 +111,7 @@ describe("AgentTerminal", () => {
 		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
 		const vm = wrapper.vm as unknown as Record<string, unknown>;
 		expect(() => {
-			(vm.push as Function)({
+			(vm.push as (payload: unknown) => void)({
 				agent: "SYSTEM",
 				level: "info",
 				thought: "Test log message",
@@ -114,13 +123,13 @@ describe("AgentTerminal", () => {
 	it("push then clear restores empty state", () => {
 		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
 		const vm = wrapper.vm as unknown as Record<string, unknown>;
-		(vm.push as Function)({
+		(vm.push as (payload: unknown) => void)({
 			agent: "SYSTEM",
 			level: "info",
 			thought: "Test log",
 			ts: 1000,
 		});
-		(vm.clear as Function)();
+		(vm.clear as () => void)();
 		expect(wrapper.find(".empty-hint").exists()).toBe(true);
 	});
 
@@ -131,7 +140,7 @@ describe("AgentTerminal", () => {
 		const vm = wrapper.vm as unknown as Record<string, unknown>;
 		expect(() => {
 			for (let i = 0; i < 5; i++) {
-				(vm.push as Function)({
+				(vm.push as (payload: unknown) => void)({
 					agent: "SYSTEM",
 					level: "info",
 					thought: `Log ${i}`,
@@ -139,14 +148,47 @@ describe("AgentTerminal", () => {
 				});
 			}
 		}).not.toThrow();
-		(vm.clear as Function)();
+		(vm.clear as () => void)();
 		expect(wrapper.find(".empty-hint").exists()).toBe(true);
 	});
 
-	it("calls mockAgentStream on mount with useMock=true", async () => {
+	it("does NOT call mockAgentStream on mount with useMock=true (three-branch logic: mock mode waits for explicit start)", async () => {
 		const { mockAgentStream } = await import("@/services/mockApi");
 		mount(AgentTerminal, { props: { useMock: true } });
+		// onMounted 三分支逻辑：mock 模式不自动启动，等待父组件显式 start()
+		expect(mockAgentStream).not.toHaveBeenCalled();
+	});
+
+	it("calls mockAgentStream when start() is invoked explicitly (mock mode)", async () => {
+		const { mockAgentStream } = await import("@/services/mockApi");
+		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
+		const vm = wrapper.vm as unknown as { start: () => void };
+		vm.start();
 		expect(mockAgentStream).toHaveBeenCalled();
+	});
+
+	it("uses current cloud execution profile when creating V1 task", async () => {
+		const { createTaskAndSubscribeV1 } = await import("@/services/mockApi");
+		useExecutionStore().setProfile("cloud");
+		const wrapper = mount(AgentTerminal, {
+			props: {
+				useMock: false,
+				requirement: "实现 ARINC 429 解码",
+				language: "cpp",
+			},
+		});
+		const vm = wrapper.vm as unknown as { start: () => void };
+
+		vm.start();
+
+		expect(createTaskAndSubscribeV1).toHaveBeenCalledWith(
+			"实现 ARINC 429 解码",
+			"cpp",
+			"cloud",
+			expect.any(Function),
+			expect.any(Function),
+			expect.any(Function),
+		);
 	});
 
 	it("clears logs on unmount without errors", () => {
@@ -157,7 +199,7 @@ describe("AgentTerminal", () => {
 	it("calls finish on unmount to clean up typing timer", () => {
 		const wrapper = mount(AgentTerminal, { props: { useMock: true } });
 		const vm = wrapper.vm as unknown as Record<string, unknown>;
-		(vm.push as Function)({
+		(vm.push as (payload: unknown) => void)({
 			agent: "SYSTEM",
 			level: "info",
 			thought: "Some log",

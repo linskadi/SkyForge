@@ -1,11 +1,18 @@
 """故障注入器：封装 VirtualSensor.inject_fault，提供故障类型描述 + 默认参数 + 参数校验。
 
-参考设计文档第 5.4 节"故障注入设计"，5 类故障：
+参考设计文档第 5.4 节"故障注入设计"，12 类故障：
 - bias：传感器偏置（data + bias_value）
 - signal_loss：信号丢失（指定区间设为 0）
 - noise：高频噪声（data + random_noise * amplitude）
 - stuck：信号卡死（指定区间设为固定值）
 - step：阶跃突变（指定时间点突变）
+- saturation：饱和截断（超出阈值截断）
+- intermittent：间歇性故障（随机丢失）
+- drift：渐变漂移（线性漂移）
+- timeout：丢帧/延迟（数据缺失）
+- glitch：跳变毛刺（瞬时跳变）
+- stuck_zero：零输出（强制归零）
+- polarity：符号反转（乘 -1）
 """
 
 from typing import Any
@@ -15,7 +22,7 @@ import numpy as np
 from skyforge_engine.digital_twin.virtual_sensor import VirtualSensor
 from skyforge_engine.utils.log_util import logger
 
-# 5 类故障的描述 + 默认参数
+# 12 类故障的描述 + 默认参数（与前端 types/domain.ts:121-133 对齐）
 FAULT_TYPES_INFO: list[dict[str, Any]] = [
     {
         "type": "bias",
@@ -73,6 +80,70 @@ FAULT_TYPES_INFO: list[dict[str, Any]] = [
             "step_at": {"type": "int", "desc": "阶跃发生步号", "required": True},
             "step_value": {"type": "float", "desc": "阶跃幅度", "required": True},
         },
+    },
+    {
+        "type": "saturation",
+        "name": "饱和截断",
+        "desc": "超出阈值的数据截断到阈值，模拟传感器饱和。",
+        "default_params": {"min_val": -1000.0, "max_val": 1000.0},
+        "params_schema": {
+            "min_val": {"type": "float", "desc": "最小阈值", "required": True},
+            "max_val": {"type": "float", "desc": "最大阈值", "required": True},
+        },
+    },
+    {
+        "type": "intermittent",
+        "name": "间歇性故障",
+        "desc": "随机区间数据丢失，模拟间歇性传感器故障。",
+        "default_params": {"probability": 0.1},
+        "params_schema": {
+            "probability": {"type": "float", "desc": "故障概率（0-1）", "required": True},
+        },
+    },
+    {
+        "type": "drift",
+        "name": "渐变漂移",
+        "desc": "数据线性漂移，模拟传感器老化漂移。",
+        "default_params": {"drift_rate": 0.5},
+        "params_schema": {
+            "drift_rate": {"type": "float", "desc": "漂移速率（每步）", "required": True},
+        },
+    },
+    {
+        "type": "timeout",
+        "name": "丢帧/延迟",
+        "desc": "随机数据缺失，模拟通信丢帧。",
+        "default_params": {"drop_rate": 0.05},
+        "params_schema": {
+            "drop_rate": {"type": "float", "desc": "丢帧率（0-1）", "required": True},
+        },
+    },
+    {
+        "type": "glitch",
+        "name": "跳变毛刺",
+        "desc": "瞬时跳变，模拟电磁干扰毛刺。",
+        "default_params": {"glitch_at": 50, "glitch_value": 5000.0},
+        "params_schema": {
+            "glitch_at": {"type": "int", "desc": "毛刺发生步号", "required": True},
+            "glitch_value": {"type": "float", "desc": "毛刺幅度", "required": True},
+        },
+    },
+    {
+        "type": "stuck_zero",
+        "name": "零输出",
+        "desc": "指定区间数据强制归零，模拟传感器归零故障。",
+        "default_params": {"start": 0, "end": 100},
+        "params_schema": {
+            "start": {"type": "int", "desc": "起始步号", "required": True},
+            "end": {"type": "int", "desc": "结束步号（不含）", "required": True},
+        },
+    },
+    {
+        "type": "polarity",
+        "name": "符号反转",
+        "desc": "数据乘 -1，模拟传感器极性反转。",
+        "default_params": {},
+        "params_schema": {},
     },
 ]
 

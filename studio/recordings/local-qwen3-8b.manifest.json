@@ -1,0 +1,20 @@
+{
+  "id": "local-qwen3-8b-20260717",
+  "title": "本地 Qwen3:8B 低通滤波器运行",
+  "profile_id": "local",
+  "source": "replay",
+  "status": "verified_with_degradation",
+  "recorded_at": "2026-07-17T21:04:05.212488+08:00",
+  "model": "qwen3:8b (Ollama)",
+  "duration_ms": 733989,
+  "source_log": "../../docs/verification/ollama_gcc_verification_log.json",
+  "source_log_sha256": "b6eb6a50e245134cfc8b056327e16ea4b6bb00f300c1b0b2b486f3b8d4013c11",
+  "evidence": {
+    "llm": { "status": "observed", "engine": "Ollama", "model": "qwen3:8b" },
+    "static_analysis": { "status": "observed", "engine": "Cppcheck", "findings": 4 },
+    "compilation": { "status": "simulated", "engine": "Python simulator", "warning": "原始日志显示 use_real_gcc=true，但 Simulation.used_mock=true，因此不把 GCC 标为观测通过" },
+    "simulation": { "status": "simulated", "passed": true }
+  },
+  "video": { "status": "unavailable", "path": null },
+  "disclaimer": "这是对既有真实本地模型运行日志的离线回放。降级阶段保持 simulated 标识，不构成适航证据。"
+}

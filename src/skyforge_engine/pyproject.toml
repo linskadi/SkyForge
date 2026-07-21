@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skyforge-engine"
-version = "0.4.0"
+version = "0.5.0"
 description = "SkyForge Engine — 机载软件代码生成核心引擎（零LLM，零Web）"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,6 +12,9 @@ dependencies = [
     "numpy>=2.2.5",
     "loguru>=0.7.3",
     "packaging>=21.0",
+    "pydantic-settings>=2.8.0",
+    "jinja2>=3.1",
+    "z3-solver>=4.13.0",
 ]
 
 [project.optional-dependencies]

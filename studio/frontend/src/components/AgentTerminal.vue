@@ -1,12 +1,4 @@
 <script setup lang="ts">
-import {
-	type AgentLog,
-	type AgentType,
-	type LogLevel,
-	connectAgentStream,
-	mockAgentStream,
-} from "@/services/mockApi";
-import { agentColorMap, levelColorMap } from "@/utils/colors";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 /**
  * AgentTerminal 组件（VSCode 终端样式 + 虚拟滚动）
@@ -16,21 +8,69 @@ import { useVirtualizer } from "@tanstack/vue-virtual";
  * - 打字机效果：逐字推入（20ms/字）
  * - 闪烁光标 ▊
  */
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import {
+	computed,
+	nextTick,
+	onBeforeUnmount,
+	onMounted,
+	ref,
+	watch,
+} from "vue";
+import {
+	type AgentLog,
+	type AgentType,
+	connectAgentStream,
+	connectV1TaskEvents,
+	createTaskAndSubscribeV1,
+	DEFAULT_WS_URL,
+	type LogLevel,
+	mockAgentStream,
+	type StreamCompletePayload,
+} from "@/services/mockApi";
+import { useExecutionStore } from "@/stores/executionStore";
+import { agentColorMap, levelColorMap } from "@/utils/colors";
 
 interface Props {
 	useMock?: boolean;
 	wsUrl?: string;
 	typeInterval?: number;
 	maxLogs?: number;
+	requirement?: string;
+	language?: string;
+	/** 订阅模式：传入 task_id 时连接 WS 后发送 {task_id, action: "subscribe"}，
+	 * 不启动新 pipeline，只接收已有运行中 task 的实时日志。
+	 * 用于从 Dashboard 点击 running 任务恢复查看 agent 思考流。 */
+	subscribeTaskId?: string;
+	/**
+	 * 通道模式：
+	 * - "v1"（默认，Phase 5 推荐）：通过 POST /api/v1/tasks + WS
+	 *   /api/v1/tasks/{task_id}/events 启动和订阅任务。
+	 * - "legacy"：使用旧通道 /ws/agent-stream（一次性发送 requirement 触发）。
+	 *
+	 * 旧通道会在 V1 通道失败时作为 fallback 自动启用。
+	 */
+	channelMode?: "v1" | "legacy";
 }
 
 const props = withDefaults(defineProps<Props>(), {
 	useMock: true,
-	wsUrl: "ws://localhost:8000/ws/agent-stream",
+	wsUrl: DEFAULT_WS_URL,
 	typeInterval: 20,
 	maxLogs: 5000,
+	requirement: "",
+	language: "c",
+	subscribeTaskId: "",
+	channelMode: "v1",
 });
+const executionStore = useExecutionStore();
+
+/**
+ * complete 事件：仅在非 mock 模式下，WebSocket 收到 `level: "complete"` 消息时触发，
+ * 透传后端返回的 `{ result, degraded }` payload，供父组件（Generate.vue）实现
+ * HTTP 与 WebSocket 双通道汇合门控（SkyForge Spec 修复 A Task 4）。
+ */
+const emit =
+	defineEmits<(e: "complete", payload?: StreamCompletePayload) => void>();
 
 interface RenderedLog {
 	ts: number;
@@ -67,6 +107,10 @@ watch(
 let typingIndex = -1;
 let typingTimer: ReturnType<typeof setTimeout> | null = null;
 let stopStream: (() => void) | null = null;
+let v1DoneHandled = false;
+let fallbackScheduled = false;
+let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+let v1FirstMessageReceived = false;
 
 const pushLog = (log: AgentLog) => {
 	if (logs.value.length >= props.maxLogs) {
@@ -129,14 +173,140 @@ const scrollToBottom = () => {
 	});
 };
 
+/**
+ * V1 通道失败时回退到旧通道（Phase 5 兼容性策略）。
+ *
+ * 仅在父组件没有主动选择 legacy 模式时启用：若 V1 通道超过 5 秒仍未收到任何
+ * 事件或第一条事件就是错误，自动断开 V1 并连接旧 /ws/agent-stream。
+ * 父组件（Generate.vue）也可以通过显式 channelMode="legacy" 跳过回退。
+ */
+const scheduleLegacyFallback = (reason: string) => {
+	if (fallbackScheduled) return;
+	if (props.channelMode === "legacy") return;
+	fallbackScheduled = true;
+	fallbackTimer = setTimeout(() => {
+		fallbackTimer = null;
+		if (v1DoneHandled) return;
+		console.warn(
+			`[AgentTerminal] V1 通道未产生输出（${reason}），回退到 legacy /ws/agent-stream`,
+		);
+		stopAll();
+		stopStream = connectAgentStream(
+			pushLog,
+			(data) => {
+				finishCurrent();
+				emit("complete", data);
+			},
+			props.wsUrl,
+			props.requirement,
+			props.language,
+			props.subscribeTaskId || undefined,
+		);
+	}, 5_000);
+};
+
+/** 取消 legacy 回退定时器（V1 通道已收到消息时调用）。 */
+const cancelFallback = () => {
+	v1FirstMessageReceived = true;
+	if (fallbackTimer) {
+		clearTimeout(fallbackTimer);
+		fallbackTimer = null;
+	}
+	fallbackScheduled = true; // 阻止后续再次调度
+};
+
 const startStream = () => {
 	if (props.useMock) {
 		stopStream = mockAgentStream(pushLog, () => {
 			finishCurrent();
 		});
-	} else {
-		stopStream = connectAgentStream(pushLog, undefined, props.wsUrl);
+		return;
 	}
+	v1DoneHandled = false;
+	fallbackScheduled = false;
+	v1FirstMessageReceived = false;
+
+	// 订阅模式（已有 task_id，只订阅事件流）：直接走 V1 events 通道；不走创建流程
+	if (props.subscribeTaskId) {
+		stopStream = connectV1TaskEvents(
+			props.subscribeTaskId,
+			pushLog,
+			(data) => {
+				v1DoneHandled = true;
+				finishCurrent();
+				emit("complete", data);
+			},
+			0,
+			undefined,
+			cancelFallback,
+		);
+		scheduleLegacyFallback("subscribe mode");
+		return;
+	}
+
+	// 显式 legacy 模式：直接走旧通道
+	if (props.channelMode === "legacy") {
+		stopStream = connectAgentStream(
+			pushLog,
+			(data) => {
+				finishCurrent();
+				emit("complete", data);
+			},
+			props.wsUrl,
+			props.requirement,
+			props.language,
+			props.subscribeTaskId || undefined,
+		);
+		return;
+	}
+
+	// 默认 v1 模式：先创建 task，再订阅 events
+	const lang = (
+		props.language === "cpp" || props.language === "python"
+			? props.language
+			: "c"
+	) as "c" | "cpp" | "python";
+	const profileId = executionStore.profileId === "cloud" ? "cloud" : "local";
+	createTaskAndSubscribeV1(
+		props.requirement,
+		lang,
+		profileId,
+		pushLog,
+		(data) => {
+			if (data) {
+				v1DoneHandled = true;
+				finishCurrent();
+				emit("complete", data);
+			}
+		},
+		cancelFallback,
+	).then(({ taskId, stop }) => {
+		if (!taskId) {
+			// 创建失败：立即回退到 legacy 通道
+			console.warn(
+				"[AgentTerminal] V1 POST /api/v1/tasks 失败，回退到 legacy 通道",
+			);
+			stop();
+			fallbackScheduled = true; // 跳过 5s 等待
+			stopStream = connectAgentStream(
+				pushLog,
+				(d) => {
+					finishCurrent();
+					emit("complete", d);
+				},
+				props.wsUrl,
+				props.requirement,
+				props.language,
+				props.subscribeTaskId || undefined,
+			);
+			return;
+		}
+		stopStream = stop;
+		// 仅在 V1 通道尚未产生输出时才调度 fallback
+		if (!v1FirstMessageReceived && !fallbackScheduled) {
+			scheduleLegacyFallback("create + subscribe");
+		}
+	});
 };
 
 const stopAll = () => {
@@ -144,10 +314,15 @@ const stopAll = () => {
 		clearTimeout(typingTimer);
 		typingTimer = null;
 	}
+	if (fallbackTimer) {
+		clearTimeout(fallbackTimer);
+		fallbackTimer = null;
+	}
 	if (stopStream) {
 		stopStream();
 		stopStream = null;
 	}
+	fallbackScheduled = true; // 阻止延迟回退
 };
 
 const clearLogs = () => {
@@ -171,8 +346,8 @@ const formatTs = (ts: number) => {
 	)}.${pad(d.getMilliseconds(), 3)}`;
 };
 
-const badgeStyle = (agent: AgentType) => {
-	const c = agentColorMap[agent];
+const badgeStyle = (agent: string) => {
+	const c = agentColorMap[agent] ?? { bg: "#475569", fg: "#f1f5f9" };
 	return {
 		backgroundColor: c.bg,
 		color: c.fg,
@@ -193,12 +368,40 @@ watch(
 	() => {
 		stopAll();
 		logs.value = [];
-		startStream();
 	},
 	{ immediate: false },
 );
 
-startStream();
+watch(
+	() => props.subscribeTaskId,
+	(next, prev) => {
+		// 订阅 task_id 变化时重连（仅在非 mock 模式下）
+		if (next !== prev && !props.useMock && next) {
+			stopAll();
+			logs.value = [];
+			startStream();
+		}
+	},
+	{ immediate: false },
+);
+
+/**
+ * onMounted 三分支判断：避免订阅模式下 onMounted 启动后又因 watch 重启。
+ *
+ * - 订阅模式（subscribeTaskId 已设置）：直接启动，startStream 内部发送
+ *   {task_id, action: "subscribe"}，不会启动新 pipeline；watch 因值未变化
+ *   不会再次触发，避免瞬态重复请求。
+ * - 生成模式（非 mock 且有 requirement）：启动后通过 WebSocket 发送
+ *   {requirement, language} 触发后端 pipeline。
+ * - 其他情况（mock 模式或无需求）：不自动启动，由父组件显式调用 start()，
+ *   避免 onMounted 启动 {requirement, language} 后被 subscribeTaskId watch 重启。
+ */
+onMounted(() => {
+	if (props.subscribeTaskId) {
+		startStream();
+	}
+	// 新任务永远由显式按钮启动；编辑 requirement 不产生网络副作用。
+});
 
 onBeforeUnmount(() => {
 	stopAll();

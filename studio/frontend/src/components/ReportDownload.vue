@@ -1,15 +1,5 @@
 <script setup lang="ts">
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getApi } from "@/services/apiSwitcher";
-import type { GenerateResult, ReportResult } from "@/services/mockApi";
-import {
-	Download,
-	FileText,
-	Loader2,
-	Printer,
-	Sparkles,
-} from "lucide-vue-next";
+import { Download, FileText, Loader2, Printer, Sparkles } from "@lucide/vue";
 /**
  * ReportDownload DO-178C 报告下载组件
  *
@@ -22,6 +12,10 @@ import {
  *   - 打印按钮：window.print()
  */
 import { computed, ref } from "vue";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getApi } from "@/services/apiSwitcher";
+import type { GenerateResult, ReportResult } from "@/services/mockApi";
 
 interface Props {
 	/** 生成结果（用于填充报告内容） */

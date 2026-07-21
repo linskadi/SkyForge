@@ -57,6 +57,7 @@ class ApprovalRequest:
     timeout: int
     created_at: str
     status: str = "pending"  # pending / approved / rejected / timeout
+    task_id: str = ""
     # 内部字段（不序列化）
     _event: asyncio.Event = field(default_factory=asyncio.Event, repr=False)
     _result: Optional[dict[str, Any]] = None
@@ -74,6 +75,7 @@ class ApprovalRequest:
             "timeout": self.timeout,
             "created_at": self.created_at,
             "status": self.status,
+            "task_id": self.task_id,
         }
         if include_internal and self._result is not None:
             d["result"] = self._result
@@ -88,6 +90,7 @@ class ApprovalRequest:
             "timeout": str(self.timeout),
             "created_at": self.created_at,
             "status": self.status,
+            "task_id": self.task_id,
         }
 
     @classmethod
@@ -100,6 +103,7 @@ class ApprovalRequest:
             timeout=int(data["timeout"]),
             created_at=data["created_at"],
             status=data.get("status", "pending"),
+            task_id=data.get("task_id", ""),
         )
 
 
@@ -114,6 +118,7 @@ class ApprovalResult:
     reviewer: str = ""
     timestamp: str = ""
     status: str = "approved"  # approved / rejected / timeout / skipped
+    task_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """转换为可序列化字典。"""
@@ -125,6 +130,7 @@ class ApprovalResult:
             "reviewer": self.reviewer,
             "timestamp": self.timestamp,
             "status": self.status,
+            "task_id": self.task_id,
         }
 
 
@@ -149,15 +155,19 @@ class HILManager:
         """初始化 HIL 管理器。
 
         Args:
-            enabled: 是否启用 HIL，默认从环境变量 HIL_ENABLED 读取。
-            default_timeout: 默认超时时间（秒），默认从环境变量 HIL_TIMEOUT 读取。
+            enabled: 是否启用 HITL，默认从环境变量 HITL_ENABLED 读取。
+            default_timeout: 默认超时时间（秒），默认从 HITL_TIMEOUT 读取。
         """
+        # HIL_ENABLED/HIL_TIMEOUT are accepted for one compatibility release;
+        # new deployments must use HITL_* so hardware HIL remains independent.
+        configured_enabled = os.getenv("HITL_ENABLED")
+        if configured_enabled is None:
+            configured_enabled = os.getenv("HIL_ENABLED", "false")
         self.enabled = (
-            enabled
-            if enabled is not None
-            else (os.getenv("HIL_ENABLED", "true").lower() == "true")
+            enabled if enabled is not None else configured_enabled.lower() == "true"
         )
-        self.default_timeout = default_timeout or int(os.getenv("HIL_TIMEOUT", "300"))
+        configured_timeout = os.getenv("HITL_TIMEOUT", os.getenv("HIL_TIMEOUT", "300"))
+        self.default_timeout = default_timeout or int(configured_timeout)
         # request_id → ApprovalRequest
         self._requests: dict[str, ApprovalRequest] = {}
         # 已完成审批的历史记录
@@ -313,6 +323,7 @@ class HILManager:
         checkpoint: str,
         content: str,
         timeout: Optional[int] = None,
+        task_id: str = "",
     ) -> dict[str, Any]:
         """创建审批请求，等待人工确认（或超时自动批准）。
 
@@ -343,6 +354,7 @@ class HILManager:
                 "status": "skipped",
                 "request_id": "",
                 "checkpoint": checkpoint,
+                "task_id": task_id,
             }
 
         # 2. 检查 checkpoint 合法性
@@ -356,6 +368,7 @@ class HILManager:
                 "status": "skipped",
                 "request_id": "",
                 "checkpoint": checkpoint,
+                "task_id": task_id,
             }
 
         # 3. 确保 Redis 可用
@@ -370,6 +383,7 @@ class HILManager:
             content=content,
             timeout=timeout_value,
             created_at=_now_iso(),
+            task_id=task_id,
         )
 
         async with self._lock:
@@ -430,6 +444,7 @@ class HILManager:
             reviewer=result.get("reviewer", ""),
             timestamp=result.get("timestamp", _now_iso()),
             status=result["status"],
+            task_id=task_id,
         )
 
         async with self._lock:
@@ -592,6 +607,33 @@ def get_hil_manager() -> HILManager:
 
 
 def reset_hil_manager() -> None:
-    """重置 HILManager 单例（仅供测试使用，强制下次重新创建）。"""
+    """重置 HILManager 单例（仅供测试使用，强制下次重新创建）。
+
+    清理内容：
+    - 旧实例的 pending 请求字典与历史记录（避免跨用例泄漏）
+    - 后台 Redis pubsub 监听任务（asyncio.Task 句柄）
+    - 类级 Redis 连接状态（_redis_checked / _redis_client / _redis_ok /
+      _redis_listener_task），强制下次 _ensure_redis 重新连接
+    """
     global _hil_manager
+    # 1. 清理旧实例的内存状态（pending 请求 / 历史）
+    if _hil_manager is not None:
+        try:
+            _hil_manager.clear()
+        except Exception as e:
+            logger.warning(f"reset_hil_manager:清理旧实例状态失败: {e}")
+    # 2. 取消后台 Redis pubsub 监听任务（跨测试用例可能泄漏）
+    listener_task = HILManager._redis_listener_task
+    if listener_task is not None:
+        if not listener_task.done():
+            try:
+                listener_task.cancel()
+            except Exception as e:
+                logger.debug(f"reset_hil_manager:取消监听任务失败: {e}")
+        HILManager._redis_listener_task = None
+    # 3. 重置类级 Redis 连接状态，强制下次重新初始化
+    HILManager._redis_checked = False
+    HILManager._redis_ok = False
+    HILManager._redis_client = None
+    # 4. 丢弃单例引用
     _hil_manager = None

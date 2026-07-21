@@ -1,0 +1,59 @@
+component: pid_controller
+version: 1.0.0
+safety_level: DAL-B
+traceability: [REQ-001]
+
+interface:
+  inputs:
+    - name: setpoint
+      type: double
+      range: [0, 10000]
+      unit: "RPM"
+      description: "目标转速"
+    - name: actual
+      type: double
+      range: [0, 10000]
+      unit: "RPM"
+      description: "当前转速"
+  outputs:
+    - name: output
+      type: double
+      range: [0, 1000]
+      unit: "PWM"
+      description: "控制输出"
+
+contracts:
+  preconditions:
+    - "setpoint >= 0"
+    - "setpoint <= 10000"
+    - "actual >= 0"
+    - "actual <= 10000"
+    - "sample_rate == 100Hz"
+  
+  postconditions:
+    - "output >= 0"
+    - "output <= 1000"
+    - "output is finite"
+  
+  invariants:
+    - "Kp >= 0.1"
+    - "Kp <= 10.0"
+    - "Ki >= 0.01"
+    - "Ki <= 1.0"
+    - "Kd >= 0.001"
+    - "Kd <= 0.1"
+  
+  fault_handling:
+    - "if setpoint < 0 or setpoint > 10000: clamp to valid range"
+    - "if actual < 0 or actual > 10000: clamp to valid range"
+    - "if output > 1000: apply anti-windup"
+
+performance:
+  - "wcet < 500us"
+  - "memory_usage < 512B"
+  - "control_rate >= 100Hz"
+
+verification:
+  - "MISRA-C:2012 compliant"
+  - "DO-178C DAL-B level"
+  - "Anti-windup implemented"

@@ -2,13 +2,13 @@
 注释标注 [REQ-xxx] [MISRA-Rule-x.x]。
 """
 
+import asyncio
 import re
-from typing import Any
+from typing import Any, Callable
 
-try:
-    from skyforge_llm.client import get_lmstudio_client
-except ImportError:
-    get_lmstudio_client = None
+# LLM 客户端 — 通过 L0 provider 注入（L3 启动时注册自己的单例，
+# 引擎独立运行时回退到 L1 skyforge_llm.client）。详见 llm_provider.py。
+from skyforge_engine.llm_provider import get_llm_client as get_lmstudio_client
 from skyforge_engine.utils.log_util import logger
 
 # System Prompt（参考设计文档 1.6 节，四段式骨架：角色/工具/输出/禁忌）
@@ -43,16 +43,29 @@ class CodeGeneratorAgent:
     输出：C 代码字符串（含函数实现 + 头文件），注释强制标注 `[REQ-xxx] [MISRA-Rule-x.x]`
     供 Patch 3 追溯链使用。
 
-    LM Studio 可用（USE_LLM=true）时调用真实 LLM 在契约骨架上补全实现；
-    否则降级为按需求类型套用机载 C 代码模板的 Mock 实现。
+    MOCK 模式时直接按需求类型套用机载 C 代码模板；
+    API / LOCAL 模式时调用真实 LLM 在契约骨架上补全实现，异常直接抛出。
     """
 
-    async def run(self, requirement_json: dict[str, Any], contract: str) -> str:
+    def __init__(self, strategy=None) -> None:
+        if strategy is None:
+            from skyforge_engine.core.strategies import get_strategy_for_mode
+            strategy = get_strategy_for_mode()
+        self.strategy = strategy
+
+    async def run(
+        self,
+        requirement_json: dict[str, Any],
+        contract: str,
+        log_hook: Callable[[str, str, str], Any] | None = None,
+    ) -> str:
         """根据需求与契约生成 C 代码（含头文件）。
 
         Args:
             requirement_json: 结构化需求字典。
             contract: .contract YAML 字符串。
+            log_hook: 可选的流式推送回调 (agent_name, level, message)，
+                支持 sync / async / None。用于推送安全校验告警。
 
         Returns:
             C 代码字符串。
@@ -61,42 +74,90 @@ class CodeGeneratorAgent:
             f"CodeGeneratorAgent:开始:为 {requirement_json.get('req_id')} 生成 C 代码"
         )
 
-        # 检查 LM Studio 是否可用
-        client = get_lmstudio_client()
-        if client.is_available():
-            logger.info("CodeGeneratorAgent:使用真实 LLM")
-            try:
-                import json
-
-                prompt = (
-                    f"请依据以下需求 JSON 与契约生成 MISRA-C 风格 C 代码：\n"
-                    f"需求：\n{json.dumps(requirement_json, ensure_ascii=False, indent=2)}\n\n"  # noqa: E501
-                    f"契约：\n{contract}"
-                )
-                response = await client.chat_async(
-                    prompt=prompt,
-                    system_prompt=_SYSTEM_PROMPT,
-                    temperature=0.2,
-                    max_tokens=8192,
-                )
-                if response:
-                    result = self._parse_llm_response(response, requirement_json)
-                    if result:
-                        logger.info(
-                            f"CodeGeneratorAgent:完成:C 代码已生成 [LLM] "
-                            f"({len(result.splitlines())} 行)"
-                        )
-                        return result
-                logger.warning("CodeGeneratorAgent:LLM 调用失败，降级为 Mock")
-            except Exception as e:
-                logger.error(f"CodeGeneratorAgent:LLM 异常，降级为 Mock: {e}")
-
-        # 降级为 Mock
-        code = self._mock_run(requirement_json)
+        result = await self.strategy.run(
+            requirement_json,
+            contract=contract,
+            log_hook=log_hook,
+            input_type="code",
+        )
+        if not result.success:
+            if len(result.warnings) == 1:
+                raise RuntimeError(result.warnings[0])
+            raise RuntimeError(
+                f"CodeGeneratorAgent 执行失败: {result.warnings}"
+            )
+        code = result.output
         logger.info(
-            f"CodeGeneratorAgent:完成:C 代码已生成 [Mock] ({len(code.splitlines())} 行)"
+            f"CodeGeneratorAgent:完成:C 代码已生成 ({len(code.splitlines())} 行)"
         )
         return code
+
+    async def _llm_run(
+        self,
+        requirement_json: dict[str, Any],
+        contract: str = "",
+        log_hook: Callable[[str, str, str], Any] | None = None,
+    ) -> str:
+        """LLM 实现：调用 LLM 生成代码。"""
+        import json
+
+        client = get_lmstudio_client()
+        prompt = (
+            f"请依据以下需求 JSON 与契约生成 MISRA-C 风格 C 代码：\n"
+            f"需求：\n{json.dumps(requirement_json, ensure_ascii=False, indent=2)}\n\n"  # noqa: E501
+            f"契约：\n{contract}"
+        )
+        response = await client.chat_async(
+            prompt=prompt,
+            system_prompt=_SYSTEM_PROMPT,
+            temperature=0.2,
+            max_tokens=8192,
+        )
+        if not response:
+            raise RuntimeError("CodeGeneratorAgent:LLM 调用返回空响应")
+        result = self._parse_llm_response(response, requirement_json)
+        if not result:
+            raise RuntimeError("CodeGeneratorAgent:LLM 响应解析失败")
+        # 输出安全校验（轻量级、不阻塞，参考 pipeline.py hook 调用方式）
+        try:
+            from skyforge_engine.config import settings
+            from skyforge_llm.security.validator import (
+                validate_output,
+            )
+
+            if getattr(
+                settings, "SECURITY_VALIDATE_OUTPUT", True
+            ):
+                validation = validate_output(result)
+                if not validation.passed:
+                    for v in validation.violations:
+                        logger.warning(
+                            f"[Security] LLM 输出违规: {v}"
+                        )
+                        if log_hook is not None:
+                            if asyncio.iscoroutinefunction(
+                                log_hook
+                            ):
+                                await log_hook(
+                                    "CODE-Gen",
+                                    "warning",
+                                    f"安全校验: {v}",
+                                )
+                            else:
+                                log_hook(
+                                    "CODE-Gen",
+                                    "warning",
+                                    f"安全校验: {v}",
+                                )
+                for w in validation.warnings:
+                    logger.info(
+                        f"[Security] LLM 输出告警: {w}"
+                    )
+        except Exception as e:
+            logger.warning(
+                f"输出校验失败（不影响主流程）: {e}"
+            )
+        return result
 
     def _mock_run(self, requirement_json: dict[str, Any]) -> str:
         """Mock 实现：按需求类型套用机载 C 代码模板。
@@ -189,9 +250,9 @@ class CodeGeneratorAgent:
                     req_type = template_type
                     break
 
-        # 默认回退到 filter
+        # 默认回退到 generic（未知类型走通用模板，Task 8 完善）
         if not req_type:
-            req_type = "filter"
+            req_type = "generic"
 
         generator = {
             "filter": self._gen_filter_code,
@@ -217,7 +278,9 @@ class CodeGeneratorAgent:
             "rust_concurrency": self._gen_rust_concurrency_code,
             "rust_struct": self._gen_rust_struct_code,
             "rust_enum": self._gen_rust_enum_code,
-        }.get(req_type, self._gen_filter_code)
+            "generic": self._gen_generic_code,
+            "redundancy": self._gen_redundancy_code,
+        }.get(req_type, self._gen_generic_code)
         return generator(requirement_json)
 
     def _parse_llm_response(
@@ -256,6 +319,251 @@ class CodeGeneratorAgent:
             return None
 
         return stripped
+
+    def _gen_generic_code(self, req: dict[str, Any]) -> str:
+        """通用代码模板：根据需求文本生成骨架代码，注释回显用户原始需求。
+
+        生成 init/process/deinit 三段式骨架，函数名从需求文本启发式提取，
+        不预设具体功能，由 LLM 后续补全实现细节。
+        """
+        req_id = req.get("req_id", "REQ-001")
+        req_text = str(req.get("desc", req.get("description", "")))
+        module = req.get("module_name", "generic_module")
+        func_base = self._derive_func_name(req_text, prefix=module)
+        header_name = module + ".h"
+        guard = module.upper() + "_H"
+
+        return f"""/* [{req_id}] [MISRA-Rule-8.13] 通用模块实现
+ * Traceability: {req_id}
+ * 模块: {module}
+ * 需求原文: {req_text[:120]}
+ * @safety_level DAL-B
+ */
+#include "{header_name}"
+#include <stdint.h>
+#include <stdbool.h>
+
+/* [{req_id}] [MISRA-Rule-8.9] 模块内部状态，静态持久化 */
+static int32_t s_last_input = 0;   /* [{req_id}] 上次输入值 */
+static int32_t s_last_output = 0;  /* [{req_id}] 上次输出值 */
+static bool    s_initialized = false;  /* [{req_id}] [MISRA-Rule-9.1] 初始化标志 */
+
+/* [{req_id}] [MISRA-Rule-8.13] 初始化函数
+ * @note 需求: {req_text[:120]}
+ * @return 0 成功，-1 失败
+ */
+int {func_base}_init(void)
+{{
+    /* [{req_id}] 初始化逻辑 */
+    s_last_input = 0;
+    s_last_output = 0;
+    s_initialized = true;
+    return 0;
+}}
+
+/* [{req_id}] [MISRA-Rule-15.7] 处理函数
+ * @note 需求: {req_text[:120]}
+ * @param input 输入值
+ * @return 处理结果
+ */
+int32_t {func_base}_process(int32_t input)
+{{
+    int32_t result;
+
+    /* [{req_id}] [MISRA-Rule-10.1] 未初始化保护 */
+    if (false == s_initialized)
+    {{
+        (void){func_base}_init();
+    }}
+
+    /* [{req_id}] 处理逻辑: {req_text[:80]} */
+    result = input;  /* [{req_id}] [CON-001-POST-000] 默认透传，按需实现 */
+    s_last_input = input;
+    s_last_output = result;
+    return result;
+}}
+
+/* [{req_id}] [MISRA-Rule-8.13] 反初始化函数
+ * @note 需求: {req_text[:120]}
+ */
+void {func_base}_deinit(void)
+{{
+    /* [{req_id}] 清理资源 */
+    s_last_input = 0;
+    s_last_output = 0;
+    s_initialized = false;
+}}
+
+/* ===== 头文件 {header_name} =====
+ * {guard}
+ */
+#ifndef {guard}
+#define {guard}
+
+#include <stdint.h>
+#include <stdbool.h>
+
+/* [{req_id}] [MISRA-Rule-8.13] 接口仅暴露必要符号 */
+int     {func_base}_init(void);
+int32_t {func_base}_process(int32_t input);
+void    {func_base}_deinit(void);
+
+#endif /* {guard} */
+"""
+
+    def _derive_func_name(self, req_text: str, prefix: str = "process") -> str:
+        """从需求文本提取函数名前缀（简单启发式）。
+
+        取需求文本前 20 字符，去除标点和空格后转小写；
+        若结果为空则回退到 prefix（通常为 module_name）。
+        """
+        clean = re.sub(r"[^\w]", "", req_text[:20]).lower()
+        if not clean:
+            clean = prefix
+        return clean[:15]
+
+    def _gen_redundancy_code(self, req: dict[str, Any]) -> str:
+        """余度管理代码模板：双通道输入取均值，偏差超阈值报警。
+
+        实现双通道余度管理器：计算 A/B 通道均值作为输出，
+        当偏差百分比超过 5% 阈值时激活报警，符合机载余度管理典型设计。
+        """
+        req_id = req.get("req_id", "REQ-001")
+        req_text = str(req.get("desc", req.get("description", "")))
+        module = req.get("module_name", "redundancy_manager")
+        header_name = module + ".h"
+        guard = module.upper() + "_H"
+
+        return f"""/* [{req_id}] [MISRA-Rule-8.13] 余度管理器实现（双通道均值+偏差报警）
+ * Traceability: {req_id}
+ * 模块: {module}
+ * 需求原文: {req_text[:120]}
+ * @safety_level DAL-A
+ * @brief 双通道输入取均值，偏差 > 5% 时报警
+ */
+#include "{header_name}"
+#include <stdint.h>
+#include <stdbool.h>
+#include <math.h>
+
+/* [{req_id}] [MISRA-Rule-8.1] 偏差阈值 5% */
+#define DEVIATION_THRESHOLD_PERCENT 5.0f
+
+/* [{req_id}] [MISRA-Rule-8.9] 余度管理器状态结构体，静态持久化 */
+typedef struct {{
+    float    channel_a;       /* [{req_id}] 通道 A 输入 */
+    float    channel_b;       /* [{req_id}] 通道 B 输入 */
+    float    average_value;   /* [{req_id}] 均值输出 */
+    bool     alarm_active;    /* [{req_id}] 报警状态 */
+    uint32_t alarm_count;     /* [{req_id}] [MISRA-Rule-9.1] 报警计数 */
+    bool     initialized;     /* [{req_id}] [MISRA-Rule-9.1] 初始化标志 */
+}} RedundancyManager_t;
+
+/* [{req_id}] [MISRA-Rule-8.9] 模块静态实例 */
+static RedundancyManager_t s_mgr;
+
+/* [{req_id}] [MISRA-Rule-8.13] 初始化余度管理器
+ * @note 需求: {req_text[:120]}
+ */
+void {module}_init(void)
+{{
+    /* [{req_id}] 初始化逻辑 */
+    s_mgr.channel_a = 0.0f;
+    s_mgr.channel_b = 0.0f;
+    s_mgr.average_value = 0.0f;
+    s_mgr.alarm_active = false;
+    s_mgr.alarm_count = 0U;  /* [{req_id}] [MISRA-Rule-9.1] */
+    s_mgr.initialized = true;
+}}
+
+/* [{req_id}] [MISRA-Rule-15.7] 执行余度管理：取均值，检测偏差
+ * @note 需求: {req_text[:120]}
+ * @param a 通道 A 输入
+ * @param b 通道 B 输入
+ * @return 双通道均值
+ */
+float {module}_process(float a, float b)
+{{
+    float deviation = 0.0f;
+
+    /* [{req_id}] [MISRA-Rule-10.1] 未初始化保护 */
+    if (false == s_mgr.initialized)
+    {{
+        {module}_init();
+    }}
+
+    s_mgr.channel_a = a;
+    s_mgr.channel_b = b;
+
+    /* [{req_id}] 计算均值 */
+    s_mgr.average_value = (a + b) * 0.5f;
+
+    /* [{req_id}] [MISRA-Rule-10.4] 计算偏差百分比（避免除零） */
+    if (fabsf(s_mgr.average_value) > 1.0e-6f)
+    {{
+        deviation = fabsf(a - b) / s_mgr.average_value * 100.0f;
+    }}
+
+    /* [{req_id}] 偏差 > 5% 时报警 */
+    if (deviation > DEVIATION_THRESHOLD_PERCENT)
+    {{
+        s_mgr.alarm_active = true;
+        s_mgr.alarm_count++;  /* [{req_id}] [CON-001-POST-001] */
+    }}
+    else
+    {{
+        s_mgr.alarm_active = false;
+    }}
+
+    return s_mgr.average_value;  /* [{req_id}] [CON-001-POST-000] */
+}}
+
+/* [{req_id}] [MISRA-Rule-8.13] 获取报警状态
+ * @note 需求: {req_text[:120]}
+ * @return true=偏差超阈值，false=正常
+ */
+bool {module}_is_alarm(const RedundancyManager_t *mgr)  /* [{req_id}] [MISRA-Rule-8.13] */
+{{
+    if (((void *)0) == mgr)
+    {{
+        return s_mgr.alarm_active;
+    }}
+    return mgr->alarm_active;
+}}
+
+/* [{req_id}] [MISRA-Rule-8.13] 获取报警计数 */
+uint32_t {module}_get_alarm_count(void)
+{{
+    return s_mgr.alarm_count;
+}}
+
+/* ===== 头文件 {header_name} =====
+ * {guard}
+ */
+#ifndef {guard}
+#define {guard}
+
+#include <stdint.h>
+#include <stdbool.h>
+
+/* [{req_id}] [MISRA-Rule-8.9] 类型定义 */
+typedef struct {{
+    float    channel_a;
+    float    channel_b;
+    float    average_value;
+    bool     alarm_active;
+    uint32_t alarm_count;
+    bool     initialized;
+}} RedundancyManager_t;
+
+/* [{req_id}] [MISRA-Rule-8.13] 接口仅暴露必要符号 */
+void     {module}_init(void);
+float    {module}_process(float a, float b);
+bool     {module}_is_alarm(const RedundancyManager_t *mgr);
+uint32_t {module}_get_alarm_count(void);
+
+#endif /* {guard} */
+"""
 
     def _gen_filter_code(self, req: dict[str, Any]) -> str:
         """生成一阶 IIR 低通滤波器 C 代码（机载典型信号处理）。"""

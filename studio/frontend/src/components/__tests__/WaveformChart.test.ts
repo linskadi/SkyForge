@@ -41,7 +41,7 @@ vi.mock("echarts/renderers", () => ({
 	CanvasRenderer: {},
 }));
 
-vi.mock("lucide-vue-next", () => ({
+vi.mock("@lucide/vue", () => ({
 	Download: { name: "Download", template: "<span />" },
 	RotateCcw: { name: "RotateCcw", template: "<span />" },
 	ZoomIn: { name: "ZoomIn", template: "<span />" },

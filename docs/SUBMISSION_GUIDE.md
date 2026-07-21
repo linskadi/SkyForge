@@ -2,7 +2,7 @@
 
 > 本文档用于指导「航空工业软件开源创新大赛 · 机上软件开发工具赛道」开源交付物在 AtomGit 上的同步与发布。
 >
-> **重要安全约束**：以下 `git push` 命令需由用户**手动执行**，自动化任务不会代为推送。请逐项核对后再操作。
+> **重要安全约束**：`git push` 需由维护者确认，或由自动化任务在获得明确授权后执行。请逐项核对后再操作。
 
 ---
 
@@ -12,11 +12,11 @@
 
 ```text
 # 1. 登录 AtomGit (https://atomgit.com)
-# 2. 在 ch-onboard 组织下创建名为 skyforge 的公开仓库
-#    组织地址: https://atomgit.com/ch-onboard
+# 2. 确认 AtomGit 上 SkyForge 公开仓库可访问
+#    仓库地址: https://atomgit.com/gcw_TTqe9ALQ/SkyForge
 # 3. 仓库属性必须选择「公开项目」(严禁私有)
 # 4. 添加全体队员 AtomGit 用户名至协作人列表(读写权限)
-# 5. 仓库地址应为: https://atomgit.com/ch-onboard/skyforge
+# 5. GitHub 镜像地址: https://github.com/linskadi/SkyForge
 ```
 
 ### 2. 本地代码同步(用户手动执行)
@@ -44,22 +44,23 @@ git commit -m "feat: 完成 SkyForge 比赛优化任务(Task 1-11)
 - Task 10: ARINC 653 适配器增强
 - Task 11: 提交包准备与最终检查
 
-测试状态: 204+32 测试通过"
+测试状态: uv run pytest -q 596 passed；pnpm test 172 passed；pnpm test:e2e 4 passed"
 
 # 添加远程仓库
-git remote add origin https://atomgit.com/ch-onboard/skyforge.git
+git remote add atomgit https://atomgit.com/gcw_TTqe9ALQ/SkyForge.git
 # (如果已存在,使用以下命令更新地址)
-git remote set-url origin https://atomgit.com/ch-onboard/skyforge.git
+git remote set-url atomgit https://atomgit.com/gcw_TTqe9ALQ/SkyForge.git
+git remote set-url origin https://github.com/linskadi/SkyForge.git
 
 # 确认远程地址
 git remote -v
 
-# 推送代码(用户手动执行此步骤,请在确认无误后亲自运行)
-# git push -u origin main
-# (或 git push -u origin master,根据实际分支名)
+# 推送代码（维护者确认或授权自动化后执行）
+git push atomgit main
+git push origin main
 ```
 
-> **说明**：上述 `git commit` 与 `git remote add` 可由自动化任务准备，但 `git push` 必须由用户本人手动执行以避免误推。
+> **说明**：当前本地远端名约定为 `atomgit`（AtomGit）与 `origin`（GitHub）。
 
 ---
 
@@ -68,7 +69,7 @@ git remote -v
 1. **仓库必须为公开项目**，严禁私有。比赛要求开源交付，私有仓库视为不符合要求。
 2. **添加所有团队成员为协作者**（读写权限），便于后续协作与代码评审。
 3. 推送前确认 `LICENSE` 文件存在且为 **MIT License**（位于 `SkyForge/LICENSE`）。
-4. 推送前确认 `ThirdParty.md` 完整标注所有第三方组件来源、版本、引用说明（根目录 `ThirdParty.md` 与 `docs/ThirdParty.md` 两份）。
+4. 推送前确认 `ThirdParty.md` 完整标注所有第三方组件来源、版本、引用说明；补充材料位于 `docs/thirdparty/`。
 5. **严禁删除代码、移除 LICENSE**。必须上传完整代码，缺失核心内容视为不符合开源交付要求。
 6. 推送前建议本地运行 `make test`、`make do178c-check`、`make benchmark`，确认无误后再推送。
 7. 推送完成后，在 AtomGit 网页确认仓库可见性为「公开」，否则评委无法访问。
@@ -80,16 +81,15 @@ git remote -v
 
 请在推送完成后逐项确认：
 
-- [ ] 仓库地址正确（`atomgit.com/ch-onboard/skyforge`）
+- [ ] 仓库地址正确（`atomgit.com/gcw_TTqe9ALQ/SkyForge` 与 `github.com/linskadi/SkyForge`）
 - [ ] 仓库为**公开**状态（网页右上角可见「Public」标识）
 - [ ] `LICENSE` 文件存在且为 MIT
-- [ ] `ThirdParty.md` 完整（根目录 + docs/ 双份）
+- [ ] `ThirdParty.md` 完整，`docs/thirdparty/` 补充材料可访问
 - [ ] `README.md` 可读，包含项目说明、架构图、快速开始
 - [ ] `src/` 目录存在且包含核心代码（四层架构：`skyforge_core` / `skyforge_engine` / `skyforge_llm` / `studio`）
-- [ ] `docs/` 目录包含所有必需文档（user / compliance / review / industry / benchmark / verification / images 七个子目录）
-- [ ] `docs/compliance/` 下 8 份 DO-178C 计划文档齐全（PSAC/SDP/SVP/SCMP/SQAP/TQP/TOR/TAS）
+- [ ] `docs/` 目录包含当前统一文档（USER_GUIDE / DO178C_COMPLIANCE_PACKAGE / PROJECT_REVIEW / COMPETITION_EDITION / benchmark / verification / images）
+- [ ] DO-178C 计划与 DO-330 工具鉴定草案已合并到 `docs/DO178C_COMPLIANCE_PACKAGE.md`
 - [ ] `examples/` 目录存在（12 个基础示例 + 2 个完整示例：ARINC 653 + FreeRTOS）
-- [ ] `models/` 目录存在（已附 README 说明 Mock 模式与后续 .slx/.fmu 规划）
 - [ ] 已添加全体团队成员为协作者
 - [ ] 分支为 `main`（或 `master`）且为默认分支
 

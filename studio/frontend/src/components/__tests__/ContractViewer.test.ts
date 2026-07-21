@@ -1,6 +1,6 @@
-import type { Contract } from "@/services/mockApi";
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Contract } from "@/services/mockApi";
 import ContractViewer from "../ContractViewer.vue";
 
 vi.mock("@/utils/tagParser", () => ({
@@ -8,13 +8,14 @@ vi.mock("@/utils/tagParser", () => ({
 		const tokens: Array<{ type: string; value: string }> = [];
 		const regex = /\[(CON-\d+-[A-Z]+-\d+)\]/g;
 		let lastIdx = 0;
-		let match;
-		while ((match = regex.exec(text)) !== null) {
+		let match: RegExpExecArray | null = regex.exec(text);
+		while (match !== null) {
 			if (match.index > lastIdx) {
 				tokens.push({ type: "text", value: text.slice(lastIdx, match.index) });
 			}
 			tokens.push({ type: "con", value: match[1] });
 			lastIdx = match.index + match[0].length;
+			match = regex.exec(text);
 		}
 		if (lastIdx < text.length) {
 			tokens.push({ type: "text", value: text.slice(lastIdx) });
@@ -166,7 +167,8 @@ describe("ContractViewer", () => {
 		const badge = wrapper.find(".con-badge");
 		await badge.trigger("click");
 		expect(wrapper.emitted("tagClick")).toBeTruthy();
-		expect(wrapper.emitted("tagClick")![0][0]).toBe("CON-LP-PRE-000");
+		const events1 = wrapper.emitted("tagClick");
+		expect(events1?.[0]?.[0]).toBe("CON-LP-PRE-000");
 	});
 
 	it("emits tagClick with null when same badge clicked again (toggle)", async () => {
@@ -179,7 +181,8 @@ describe("ContractViewer", () => {
 		const badge = wrapper.find(".con-badge.active");
 		await badge.trigger("click");
 		expect(wrapper.emitted("tagClick")).toBeTruthy();
-		expect(wrapper.emitted("tagClick")![0][0]).toBeNull();
+		const events2 = wrapper.emitted("tagClick");
+		expect(events2?.[0]?.[0]).toBeNull();
 	});
 
 	it("highlights activeTag badge", () => {
@@ -270,7 +273,8 @@ describe("ContractViewer", () => {
 		const invTag = wrapper.find(".con-tag.active");
 		if (invTag.exists()) {
 			await invTag.trigger("click");
-			expect(wrapper.emitted("tagClick")![0][0]).toBeNull();
+			const events3 = wrapper.emitted("tagClick");
+			expect(events3?.[0]?.[0]).toBeNull();
 		}
 	});
 

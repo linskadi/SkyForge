@@ -573,6 +573,64 @@ HLR [REQ-xxx] → LLR [LLR-xxx] → 契约 [CON-xxx] →
 <p style="color: #94a3b8;">未执行数字孪生仿真。</p>
 {% endif %}
 
+<!-- ========== 4.7 覆盖率分析（GCC 14.2+ lcov 真实 / 静态分析回退） ========== -->
+<h2>4.7 覆盖率分析</h2>
+{% if coverage_result and coverage_result.analyzed %}
+<div class="summary-card">
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="num">{{ coverage_result.statement_coverage }}%</div>
+      <div class="label">语句覆盖率（目标 {{ coverage_result.statement_target }}%）</div>
+    </div>
+    <div class="stat">
+      <div class="num">{{ coverage_result.decision_coverage }}%</div>
+      <div class="label">判定覆盖率（目标 {{ coverage_result.decision_target }}%）</div>
+    </div>
+    <div class="stat">
+      <div class="num">{{ coverage_result.mcdc_coverage }}%</div>
+      <div class="label">MC/DC 覆盖率（目标 {{ coverage_result.mcdc_target }}%）</div>
+    </div>
+    <div class="stat">
+      <div class="num">
+        {% if coverage_result.method == 'gcov' %}
+        <span class="status-pass">真实 gcov/lcov</span>
+        {% else %}
+        <span class="badge badge-partial">静态分析回退</span>
+        {% endif %}
+      </div>
+      <div class="label">收集方法 ({{ coverage_result.version }})</div>
+    </div>
+  </div>
+  <p style="margin-top: 8px; color: #64748b; font-size: 12px;">
+    DAL 等级：{{ coverage_result.dal }} · MC/DC 满足：{{ coverage_result.mcdc_satisfied }}/{{ coverage_result.mcdc_total }}
+    {% if coverage_result.fault_injected %} · 已执行故障注入测试{% endif %}
+  </p>
+</div>
+{% if coverage_result.decision_points %}
+<h3>判定点详情</h3>
+<table>
+  <thead><tr><th>行号</th><th>类型</th><th>条件</th><th>运算符</th><th>状态</th></tr></thead>
+  <tbody>
+    {% for dp in coverage_result.decision_points %}
+    <tr>
+      <td>{{ dp.line }}</td>
+      <td>{{ dp.type }}</td>
+      <td><code>{{ dp.conditions | join(' / ') }}</code></td>
+      <td>{{ dp.operator }}</td>
+      <td>
+        {% if dp.status == '满足' %}<span class="status-pass">{{ dp.status }}</span>
+        {% elif dp.status == '部分满足' %}<span class="badge badge-partial">{{ dp.status }}</span>
+        {% else %}<span class="status-fail">{{ dp.status }}</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% else %}
+<p style="color: #94a3b8;">未执行覆盖率分析（coverage_result 为空或 analyzed=False）。</p>
+{% endif %}
+
 <!-- ========== 6. DO-178C 目标符合性表 ========== -->
 <h2>5. DO-178C 目标符合性表</h2>
 <p>依据 DO-178C Level C 关键目标（Table A-2 ~ A-9）自动评估：</p>
@@ -686,7 +744,7 @@ def generate_report(pipeline_result: dict[str, Any]) -> str:
     # ---- 3) 提取封面元信息 ----
     requirement = pipeline_result.get("requirement") or {}
     project_name = (
-        requirement.get("module_name") or requirement.get("module") or "airborne_module"
+        requirement.get("module_name") or requirement.get("module") or "skyforge_module"
     )
     contract_yaml: str = pipeline_result.get("contract", "") or ""
     version = _extract_version(contract_yaml) or "1.0.0"
@@ -755,6 +813,8 @@ def generate_report(pipeline_result: dict[str, Any]) -> str:
         sim_duration_ms=sim_duration_ms,
         sim_input_preview=sim_input_preview,
         sim_output_preview=sim_output_preview,
+        # 覆盖率分析（GCC 14.2+ lcov 真实 / 静态分析回退）
+        coverage_result=pipeline_result.get("coverage_result") or {},
         # DO-178C 目标
         objectives=objectives,
         obj_pass_count=sum(1 for o in objectives if o.status == "满足"),

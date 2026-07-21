@@ -15,6 +15,9 @@ class LoggerInitializer:
         self.log_path_error = os.path.join(
             self.log_path, f"{time.strftime('%Y-%m-%d')}_error.log"
         )
+        self.log_path_app = os.path.join(
+            self.log_path, f"{time.strftime('%Y-%m-%d')}_app.log"
+        )
 
     def __ensure_log_directory_exists(self):
         """
@@ -23,17 +26,18 @@ class LoggerInitializer:
         if not os.path.exists(self.log_path):
             os.mkdir(self.log_path)
 
-    @staticmethod
-    def __filter(record):
-        """自定义日志过滤器，保留所有日志。"""
-        return True
-
     def init_log(self):
         """
         初始化日志配置
         """
         # 自定义日志格式
-        format_str = (
+        console_format = (
+            "<green>{time:HH:mm:ss.SSS}</green> | "
+            "<level>{level: <7}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan> - "
+            "<level>{message}</level>"
+        )
+        file_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
             "<level>{level: <8}</level> | "
             "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
@@ -41,12 +45,30 @@ class LoggerInitializer:
         )
         _logger.remove()
         # 移除后重新添加sys.stderr, 目的: 控制台输出与文件日志内容和结构一致
-        _logger.add(sys.stderr, filter=self.__filter, format=format_str, enqueue=False)
+        level = os.getenv("LOG_LEVEL", "INFO").upper()
+        _logger.add(
+            sys.stderr,
+            level=level,
+            format=console_format,
+            enqueue=False,
+            colorize=True,
+        )
+        _logger.add(
+            self.log_path_app,
+            level=level,
+            format=file_format,
+            rotation="50MB",
+            retention="14 days",
+            encoding="utf-8",
+            enqueue=False,
+            compression="zip",
+        )
         _logger.add(
             self.log_path_error,
-            filter=self.__filter,
-            format=format_str,
+            level="ERROR",
+            format=file_format,
             rotation="50MB",
+            retention="30 days",
             encoding="utf-8",
             enqueue=False,
             compression="zip",

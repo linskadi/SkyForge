@@ -7,15 +7,16 @@ This guide explains how to develop plugins for the SkyForge plugin system. Plugi
 ## Table of Contents
 
 1. [Plugin Architecture](#plugin-architecture)
-2. [Getting Started](#getting-started)
-3. [Plugin Types](#plugin-types)
-4. [Plugin Lifecycle](#plugin-lifecycle)
-5. [Plugin Metadata](#plugin-metadata)
-6. [Plugin Configuration](#plugin-configuration)
-7. [Plugin Dependencies](#plugin-dependencies)
-8. [Plugin Events](#plugin-events)
-9. [Examples](#examples)
-10. [Best Practices](#best-practices)
+2. [Coding Standards Plugin (Implemented)](#coding-standards-plugin-implemented)
+3. [Getting Started](#getting-started)
+4. [Plugin Types](#plugin-types)
+5. [Plugin Lifecycle](#plugin-lifecycle)
+6. [Plugin Metadata](#plugin-metadata)
+7. [Plugin Configuration](#plugin-configuration)
+8. [Plugin Dependencies](#plugin-dependencies)
+9. [Plugin Events](#plugin-events)
+10. [Examples](#examples)
+11. [Best Practices](#best-practices)
 
 ## Plugin Architecture
 
@@ -42,6 +43,64 @@ plugins/
     ├── report_plugin/
     └── validator_plugin/
 ```
+
+## Coding Standards Plugin (Implemented)
+
+SkyForge 已实现可插拔编码标准系统，位于 `src/skyforge_engine/coding_standards/`。DO-178C 过程标准固定，编码标准通过 `CodingStandardRegistry` 动态注册。
+
+### 核心组件
+
+- **base.py**: 包含 `CodingStandard` 数据类和 `get_registry()` 函数（全局单例注册表）
+- **CodingStandardRegistry**: 统一管理编码标准的注册、查询、迭代，支持按语言、标准ID、规则ID多维查询
+
+### 已注册标准
+
+| 标准 ID | 名称 | 语言 | 红线规则 | 修复器 | Mock 违规 |
+|---------|------|------|---------|--------|-----------|
+| `misra_c_2012` | MISRA-C:2012 | C | 10 条 | 57 个 | 8 种 |
+| `jsf_av_cpp` | MISRA-C++/JSF AV C++/CERT C++ | C++ | 5 条 | — | 4 种 |
+| `python_safety` | 军工软件Python编程规范 (T/ZASDI 0002-2023) | Python | 3 条 | 4 个 | 4 种 |
+
+### 添加新编码标准
+
+```python
+from skyforge_engine.coding_standards.base import CodingStandard, get_registry
+
+# 1. 定义编码标准
+my_std = CodingStandard(
+    standard_id="my_custom_standard",
+    name="My Custom Standard",
+    languages=["c"],
+    version="1.0",
+    rule_data_file="path/to/rules.txt",
+    red_line_rules=["R1", "R2"],
+    fixers={"R1": my_fixer_func},
+    mock_scan_patterns=[{"pattern": r"...", "rule_id": "R1", "severity": "error", "message": "..."}],
+    rule_prefix_category={"R": "Category 1"},
+    agent_default_queries={"code_generator": ["query1", "query2"]},
+    agent_display_names={"code_generator": "代码生成 Agent"},
+    priority=100,
+)
+
+# 2. 注册到全局 Registry
+registry = get_registry()
+registry.register(my_std)
+
+# 3. 使用
+rules = registry.get_red_line_rules("c")
+std = registry.get("my_custom_standard")
+fixers = registry.get_fixers("c")
+```
+
+### 集成点
+
+编码标准注册后自动被以下模块使用：
+- `rag_enhancer.py`: 红线规则检测、Agent 查询
+- `rule_parser.py`: 规则分类映射
+- `cppcheck_scanner.py`: Mock 扫描模式
+- `code_repairer.py`: 代码修复函数调度
+
+---
 
 ## Getting Started
 

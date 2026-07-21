@@ -1,5 +1,5 @@
-import type { GenerateResult } from "@/types/domain";
 import { describe, expect, it } from "vitest";
+import type { GenerateResult } from "@/types/domain";
 import { buildReport, escapeHtml } from "./reportGenerator";
 
 describe("escapeHtml", () => {

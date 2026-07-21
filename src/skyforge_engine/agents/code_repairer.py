@@ -3,21 +3,22 @@
 输入：Cppcheck 扫描结果（违规列表：行号+规则ID+描述）+ 原 C 代码
 输出：修复后的 C 代码 + 修复说明列表
 
-LM Studio 可用（USE_LLM=true）时调用真实 LLM 做语义重写；
+本地 LLM 可用（USE_LLM=true）时调用真实 LLM 做语义重写；
 否则降级为基于规则 ID 的模板修复（8 个常见 MISRA-C 规则）。
 每处修复标注对应 MISRA 规则 ID 和 [REQ-xxx]（保持追溯链）。
 """
 
+import asyncio
 import re
 from dataclasses import dataclass, field
+from typing import Any, Callable
 
 from skyforge_engine.config import settings
 from skyforge_engine.agents.misra_fixes import FIXERS
 from skyforge_engine.agents.types import RepairAction
-try:
-    from skyforge_llm.client import get_lmstudio_client
-except ImportError:
-    get_lmstudio_client = None
+# LLM 客户端 — 通过 L0 provider 注入（L3 启动时注册自己的单例，
+# 引擎独立运行时回退到 L1 skyforge_llm.client）。详见 llm_provider.py。
+from skyforge_engine.llm_provider import get_llm_client as get_lmstudio_client
 from skyforge_engine.tools.cppcheck_scanner import Violation
 from skyforge_engine.rag.misra_searcher import MisraRuleSearcher
 from skyforge_engine.rag.rag_enhancer import build_misra_context
@@ -72,15 +73,22 @@ class CodeRepairerAgent:
     输入：Cppcheck 扫描违规列表 + 原 C 代码。
     输出：修复后的 C 代码 + 修复说明列表（RepairAction）。
 
-    LM Studio 可用（USE_LLM=true）时调用真实 LLM 做语义重写；
+    本地 LLM 可用（USE_LLM=true）时调用真实 LLM 做语义重写；
     否则降级为基于规则 ID 的模板修复（8 个常见 MISRA-C 规则）。
     """
+
+    def __init__(self, strategy=None) -> None:
+        if strategy is None:
+            from skyforge_engine.core.strategies import get_strategy_for_mode
+            strategy = get_strategy_for_mode()
+        self.strategy = strategy
 
     async def repair(
         self,
         code: str,
         violations: list[Violation],
         req_id: str = "REQ-001",
+        log_hook: Callable[[str, str, str], Any] | None = None,
     ) -> RepairResult:
         """根据违规列表修复 C 代码。
 
@@ -88,6 +96,8 @@ class CodeRepairerAgent:
             code: 原 C 代码字符串。
             violations: scan() 返回的违规列表。
             req_id: 关联的 [REQ-xxx] 追溯 Tag。
+            log_hook: 可选的流式推送回调 (agent_name, level, message)，
+                支持 sync / async / None。用于推送安全校验告警。
 
         Returns:
             RepairResult（含修复后代码 + 修复说明列表）。
@@ -98,58 +108,90 @@ class CodeRepairerAgent:
 
         logger.info(f"CodeRepairerAgent:开始:修复 {len(violations)} 条违规")
 
-        # RAG 增强：根据违规规则 ID 检索 MISRA 规则详情，注入到修复 prompt
-        # 当 RAG_ENABLED=false 时跳过（参考文档 1.6.4 节）
+        result = await self.strategy.run(
+            code,
+            violations=violations,
+            req_id=req_id,
+            log_hook=log_hook,
+            input_type="repair",
+        )
+        if not result.success:
+            if len(result.warnings) == 1:
+                raise RuntimeError(result.warnings[0])
+            raise RuntimeError(
+                f"CodeRepairerAgent 执行失败: {result.warnings}"
+            )
+        repair_result = result.output
+        logger.info(
+            f"CodeRepairerAgent:完成:共修复 {len(repair_result.actions)} 处"
+        )
+        return repair_result
+
+    async def _llm_run(
+        self,
+        code: str,
+        violations: list[Violation],
+        req_id: str = "REQ-001",
+        log_hook: Callable[[str, str, str], Any] | None = None,
+    ) -> RepairResult:
+        """LLM 实现：调用 LLM 修复代码。"""
+        client = get_lmstudio_client()
+        if not client.is_available():
+            raise RuntimeError("CodeRepairerAgent:LLM 不可用")
+
+        # RAG 增强
         rag_context = ""
         if getattr(settings, "RAG_ENABLED", False):
             rag_context = self._build_rag_context(violations)
-            if rag_context:
-                logger.info(
-                    f"CodeRepairerAgent:RAG 已注入上下文 ({len(rag_context)} 字符)"
-                )
-        else:
-            logger.debug("CodeRepairerAgent:RAG 未启用，跳过上下文注入")
 
-        # 检查 LM Studio 是否可用
-        client = get_lmstudio_client()
-        if client.is_available():
-            logger.info("CodeRepairerAgent:使用真实 LLM")
-            try:
-                violations_desc = "\n".join(
-                    f"- L{v.line} [{v.rule_id}] {v.message}" for v in violations
-                )
-                prompt_parts = [
-                    f"请修复以下 C 代码中的 MISRA-C 违规（保持功能不变，"
-                    f"为每处修复追加 [{req_id}] 注释）：\n\n"
-                    f"违规列表：\n{violations_desc}\n\n"
-                ]
-                if rag_context:
-                    prompt_parts.append(f"{rag_context}\n\n")
-                prompt_parts.append(f"原代码：\n{code}")
-                prompt = "".join(prompt_parts)
-                response = await client.chat_async(
-                    prompt=prompt,
-                    system_prompt=_SYSTEM_PROMPT,
-                    temperature=0.2,
-                    max_tokens=8192,
-                )
-                if response:
-                    result = self._parse_llm_response(
-                        response, code, violations, req_id
-                    )
-                    if result is not None:
-                        logger.info(
-                            f"CodeRepairerAgent:完成:共修复"
-                            f" {len(result.actions)} 处 [LLM]"
-                        )
-                        return result
-                logger.warning("CodeRepairerAgent:LLM 调用失败，降级为 Mock")
-            except Exception as e:
-                logger.error(f"CodeRepairerAgent:LLM 异常，降级为 Mock: {e}")
+        violations_desc = "\n".join(
+            f"- L{v.line} [{v.rule_id}] {v.message}" for v in violations
+        )
+        prompt_parts = [
+            f"请修复以下 C 代码中的 MISRA-C 违规（保持功能不变，"
+            f"为每处修复追加 [{req_id}] 注释）：\n\n"
+            f"违规列表：\n{violations_desc}\n\n"
+        ]
+        if rag_context:
+            prompt_parts.append(f"{rag_context}\n\n")
+        prompt_parts.append(f"原代码：\n{code}")
+        prompt = "".join(prompt_parts)
+        response = await client.chat_async(
+            prompt=prompt,
+            system_prompt=_SYSTEM_PROMPT,
+            temperature=0.2,
+            max_tokens=8192,
+        )
+        if not response:
+            raise RuntimeError("CodeRepairerAgent:LLM 调用返回空响应")
+        result = self._parse_llm_response(response, code, violations, req_id)
+        if result is None:
+            raise RuntimeError("CodeRepairerAgent:LLM 输出解析失败")
 
-        # 降级为 Mock（模板修复）
-        result = self._mock_repair(code, violations, req_id)
-        logger.info(f"CodeRepairerAgent:完成:共修复 {len(result.actions)} 处 [Mock]")
+        # 输出安全校验
+        try:
+            from skyforge_llm.security.validator import (
+                validate_output,
+            )
+
+            if getattr(settings, "SECURITY_VALIDATE_OUTPUT", True):
+                validation = validate_output(result.code)
+                if not validation.passed:
+                    for v in validation.violations:
+                        logger.warning(f"[Security] LLM 输出违规: {v}")
+                        if log_hook is not None:
+                            if asyncio.iscoroutinefunction(log_hook):
+                                await log_hook(
+                                    "REPAIR", "warning", f"安全校验: {v}"
+                                )
+                            else:
+                                log_hook(
+                                    "REPAIR", "warning", f"安全校验: {v}"
+                                )
+                for w in validation.warnings:
+                    logger.info(f"[Security] LLM 输出告警: {w}")
+        except Exception as e:
+            logger.warning(f"输出校验失败（不影响主流程）: {e}")
         return result
 
     def _build_rag_context(self, violations: list[Violation]) -> str:
@@ -236,11 +278,12 @@ class CodeRepairerAgent:
         violations: list[Violation],
         req_id: str,
     ) -> RepairResult | None:
-        """解析 LLM 输出的修复结果（三级降级，失败返回 None）。"""
-        from skyforge_llm.parser import safe_parse_llm_json
+        """解析 LLM 输出的修复结果（失败返回 None）。"""
+        from skyforge_llm.parser import JSONParseError, safe_parse_llm_json
 
-        parsed = safe_parse_llm_json(response)
-        if parsed is None:
+        try:
+            parsed = safe_parse_llm_json(response)
+        except JSONParseError:
             logger.warning("CodeRepairerAgent:LLM 输出解析失败，降级为 Mock")
             return None
 

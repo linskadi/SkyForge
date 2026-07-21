@@ -507,6 +507,14 @@ def _check_obj12(
 ) -> ObjectiveResult:
     """OBJ-12 契约违约处理。"""
     d = _build_def("OBJ-12", def_map)
+
+    # 检查 1: pipeline_result 中的 breach_resolved/breach_detected 标记（证据收集注入）
+    if pipeline_result.get("breach_resolved"):
+        status = STATUS_PASS
+        evidence = "契约违约已解决（无违约或违约已修复）"
+        return ObjectiveResult(status=status, evidence=evidence, **d)
+
+    # 检查 2: 仿真结果中的契约违约
     sim = pipeline_result.get("simulation_result")
     if isinstance(sim, dict):
         cv = sim.get("contract_violation")
@@ -541,16 +549,17 @@ def _check_obj13(
         return ObjectiveResult(status=STATUS_NA, evidence="", **d)
 
     cov = pipeline_result.get("coverage_result", {}) or {}
+    method = cov.get("method", "static_analysis")
     stmt_pct = cov.get("statement_coverage", 0)
     if stmt_pct >= 100:
         status = STATUS_PASS
-        evidence = f"语句覆盖率 {stmt_pct}%（100%）"
+        evidence = f"语句覆盖率 {stmt_pct}%（100%） · 收集方法: {_method_label(method)}"
     elif stmt_pct >= 80:
         status = STATUS_PARTIAL
-        evidence = f"语句覆盖率 {stmt_pct}%（目标 100%）"
+        evidence = f"语句覆盖率 {stmt_pct}%（目标 100%） · 收集方法: {_method_label(method)}"
     else:
         status = STATUS_FAIL
-        evidence = f"语句覆盖率 {stmt_pct}%（目标 100%，差距 {100 - stmt_pct}%）"
+        evidence = f"语句覆盖率 {stmt_pct}%（目标 100%，差距 {100 - stmt_pct}%） · 收集方法: {_method_label(method)}"
     return ObjectiveResult(status=status, evidence=evidence, **d)
 
 
@@ -565,16 +574,17 @@ def _check_obj14(
         return ObjectiveResult(status=STATUS_NA, evidence="", **d)
 
     cov = pipeline_result.get("coverage_result", {}) or {}
+    method = cov.get("method", "static_analysis")
     dec_pct = cov.get("decision_coverage", 0)
     if dec_pct >= 100:
         status = STATUS_PASS
-        evidence = f"判定覆盖率 {dec_pct}%（100%）"
+        evidence = f"判定覆盖率 {dec_pct}%（100%） · 收集方法: {_method_label(method)}"
     elif dec_pct >= 80:
         status = STATUS_PARTIAL
-        evidence = f"判定覆盖率 {dec_pct}%（目标 100%）"
+        evidence = f"判定覆盖率 {dec_pct}%（目标 100%） · 收集方法: {_method_label(method)}"
     else:
         status = STATUS_FAIL
-        evidence = f"判定覆盖率 {dec_pct}%（目标 100%，差距 {100 - dec_pct}%）"
+        evidence = f"判定覆盖率 {dec_pct}%（目标 100%，差距 {100 - dec_pct}%） · 收集方法: {_method_label(method)}"
     return ObjectiveResult(status=status, evidence=evidence, **d)
 
 
@@ -589,20 +599,29 @@ def _check_obj15(
         return ObjectiveResult(status=STATUS_NA, evidence="", **d)
 
     cov = pipeline_result.get("coverage_result", {}) or {}
+    method = cov.get("method", "static_analysis")
     mcdc_pct = cov.get("mcdc_coverage", 0)
+    method_label = _method_label(method)
     if mcdc_pct >= 100:
         status = STATUS_PASS
-        evidence = f"MC/DC 覆盖率 {mcdc_pct}%（100%）"
+        evidence = f"MC/DC 覆盖率 {mcdc_pct}%（100%） · 收集方法: {method_label}"
     elif mcdc_pct >= 80:
         status = STATUS_PARTIAL
-        evidence = f"MC/DC 覆盖率 {mcdc_pct}%（目标 100%）"
+        evidence = f"MC/DC 覆盖率 {mcdc_pct}%（目标 100%） · 收集方法: {method_label}"
     else:
         status = STATUS_FAIL
         evidence = (
             f"MC/DC 覆盖率 {mcdc_pct}%（目标 100%，差距 {100 - mcdc_pct}%）"
-            " — MC/DC 分析为 Phase 3 MVP 版本"
+            f" · 收集方法: {method_label}"
         )
     return ObjectiveResult(status=status, evidence=evidence, **d)
+
+
+def _method_label(method: str) -> str:
+    """覆盖率收集方法的人类可读标签。"""
+    if method == "gcov":
+        return "真实 gcov/lcov (GCC 14.2+)"
+    return "静态分析回退 (mcdc_calculator)"
 
 
 def _check_obj16(
@@ -642,7 +661,30 @@ def _check_obj17(
     if not dal.requires_independent_verification:
         return ObjectiveResult(status=STATUS_NA, evidence="", **d)
 
-    # 检查 HIL 审批记录和独立验证标记
+    # 检查 1: pipeline_result 中的 independent_reviews 列表（证据收集注入）
+    independent_reviews = pipeline_result.get("independent_reviews", [])
+    if isinstance(independent_reviews, list) and independent_reviews:
+        # 分离工具审查和人工审查
+        tool_reviews = [r for r in independent_reviews if r.get("reviewer_role") in ("automated_tool", "tool")]
+        human_reviews = [r for r in independent_reviews if r.get("reviewer_role") == "human_reviewer"]
+        approved_tool_reviews = [r for r in tool_reviews if r.get("approved", False)]
+        approved_human_reviews = [r for r in human_reviews if r.get("approved", False)]
+
+        # 独立工具通过 + 独立人工通过 = PASS
+        if approved_tool_reviews and approved_human_reviews:
+            status = STATUS_PASS
+            evidence = (
+                f"独立验证完成: {len(approved_tool_reviews)} 个独立工具通过 + "
+                f"{len(approved_human_reviews)} 个人工审查通过"
+            )
+            return ObjectiveResult(status=status, evidence=evidence, **d)
+        # 仅工具通过
+        elif approved_tool_reviews and not approved_human_reviews:
+            status = STATUS_PARTIAL
+            evidence = f"独立工具验证通过 ({len(approved_tool_reviews)} 个)，但缺少独立人工审查"
+            return ObjectiveResult(status=status, evidence=evidence, **d)
+
+    # 检查 2: HIL 审批记录和独立验证标记（原有逻辑）
     hil_history = pipeline_result.get("hil_history", []) or []
     ccr = pipeline_result.get("contract_check_result")
     has_hil = len(hil_history) > 0 if isinstance(hil_history, list) else False

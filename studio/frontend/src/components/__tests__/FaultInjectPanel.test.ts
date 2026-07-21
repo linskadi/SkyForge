@@ -2,7 +2,7 @@ import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import FaultInjectPanel from "../FaultInjectPanel.vue";
 
-vi.mock("lucide-vue-next", () => ({
+vi.mock("@lucide/vue", () => ({
 	AlertTriangle: { name: "AlertTriangle", template: "<span />" },
 	ArrowUpDown: { name: "ArrowUpDown", template: "<span />" },
 	CircleDot: { name: "CircleDot", template: "<span />" },
@@ -180,7 +180,8 @@ describe("FaultInjectPanel", () => {
 				.find((btn) => btn.text().includes("注入故障"));
 			await injectBtn?.trigger("click");
 			expect(wrapper.emitted("inject")).toBeTruthy();
-			expect(wrapper.emitted("inject")![0][0]).toEqual(
+			const injectEvents = wrapper.emitted("inject");
+			expect(injectEvents?.[0]?.[0]).toEqual(
 				expect.arrayContaining([
 					expect.objectContaining({
 						type: expect.any(String),

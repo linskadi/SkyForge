@@ -1,4 +1,14 @@
 <script setup lang="ts">
+import {
+	AlertTriangle,
+	CheckCircle2,
+	ChevronDown,
+	ChevronRight,
+	MinusCircle,
+	Play,
+	XCircle,
+} from "@lucide/vue";
+import { computed, ref, watch } from "vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,16 +31,6 @@ import type {
 	VerificationCheck,
 	VerificationResult,
 } from "@/types/verification";
-import {
-	AlertTriangle,
-	CheckCircle2,
-	ChevronDown,
-	ChevronRight,
-	MinusCircle,
-	Play,
-	XCircle,
-} from "lucide-vue-next";
-import { computed, ref } from "vue";
 
 interface Props {
 	/** 验证结果对象（与 /api/verify 返回格式一致） */
@@ -45,6 +45,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
 	/** 用户点击"开始验证"按钮 */
+	// biome-ignore lint/style/useShorthandFunctionType: Vue defineEmits 需要调用签名语法
 	(e: "start-verify"): void;
 }>();
 
@@ -57,6 +58,29 @@ const toggleExpand = (name: string) => {
 	else next.add(name);
 	expanded.value = next;
 };
+
+/**
+ * 当结果变化时，自动展开所有 skipped 项的 counter_example。
+ *
+ * 后端在 Z3/CBMC 不可用时会返回 skipped 检查项，并在 counter_example
+ * 字段附带说明（如 "Z3 不可用（pip install z3-solver 启用）"）。
+ * 默认展开使用户无需点击即可看到跳过原因，避免误以为前端未调用真实后端。
+ */
+watch(
+	() => props.result,
+	(newResult) => {
+		const next = new Set<string>();
+		if (newResult) {
+			for (const c of newResult.checks) {
+				if (c.status === "skipped" && c.counter_example) {
+					next.add(c.name);
+				}
+			}
+		}
+		expanded.value = next;
+	},
+	{ immediate: true },
+);
 
 /** 顶部状态配置 */
 const statusConfig = computed(() => {

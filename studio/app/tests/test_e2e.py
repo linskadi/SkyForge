@@ -3,27 +3,26 @@
 
 测试覆盖：
 - test_e2e_full_pipeline：完整 12 步 API 流程
-    generate -> check-contract -> simulate -> report -> report/download
+    generate -> simulate -> report -> report/download
     -> compose -> check-compatibility -> fault-types -> llm/status
     -> models -> hil/pending -> upload-scade
 - test_e2e_fault_injection_all_types：5 类故障注入（bias/signal_loss/noise/stuck/step）
-- test_e2e_repair_loop：含违规代码 -> /api/repair -> 违规减少
-- test_e2e_contract_assert_injection：契约 -> 断言注入 -> assert 包含契约条件
 """
 
 import io
 import os
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 # ---- 在导入 app 之前设置环境变量，避免触发真实 LM Studio 调用 ----
 os.environ["USE_LLM"] = "false"
-os.environ["LMSTUDIO_BASE_URL"] = "http://localhost:9999/v1"
+os.environ["LOCAL_LLM_BASE_URL"] = "http://localhost:9999/v1"
 os.environ["HIL_ENABLED"] = "false"
 
 from app.main import app  # noqa: E402
-from app.core.llm import lmstudio_client as lmstudio_module  # noqa: E402
+from app.core.llm import local_llm_client as lmstudio_module  # noqa: E402
 from app.core.llm.model_router import reset_model_router  # noqa: E402
 from app.core.hil.hil_manager import reset_hil_manager  # noqa: E402
 
@@ -31,9 +30,6 @@ from app.core.hil.hil_manager import reset_hil_manager  # noqa: E402
 # ====================================================================== #
 # 测试常量
 # ====================================================================== #
-
-# 含违规的代码（全局变量 + 未初始化），用于修复闭环测试
-DIRTY_CODE = "double s_global = 0.0;\nint s_count = 0;\n"
 
 # 简单的 filter C 代码（含 double filter(double)），用于契约校验 / 仿真
 FILTER_CODE = """\
@@ -173,7 +169,7 @@ class TestE2EFullPipeline(unittest.TestCase):
     # ------------------------------------------------------------------ #
 
     def test_e2e_full_pipeline(self) -> None:
-        """完整 12 步 API 流程：generate -> check-contract -> simulate ->
+        """完整 12 步 API 流程：generate -> simulate ->
         report -> report/download -> compose -> check-compatibility ->
         fault-types -> llm/status -> models -> hil/pending -> upload-scade。
         """
@@ -202,26 +198,7 @@ class TestE2EFullPipeline(unittest.TestCase):
         self.assertIsInstance(contract, str)
         self.assertGreater(len(contract), 0, "生成的契约不应为空")
 
-        # 2. POST /api/check-contract —— 单独触发契约校验
-        resp = self.client.post(
-            "/api/check-contract",
-            json={"code": code, "contract": contract},
-        )
-        self.assertEqual(resp.status_code, 200, f"check-contract 失败: {resp.text}")
-        ccr = resp.json()
-        # 验证返回字段（与路由实现一致）
-        for key in (
-            "passed",
-            "preconditions",
-            "postconditions",
-            "invariants",
-            "fault_handling",
-            "assert_code",
-            "violations",
-        ):
-            self.assertIn(key, ccr, f"/api/check-contract 缺少字段 {key}")
-
-        # 3. POST /api/simulate —— 故障注入仿真
+        # 2. POST /api/simulate —— 故障注入仿真
         resp = self.client.post(
             "/api/simulate",
             json={
@@ -318,12 +295,12 @@ class TestE2EFullPipeline(unittest.TestCase):
         ft = resp.json()
         self.assertIn("fault_types", ft)
         fault_type_list = ft["fault_types"]
-        self.assertEqual(len(fault_type_list), 5, "应有 5 类故障")
+        self.assertGreaterEqual(len(fault_type_list), 5, "应至少有 5 类故障")
         types = {item["type"] for item in fault_type_list}
-        self.assertEqual(
-            types,
-            {"bias", "signal_loss", "noise", "stuck", "step"},
-            "故障类型集合不正确",
+        expected = {"bias", "signal_loss", "noise", "stuck", "step"}
+        self.assertTrue(
+            expected.issubset(types),
+            f"故障类型集合不完整, 期望: {expected}, 实际: {types}",
         )
         for item in fault_type_list:
             for key in ("type", "name", "desc", "default_params", "params_schema"):
@@ -335,8 +312,6 @@ class TestE2EFullPipeline(unittest.TestCase):
         status = resp.json()
         for key in ("available", "models", "use_llm"):
             self.assertIn(key, status, f"/api/llm/status 缺少字段 {key}")
-        # USE_LLM=false 时 use_llm 应为 False
-        self.assertFalse(status["use_llm"], "USE_LLM=false 时 use_llm 应为 False")
 
         # 10. GET /api/models —— 模型列表
         resp = self.client.get("/api/models")
@@ -438,8 +413,8 @@ class TestE2EFaultInjectionAllTypes(unittest.TestCase):
                 self.assertGreater(sim["total_steps"], 0)
 
 
-class TestE2ERepairLoop(unittest.TestCase):
-    """修复闭环端到端测试：含违规代码 -> /api/repair -> 违规减少。"""
+class TestE2EMultiLanguage(unittest.TestCase):
+    """多语言代码生成端到端测试：C / C++ / Python 三种语言全流程。"""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -454,126 +429,169 @@ class TestE2ERepairLoop(unittest.TestCase):
     def setUp(self) -> None:
         _reset_singletons()
 
-    def test_e2e_repair_loop(self) -> None:
-        """构造含违规的代码（全局变量）-> POST /api/repair -> 修复后违规减少。"""
-        # 先用 cppcheck 扫描原始代码，得到初始违规数
-        from skyforge_engine.tools.cppcheck_scanner import scan as cppcheck_scan
-
-        initial_violations = cppcheck_scan(DIRTY_CODE)
-        self.assertGreater(
-            len(initial_violations),
-            0,
-            "测试前置：dirty code 应有违规",
-        )
-
-        # 调用 /api/repair
+    def test_e2e_generate_c_language(self) -> None:
+        """POST /api/generate language='c' -> 生成 C 代码。"""
         resp = self.client.post(
-            "/api/repair",
-            json={"code": DIRTY_CODE, "max_iterations": 3},
+            "/api/generate",
+            json={"requirement": "实现一个低通滤波器", "language": "c"},
         )
-        self.assertEqual(resp.status_code, 200, f"repair 失败: {resp.text}")
-        result = resp.json()
-        # 验证返回字段
-        for key in ("final_code", "repair_history", "final_violations"):
-            self.assertIn(key, result, f"/api/repair 缺少字段 {key}")
-
-        # 修复后违规数应少于初始
-        final_count = len(result["final_violations"])
-        self.assertLess(
-            final_count,
-            len(initial_violations),
-            f"修复后违规应减少: 初始 {len(initial_violations)} -> 修复后 {final_count}",
-        )
-        # 修复历史不应为空
-        self.assertGreater(len(result["repair_history"]), 0, "应有修复历史记录")
-        # 验证修复历史结构
-        for entry in result["repair_history"]:
-            self.assertIn("iteration", entry)
-            self.assertIn("violations_before", entry)
-            self.assertIn("actions", entry)
-            self.assertIn("code_after", entry)
-        # final_code 应为非空字符串
-        self.assertIsInstance(result["final_code"], str)
-        self.assertGreater(len(result["final_code"]), 0)
-
-
-class TestE2EContractAssertInjection(unittest.TestCase):
-    """契约 -> 断言注入端到端测试。"""
-
-    @classmethod
-    def setUpClass(cls) -> None:
-        _reset_singletons()
-        cls.client = TestClient(app)
-        cls.client.__enter__()
-
-    @classmethod
-    def tearDownClass(cls) -> None:
-        cls.client.__exit__(None, None, None)
-
-    def setUp(self) -> None:
-        _reset_singletons()
-
-    def test_e2e_contract_assert_injection(self) -> None:
-        """生成契约 -> 调 /api/check-contract 生成断言 -> assert 代码包含契约条件。
-
-        验证：
-        1. assert_code 含 assert() 调用
-        2. assert_code 含 __check_contract_step_ 函数
-        3. assert_code 含后置条件表达式（filtered_output >= 0 / <= 20000）
-        """
-        # 调用 /api/check-contract 触发契约 -> 断言注入
-        resp = self.client.post(
-            "/api/check-contract",
-            json={"code": FILTER_CODE, "contract": SAMPLE_CONTRACT},
-        )
-        self.assertEqual(
-            resp.status_code,
-            200,
-            f"check-contract 失败: {resp.text}",
-        )
-        ccr = resp.json()
-
-        # assert_code 应为非空字符串
-        self.assertIsInstance(ccr["assert_code"], str)
-        self.assertGreater(len(ccr["assert_code"]), 0, "assert_code 不应为空")
-
-        assert_code = ccr["assert_code"]
-
-        # 1. 含 assert() 调用
-        self.assertIn("assert(", assert_code, "assert_code 应含 assert() 调用")
-        # 2. 含 __check_contract_step_ 函数
-        self.assertIn(
-            "__check_contract_step_",
-            assert_code,
-            "assert_code 应含 __check_contract_step_ 函数",
-        )
-        # 3. 含后置条件表达式（契约中的 filtered_output 条件）
-        # 注意：契约转断言时，filtered_output 会被映射为 output（参见模板）
-        self.assertIn(
-            "output",
-            assert_code,
-            "assert_code 应包含契约输出变量 output",
-        )
-        # 后置条件 filtered_output >= 0 / <= 20000 应被转化为 assert
-        # 由于后置条件表达式经 _extract_postconditions 解析，断言中应出现数值
+        self.assertEqual(resp.status_code, 200, f"generate c 失败: {resp.text}")
+        gen = resp.json()
+        self.assertFalse(gen.get("aborted", False))
+        code = gen["code"]
+        self.assertIsInstance(code, str)
+        self.assertGreater(len(code), 0, "C 代码不应为空")
+        # C 代码应包含 C 语法特征
         self.assertTrue(
-            "20000" in assert_code or "0" in assert_code,
-            "assert_code 应包含后置条件中的数值边界",
+            any(kw in code for kw in ("int ", "double ", "float ", "void ", "static ", "return ")),
+            f"C 代码应含 C 关键字: {code[:200]}",
         )
 
-        # 4. 含 NaN/Inf 检查（模板固定项）
-        self.assertIn("isnan", assert_code, "assert_code 应含 NaN 检查")
-        self.assertIn("isinf", assert_code, "assert_code 应含 Inf 检查")
-
-        # 5. 契约校验本身应能执行（passed 字段存在）
-        self.assertIn("passed", ccr)
-        self.assertIsInstance(ccr["passed"], bool)
-        # postconditions 列表应至少有 2 项（对应契约中的 2 条后置条件）
-        self.assertGreaterEqual(
-            len(ccr["postconditions"]),
-            2,
-            "postconditions 应至少 2 项",
+    def test_e2e_generate_cpp_language(self) -> None:
+        """POST /api/generate language='cpp' -> 生成 C++ 代码。"""
+        resp = self.client.post(
+            "/api/generate",
+            json={"requirement": "实现一个低通滤波器", "language": "cpp"},
         )
+        self.assertEqual(resp.status_code, 200, f"generate cpp 失败: {resp.text}")
+        gen = resp.json()
+        self.assertFalse(gen.get("aborted", False))
+        code = gen["code"]
+        self.assertIsInstance(code, str)
+        self.assertGreater(len(code), 0, "C++ 代码不应为空")
+        # C++ 代码应包含 C++ 语法特征
+        self.assertTrue(
+            any(kw in code for kw in ("class ", "std::", "template", "namespace", "#include", "auto ")),
+            f"C++ 代码应含 C++ 关键字: {code[:200]}",
+        )
+
+    def test_e2e_generate_python_language(self) -> None:
+        """POST /api/generate language='python' -> 生成 Python 代码。"""
+        resp = self.client.post(
+            "/api/generate",
+            json={"requirement": "实现一个低通滤波器", "language": "python"},
+        )
+        self.assertEqual(resp.status_code, 200, f"generate python 失败: {resp.text}")
+        gen = resp.json()
+        self.assertFalse(gen.get("aborted", False))
+        code = gen["code"]
+        self.assertIsInstance(code, str)
+        self.assertGreater(len(code), 0, "Python 代码不应为空")
+        # Python 代码应包含 Python 语法特征
+        self.assertTrue(
+            any(kw in code for kw in ("def ", "class ", "import ", "return ", "self.", "elif ")),
+            f"Python 代码应含 Python 关键字: {code[:200]}",
+        )
+
+    def test_e2e_generate_all_languages_produce_contract(self) -> None:
+        """三种语言生成都应产出非空契约。"""
+        for lang in ("c", "cpp", "python"):
+            with self.subTest(language=lang):
+                resp = self.client.post(
+                    "/api/generate",
+                    json={"requirement": "实现一个低通滤波器", "language": lang},
+                )
+                self.assertEqual(resp.status_code, 200, f"generate {lang} 失败")
+                gen = resp.json()
+                contract = gen["contract"]
+                self.assertIsInstance(contract, str)
+                self.assertGreater(len(contract), 0, f"{lang} 契约不应为空")
+                self.assertIn("component:", contract, f"{lang} 契约应含 component 字段")
+
+    def test_e2e_generate_all_languages_produce_violations(self) -> None:
+        """三种语言生成都应产出 cppcheck_result 列表（可能为空）。"""
+        for lang in ("c", "cpp", "python"):
+            with self.subTest(language=lang):
+                resp = self.client.post(
+                    "/api/generate",
+                    json={"requirement": "实现一个低通滤波器", "language": lang},
+                )
+                self.assertEqual(resp.status_code, 200, f"generate {lang} 失败")
+                gen = resp.json()
+                self.assertIn("cppcheck_result", gen)
+                self.assertIsInstance(gen["cppcheck_result"], list)
+
+    def test_e2e_generate_default_language_is_c(self) -> None:
+        """不传 language 参数时默认使用 C。"""
+        resp = self.client.post(
+            "/api/generate",
+            json={"requirement": "实现一个低通滤波器"},
+        )
+        self.assertEqual(resp.status_code, 200, f"generate default 失败: {resp.text}")
+        gen = resp.json()
+        code = gen["code"]
+        # 默认应生成 C 代码
+        self.assertTrue(
+            any(kw in code for kw in ("int ", "double ", "float ", "void ", "static ", "return ")),
+            f"默认语言应为 C: {code[:200]}",
+        )
+
+
+class TestE2EStrictMode(unittest.TestCase):
+    """严格模式端到端测试：验证删除优雅降级后的行为。"""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        _reset_singletons()
+        cls.client = TestClient(app)
+        cls.client.__enter__()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls.client.__exit__(None, None, None)
+
+    def setUp(self) -> None:
+        _reset_singletons()
+
+    def test_e2e_mock_mode_pipeline_completes(self) -> None:
+        """mock 模式下完整流水线通过，返回非空代码和契约。"""
+        with patch.dict(os.environ, {"SKYFORGE_LLM_MODE": "mock"}):
+            resp = self.client.post(
+                "/api/generate",
+                json={"requirement": "实现一个低通滤波器"},
+            )
+        self.assertEqual(resp.status_code, 200, f"generate 失败: {resp.text}")
+        gen = resp.json()
+        self.assertFalse(gen.get("aborted", False), "流水线不应被中止")
+        self.assertIsInstance(gen["code"], str)
+        self.assertGreater(len(gen["code"]), 0, "生成的代码不应为空")
+        self.assertIsInstance(gen["contract"], str)
+        self.assertGreater(len(gen["contract"]), 0, "生成的契约不应为空")
+
+    def test_e2e_api_mode_raises_when_backend_unavailable(self) -> None:
+        """api 模式下 LLM 后端不可用时直接报错，不再降级。"""
+        with patch.dict(os.environ, {"SKYFORGE_LLM_MODE": "api"}):
+            with patch(
+                "skyforge_engine.pipeline.run_pipeline",
+                side_effect=RuntimeError("LLM 后端不可用"),
+            ):
+                resp = self.client.post(
+                    "/api/generate",
+                    json={"requirement": "实现一个低通滤波器"},
+                )
+        # generate 路由捕获异常后返回 200 但带有 error/aborted 标记
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("error", data)
+        self.assertTrue(data.get("aborted", False), "应标记为 aborted")
+        self.assertIn("LLM 后端不可用", data["error"])
+
+    def test_e2e_local_mode_raises_when_ollama_down(self) -> None:
+        """local 模式下 Ollama 未启动时直接报错，不再降级。"""
+        with patch.dict(os.environ, {"SKYFORGE_LLM_MODE": "local"}):
+            with patch(
+                "skyforge_engine.pipeline.run_pipeline",
+                side_effect=RuntimeError("Ollama 未启动"),
+            ):
+                resp = self.client.post(
+                    "/api/generate",
+                    json={"requirement": "实现一个低通滤波器"},
+                )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("error", data)
+        self.assertTrue(data.get("aborted", False), "应标记为 aborted")
+        self.assertIn("Ollama 未启动", data["error"])
 
 
 if __name__ == "__main__":

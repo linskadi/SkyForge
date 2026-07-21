@@ -11,7 +11,10 @@
  * 3. JSON error handling with structured ApiError
  * 4. Mock/real switching via apiSwitcher
  * 5. Re-exports the base URL for download/report scenarios
+ * 6. 统一 HTTP 错误 toast 提示（T3.3）：4xx/5xx → toast `[错误] status: detail`
  */
+
+import { toast } from "@/components/ui/toast/use-toast";
 
 /** API 基础地址 */
 export const API_BASE_URL =
@@ -30,6 +33,39 @@ export class ApiError extends Error {
 		super(`HTTP ${status} ${statusText}`);
 		this.name = "ApiError";
 	}
+}
+
+/**
+ * 从 ApiError body 中提取后端 FastAPI 错误 detail 字段
+ *
+ * FastAPI HTTPException 默认响应体为 `{"detail": "..."}`，
+ * 也可能为 `{"message": "..."}` 或纯字符串。优先取 detail，其次 message。
+ */
+function extractErrorDetail(body: unknown): string {
+	if (body == null) return "";
+	if (typeof body === "string") return body;
+	if (typeof body === "object") {
+		const obj = body as Record<string, unknown>;
+		if (typeof obj.detail === "string") return obj.detail;
+		if (typeof obj.message === "string") return obj.message;
+	}
+	return "";
+}
+
+/**
+ * 统一 HTTP 错误 toast 提示（T3.3）
+ *
+ * 在抛出 ApiError 前触发 toast，格式：`[错误] ${status}: ${detail}`
+ * 调用方仍可通过 try/catch 捕获 ApiError 实现自己的错误展示逻辑
+ * （如 Generate.vue 的错误面板 + 重试按钮）。
+ */
+function notifyHttpError(err: ApiError): void {
+	const detail = extractErrorDetail(err.body) || err.statusText || "未知错误";
+	toast({
+		title: `[错误] ${err.status}`,
+		description: detail,
+		variant: "destructive",
+	});
 }
 
 /**
@@ -60,7 +96,9 @@ export async function request<T>(
 			} catch {
 				body = await response.text().catch(() => null);
 			}
-			throw new ApiError(response.status, response.statusText, body);
+			const err = new ApiError(response.status, response.statusText, body);
+			notifyHttpError(err);
+			throw err;
 		}
 		return response.json();
 	} finally {
@@ -110,5 +148,17 @@ export function postFormData<T>(
 			body: formData,
 		},
 		timeout ?? 30_000,
+	);
+}
+
+/** DELETE 请求 */
+export function deleteJSON<T>(path: string, timeout?: number): Promise<T> {
+	return request<T>(
+		path,
+		{
+			method: "DELETE",
+			headers: { Accept: "application/json" },
+		},
+		timeout,
 	);
 }

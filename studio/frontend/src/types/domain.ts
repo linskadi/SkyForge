@@ -117,13 +117,20 @@ export interface ContractCheckResult {
 
 // ===================== Day 3: 数字孪生仿真类型 =====================
 
-/** 故障类型（5 类，参考文档第 6 章数字孪生） */
+/** 故障类型（12 类，参考文档第 6 章数字孪生） */
 export type FaultType =
 	| "bias" // 传感器偏置
 	| "signal_loss" // 信号丢失
 	| "noise" // 高频噪声
 	| "stuck" // 卡死故障
-	| "step"; // 阶跃突变
+	| "step" // 阶跃突变
+	| "saturation" // 饱和截断
+	| "intermittent" // 间歇性故障
+	| "drift" // 渐变漂移
+	| "timeout" // 丢帧/延迟
+	| "glitch" // 跳变毛刺
+	| "stuck_zero" // 零输出
+	| "polarity"; // 符号反转
 
 /** 故障注入参数（不同故障类型使用不同字段） */
 export interface FaultParams {
@@ -139,6 +146,25 @@ export interface FaultParams {
 	step_time?: number;
 	/** 突变后值（step 类型） */
 	step_value?: number;
+	// ===== 新增 7 类故障参数 =====
+	/** saturation 上限 */
+	upper_limit?: number;
+	/** saturation 下限 */
+	lower_limit?: number;
+	/** intermittent 故障周期（步） */
+	interval?: number;
+	/** intermittent 故障持续（步） */
+	duration?: number;
+	/** drift 漂移速率（每步增量） */
+	drift_rate?: number;
+	/** timeout 冻结起始步 */
+	timeout_start?: number;
+	/** glitch 毛刺幅度 */
+	glitch_magnitude?: number;
+	/** glitch 毛刺次数 */
+	glitch_count?: number;
+	/** stuck_zero 失效起始步 */
+	stuck_start?: number;
 }
 
 /** 契约违约信息（仿真中发现契约被违反时填充） */
@@ -208,6 +234,8 @@ export interface GenerateResult {
 	contract_check_result: ContractCheckResult;
 	/** 数字孪生仿真结果（Day 3，默认无故障仿真） */
 	simulation_result: SimulationResult;
+	/** 降级模式标志：LLM 不可用时为 true，Agent 走 mock 路径 */
+	degraded?: boolean;
 }
 
 // ===================== Day 4+: 后端新功能类型 =====================
@@ -277,9 +305,9 @@ export interface LLMModel {
 
 /** LLM 状态 */
 export interface LLMStatus {
-	/** LM Studio 是否可用 */
+	/** 本地 LLM 是否可用 */
 	available: boolean;
-	/** LM Studio 连接地址 */
+	/** 本地 LLM 连接地址 */
 	endpoint: string;
 	/** 当前是否使用真实 LLM（false 表示使用 Mock） */
 	use_llm: boolean;
@@ -331,19 +359,22 @@ export interface ScadeParseResult {
 	source_file: string;
 }
 
-/** HIL 检查点类型 */
-export type HILCheckpointType =
+/** HITL 人工审查（Human-in-the-Loop）检查点类型
+ *
+ * 区分于 HIL（Hardware-in-the-Loop 硬件在环，digital_twin/）。
+ */
+export type HITLCheckpointType =
 	| "requirement_review"
 	| "contract_review"
 	| "code_review"
 	| "final_review";
 
-/** HIL 待审批项 */
-export interface HILApproval {
+/** HITL 待审批项 */
+export interface HITLApproval {
 	/** 审批请求 ID */
 	request_id: string;
 	/** 检查点类型 */
-	checkpoint: HILCheckpointType;
+	checkpoint: HITLCheckpointType;
 	/** 检查点名称（中文） */
 	checkpoint_name: string;
 	/** 内容预览 */
@@ -358,8 +389,8 @@ export interface HILApproval {
 	status: "pending" | "approved" | "rejected" | "timeout";
 }
 
-/** HIL 审批历史项 */
-export interface HILHistoryItem extends HILApproval {
+/** HITL 审批历史项 */
+export interface HITLHistoryItem extends HITLApproval {
 	/** 审批人 */
 	reviewer?: string;
 	/** 审批时间戳 */
@@ -408,14 +439,26 @@ export interface MisraRule {
 	title: string;
 	/** 规则描述 */
 	description: string;
-	/** 规则分类 */
-	category: "Required" | "Mandatory" | "Advisory";
+	/** 规则分类（放宽为 string 以兼容 MISRA-C/C++/Python 多种分类体系） */
+	category: string;
 	/** 规则所属章节 */
 	section?: string;
 	/** 违规示例代码 */
 	bad_example?: string;
 	/** 合规示例代码 */
 	good_example?: string;
+}
+
+/** 规则集元数据（对应后端 /api/rules/standards 返回项） */
+export interface RuleStandard {
+	/** 规则集 ID，如 "misra_c_2012" / "jsf_av_cpp" / "python_safety" */
+	id: string;
+	/** 规则集名称（人类可读） */
+	name: string;
+	/** 适用编程语言 */
+	language: "c" | "cpp" | "python";
+	/** 标准版本号 */
+	version: string;
 }
 
 /** 修复结果（独立修复接口的返回类型） */
@@ -428,4 +471,73 @@ export interface RepairResult {
 	final_violations: MisraViolation[];
 	/** 契约校验结果 */
 	contract_check_result: ContractCheckResult;
+}
+
+// ==================== Dashboard ====================
+
+/** 最近任务记录（列表项） */
+export interface RecentTask {
+	id: string;
+	requirement: string;
+	language: "c" | "c++" | "python" | string;
+	status: "done" | "error" | "degraded" | "running";
+	degraded: boolean;
+	violation_count: number;
+	stage_reached: "req" | "con" | "code" | "repair" | "sim" | "done";
+	duration_ms: number;
+	created_at: string | null;
+}
+
+/** 系统状态聚合 */
+export interface SystemStatus {
+	backend: "online" | "offline" | "degraded";
+	llm: {
+		mode: "mock" | "api" | "local" | string;
+		provider: string | null;
+		model: string | null;
+		available: boolean;
+	};
+	tools: {
+		gcc: boolean | null;
+		z3: boolean | null;
+		cbmc: boolean | null;
+	};
+	persistence: {
+		db_rows: number;
+		last_write: string | null;
+	};
+}
+
+/** 合规率趋势数据点 */
+export interface ComplianceTrendPoint {
+	ts: string;
+	mandatory: number;
+	required: number;
+	advisory: number;
+	total: number;
+}
+
+/** Dashboard 顶部统计 */
+export interface DashboardStats {
+	today_count: number;
+	today_done: number;
+	total_count: number;
+	avg_compliance_rate: number;
+}
+
+/** 任务详情（完整记录，用于 Dashboard 展示） */
+export interface DashboardTaskRecord {
+	id: string;
+	requirement: string;
+	language: string;
+	status: string;
+	degraded: boolean;
+	code_hash: string;
+	violation_count: number;
+	mandatory_count: number;
+	required_count: number;
+	advisory_count: number;
+	stage_reached: string;
+	duration_ms: number;
+	created_at: string | null;
 }

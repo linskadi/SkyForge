@@ -1,0 +1,54 @@
+MISRA C++:2023 标准中文详解
+
+来源: 基于 MISRA C++:2023 / JSF AV C++ / CERT C++ 标准
+
+前言
+
+MISRA C++ 是由 MISRA 发布的 C++ 编码标准，旨在为嵌入式系统中的 C++ 开发提供一套严格的编码规范。
+
+1. 核心规则
+
+Rule 2.1 语言标准合规: 代码必须使用标准 C++ 编写，禁止使用编译器扩展。
+Rule 2.5 头文件保护: 所有头文件必须使用 #ifndef 或 #pragma once 保护。
+Rule 3.1 编译错误: 代码必须没有任何编译错误。
+Rule 3.2 编译警告: 代码必须没有任何编译警告。
+Rule 5.1 标识符命名: 标识符必须使用有意义的名称。
+Rule 6.1 基本类型: 禁止使用 short、long、float，使用 fixed-width 类型。
+Rule 6.2 类型转换: 禁止使用 C 风格类型转换，使用 static_cast 等。
+Rule 6.3 隐式转换: 禁止隐式类型转换。
+Rule 7.3 空指针: 禁止使用 NULL，使用 nullptr。
+Rule 7.5 指针解引用: 指针解引用前必须检查是否为 nullptr。
+Rule 8.2 初始化: 所有变量必须在声明时初始化。
+Rule 8.4 外部链接: 外部链接的函数/变量必须在头文件中声明。
+Rule 8.6 命名空间: 禁止使用 using namespace 导入整个命名空间。
+Rule 9.1 初始化列表: 使用成员初始化列表初始化构造函数。
+Rule 10.1 运算符优先级: 复杂表达式必须使用括号明确运算符优先级。
+Rule 11.1 if 语句: if 语句的条件必须是布尔表达式。
+Rule 11.2 switch 语句: switch 语句必须有 default 分支。
+Rule 11.4 goto 语句: 禁止使用 goto 语句。
+Rule 13.5 异常析构: 析构函数不能抛出异常，必须声明 noexcept。
+Rule 14.1 内存分配: 禁止使用 new/delete，使用智能指针或容器。
+Rule 14.3 资源获取即初始化: 所有资源必须使用 RAII 模式管理。
+Rule 15.5 析构函数: 基类析构函数必须是 virtual 或 protected。
+Rule 15.6 虚函数: 虚函数重写必须使用 override 关键字。
+
+JSF AV C++ 特有规则:
+
+Rule JSF-001: 禁止使用 goto
+Rule JSF-002: 禁止使用多重 return
+Rule JSF-003: 禁止使用递归
+Rule JSF-004: 所有 switch 必须有 default
+Rule JSF-005: 禁止使用 dynamic_cast
+Rule JSF-006: 禁止使用异常
+Rule JSF-007: 禁止使用 RTTI
+Rule JSF-008: 禁止使用 new/delete
+Rule JSF-009: 禁止使用多重继承
+Rule JSF-010: 禁止使用运算符重载
+
+CERT C++ 安全规则:
+
+CERT C++ ERR50-CPP: 禁止使用 setjmp/longjmp
+CERT C++ ERR51-CPP: 禁止使用 abort/exit
+CERT C++ MEM52-CPP: 禁止使用动态内存
+CERT C++ CON50-CPP: 禁止使用数据竞争
+CERT C++ EXP50-CPP: 禁止使用异常

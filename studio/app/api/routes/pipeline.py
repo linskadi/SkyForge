@@ -1,9 +1,7 @@
-"""Pipeline 编排路由：生成、上传 SCADE、修复、契约校验、仿真、故障类型。
+"""Pipeline 编排路由：生成、上传 SCADE、仿真、故障类型。
 
 POST /api/generate 触发完整 Agent 流水线
 POST /api/upload-scade 上传 G-Lustre 文件
-POST /api/repair 单独触发修复闭环
-POST /api/check-contract 单独触发契约校验
 POST /api/simulate 单独触发数字孪生仿真
 POST /api/verify 对契约执行形式化验证（Z3 + CBMC）
 GET  /api/fault-types 返回故障类型描述
@@ -11,16 +9,19 @@ GET  /api/fault-types 返回故障类型描述
 
 from dataclasses import asdict
 from typing import Any
+from uuid import uuid4
 
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+
+from app.core.llm.mode_guard import require_tool, ToolNotFoundError
 
 from skyforge_engine.digital_twin.fault_injector import FaultInjector
 from skyforge_engine.digital_twin.simulation_engine import SimulationEngine
-from skyforge_engine.pipeline import repair_loop, run_full_pipeline
 from skyforge_engine.scade.lustre_parser import parse_glustre
 from skyforge_engine.scade.lustre_to_requirement import convert, convert_to_contract
-from skyforge_engine.tools.contract_checker import check as contract_check
+from app.services.task_service import get_task_service
 from app.utils.log_util import logger
 
 router = APIRouter()
@@ -31,23 +32,7 @@ class GenerateRequest(BaseModel):
 
     requirement: str = ""
     scade_file: str = ""
-
-
-class RepairRequest(BaseModel):
-    """修复接口请求体。"""
-
-    code: str
-    contract: str = ""
-    max_iterations: int = 3
-    req_id: str = "REQ-001"
-
-
-class CheckContractRequest(BaseModel):
-    """契约校验接口请求体。"""
-
-    code: str
-    contract: str
-    cid: str = "CON-001"
+    language: str = "c"  # 目标语言: c, cpp, python
 
 
 class SimulateRequest(BaseModel):
@@ -95,23 +80,43 @@ async def generate(req: GenerateRequest) -> dict[str, Any]:
         else f"<scade_file {len(req.scade_file)}B>"
     )
     logger.info(f"/api/generate 收到输入: {req_preview}...")
-    result = await run_full_pipeline(
-        requirement=req.requirement or None,
+    service = get_task_service()
+    created = await service.create(
+        requirement=req.requirement or f"SCADE input ({len(req.scade_file)} bytes)",
         scade_file=req.scade_file or None,
+        language=req.language,
+        profile_id="local",
+        idempotency_key=f"legacy-http-{uuid4().hex}",
     )
+    detail = await service.wait(created["id"])
+    if detail is None:
+        return {"error": "task disappeared", "aborted": True}
+    # Task 13: 使用 .get() 避免 KeyError
+    result = detail.get("result") or {}
+    if not result and detail.get("status") in ("error", "cancelled", "timeout"):
+        # 失败任务直接返回错误信息
+        return {
+            "error": detail.get("error", "task failed"),
+            "status": detail.get("status"),
+            "aborted": True,
+            "task_id": created["id"],
+        }
 
     response: dict[str, Any] = {
-        "requirement": result["requirement"],
-        "contract": result["contract"],
-        "code": result["final_code"],
-        "cppcheck_result": [asdict(v) for v in result["cppcheck_result"]],
-        "repair_history": result["repair_history"],
-        "final_violations": result["final_violations"],
-        "contract_check_result": result["contract_check_result"],
+        "requirement": result.get("requirement"),
+        "contract": result.get("contract"),
+        "code": result.get("final_code"),
+        "cppcheck_result": result.get("cppcheck_result", []),
+        "repair_history": result.get("repair_history", []),
+        "final_violations": result.get("final_violations", []),
+        "contract_check_result": result.get("contract_check_result", {}),
         "simulation_result": result.get("simulation_result"),
+        "coverage_result": result.get("coverage_result") or {},
         "hil_approvals": result.get("hil_approvals", {}),
         "aborted": result.get("aborted", False),
         "abort_reason": result.get("abort_reason"),
+        "task_id": created["id"],
+        "provenance": detail.get("provenance"),
     }
     if "scade_parsed" in result:
         response["scade_parsed"] = result["scade_parsed"]
@@ -150,38 +155,6 @@ async def upload_scade(file: UploadFile) -> dict[str, Any]:
     }
 
 
-@router.post("/api/repair")
-async def repair(req: RepairRequest) -> dict[str, Any]:
-    """单独触发修复闭环：输入 C 代码，返回修复后代码 + 修复历史。"""
-    logger.info(
-        f"/api/repair 收到代码 {len(req.code)} 字符，"
-        f"max_iterations={req.max_iterations}"
-    )
-    result = await repair_loop(
-        code=req.code,
-        contract=req.contract,
-        max_iterations=req.max_iterations,
-        req_id=req.req_id,
-    )
-    return result
-
-
-@router.post("/api/check-contract")
-async def check_contract(req: CheckContractRequest) -> dict[str, Any]:
-    """单独触发契约校验：输入 C 代码 + 契约 YAML，返回校验结果 + 断言插桩代码。"""
-    logger.info(f"/api/check-contract 收到代码 {len(req.code)} 字符, cid={req.cid}")
-    result = contract_check(req.code, req.contract, cid=req.cid)
-    return {
-        "passed": result.passed,
-        "preconditions": [asdict(item) for item in result.preconditions],
-        "postconditions": [asdict(item) for item in result.postconditions],
-        "invariants": [asdict(item) for item in result.invariants],
-        "fault_handling": [asdict(item) for item in result.fault_handling],
-        "assert_code": result.assert_code,
-        "violations": result.violations,
-    }
-
-
 @router.post("/api/simulate")
 async def simulate(req: SimulateRequest) -> dict[str, Any]:
     """单独触发数字孪生仿真。"""
@@ -211,28 +184,28 @@ async def fault_types() -> dict[str, Any]:
 async def verify(req: VerifyRequest) -> dict[str, Any]:
     """对契约执行形式化验证（Z3 SMT + CBMC 有界模型检查）。
 
-    Mock 模式（Z3/CBMC 均不可用）下，所有检查项自动降级为 skipped，
-    保证接口始终可用。
-
     Returns:
         {
             "status": "passed|failed|skipped",
             "summary": {total, passed, failed, skipped},
             "checks": [{name, status, duration_ms, counter_example, tool}],
             "total_duration_ms": int,
-            "tool": "Z3|CBMC|Z3+CBMC|Mock"
+            "tool": "Z3|CBMC|Z3+CBMC"
         }
     """
-    from pathlib import Path
 
     from skyforge_engine.tools.contract_formal_verifier import verify_contract
 
     # 解析契约文本：优先 contract，其次 contract_path
     contract_text = req.contract
     if not contract_text and req.contract_path:
-        path = Path(req.contract_path)
+        from app.utils.common_utils import safe_resolve_workdir
+        try:
+            path = safe_resolve_workdir(req.contract_path)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"illegal contract_path: {exc}")
         if not path.exists():
-            logger.warning(f"/api/verify 契约文件不存在: {req.contract_path}")
+            logger.warning(f"/api/verify 契约文件不存在: {path}")
             return {
                 "status": "skipped",
                 "summary": {"total": 0, "passed": 0, "failed": 0, "skipped": 0},
@@ -259,7 +232,27 @@ async def verify(req: VerifyRequest) -> dict[str, Any]:
         f"code={'provided' if req.code else 'none'}"
     )
 
-    # 调用底层 verify_contract（Mock 模式下自动降级）
+    # 检查工具可用性
+    missing_tools = []
+    try:
+        require_tool("z3")
+    except ToolNotFoundError:
+        missing_tools.append("z3")
+    try:
+        require_tool("cbmc")
+    except ToolNotFoundError:
+        missing_tools.append("cbmc")
+
+    if len(missing_tools) == 2:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "形式化验证工具未安装",
+                "missing_tools": missing_tools,
+            },
+        )
+
+    # 调用底层 verify_contract
     verification = verify_contract(contract_text, code=req.code)
 
     # 转换为结构化 checks 列表（与 CLI 共用语义，但格式独立以避免循环依赖）

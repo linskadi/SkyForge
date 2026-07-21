@@ -1,24 +1,29 @@
-"""模型选择与 MISRA-C 规则检索路由。
+"""模型选择与编码规则检索路由。
 
 GET  /api/models 列出可用模型
 POST /api/models/select 手动选择模型
-POST /api/models/clear 清除模型选择
-GET  /api/llm/status 查询 LM Studio 状态
-POST /api/llm/switch 切换 USE_LLM 开关
-GET  /api/misra/search 搜索 MISRA-C 规则
-GET  /api/misra/rule/{rule_id} 获取单条规则详情
+GET  /api/llm/status 查询本地 LLM 状态
+GET  /api/misra/search 搜索 MISRA-C 规则（向后兼容）
 GET  /api/misra/categories 获取规则分类统计
 GET  /api/misra/rules 列出规则
+GET  /api/rules/standards 列出所有可用规则集
+GET  /api/rules/search 搜索指定规则集的规则（支持 standard_id 参数）
 """
 
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from app.core.llm.lmstudio_client import get_lmstudio_client
+from app.core.auth import require_write_access
+
+from app.core.llm.local_llm_client import get_local_llm_client as get_lmstudio_client
 from app.core.llm.model_router import get_model_router
-from app.rag.misra_searcher import MisraRuleSearcher
+from app.rag.misra_searcher import (
+    MisraRuleSearcher,
+    get_searcher,
+    get_standards,
+)
 from app.utils.log_util import logger
 
 router = APIRouter()
@@ -35,12 +40,6 @@ class ModelSelectRequest(BaseModel):
     model_id: str
 
 
-class LlmSwitchRequest(BaseModel):
-    """LLM 开关切换请求体。"""
-
-    use_llm: bool
-
-
 @router.get("/api/models")
 async def list_models() -> dict[str, Any]:
     """列出 LM Studio 中所有可用模型。"""
@@ -53,8 +52,11 @@ async def list_models() -> dict[str, Any]:
 
 
 @router.post("/api/models/select")
-async def select_model(req: ModelSelectRequest) -> dict[str, Any]:
-    """手动选择模型。传空字符串或调用 /api/models/clear 可恢复自动路由。"""
+async def select_model(
+    req: ModelSelectRequest,
+    _user: str = Depends(require_write_access),
+) -> dict[str, Any]:
+    """手动选择模型。传空字符串可恢复自动路由。"""
     router_ = get_model_router()
     model_id = req.model_id or None
     router_.set_manual_selection(model_id)
@@ -63,17 +65,6 @@ async def select_model(req: ModelSelectRequest) -> dict[str, Any]:
     return {
         "model_id": req.model_id,
         "model_info": info,
-    }
-
-
-@router.post("/api/models/clear")
-async def clear_model_selection() -> dict[str, Any]:
-    """清除手动模型选择，恢复自动路由。"""
-    router_ = get_model_router()
-    router_.set_manual_selection(None)
-    return {
-        "selected": None,
-        "message": "已清除手动选择，恢复任务类型自动路由",
     }
 
 
@@ -90,20 +81,6 @@ async def llm_status() -> dict[str, Any]:
         "available": client.is_available(),
         "models": client.get_available_models(),
         "use_llm": client.use_llm,
-        "active_backend": client.get_active_backend(),
-    }
-
-
-@router.post("/api/llm/switch")
-async def llm_switch(req: LlmSwitchRequest) -> dict[str, Any]:
-    """切换 USE_LLM 开关（不重启服务）。"""
-    client = get_lmstudio_client()
-    client.use_llm = req.use_llm
-    available = client.is_available(force_recheck=True)
-    logger.info(f"USE_LLM 已切换为 {req.use_llm}，available={available}")
-    return {
-        "use_llm": client.use_llm,
-        "available": available,
         "active_backend": client.get_active_backend(),
     }
 
@@ -127,17 +104,6 @@ async def misra_search(
         "count": len(results),
         "rules": [r.to_dict() for r in results],
     }
-
-
-@router.get("/api/misra/rule/{rule_id}")
-async def misra_get_rule(rule_id: str) -> dict[str, Any]:
-    """获取单条 MISRA-C 规则详情。"""
-    decoded = rule_id.replace("+", " ")
-    searcher = MisraRuleSearcher.get_instance()
-    rule = searcher.get_rule(decoded)
-    if rule is None:
-        return {"found": False, "rule_id": decoded, "rule": None}
-    return {"found": True, "rule_id": decoded, "rule": rule.to_dict()}
 
 
 @router.get("/api/misra/categories")
@@ -179,4 +145,54 @@ async def misra_list_rules(
         "total": len(searcher.get_all_rules()),
         "count": len(rules),
         "rules": [r.to_dict() for r in rules],
+    }
+
+
+# ============================================================================ #
+# 多规则集 API（支持 MISRA-C / MISRA-C++ / Python 军工规范）
+# ============================================================================ #
+
+
+@router.get("/api/rules/standards")
+async def list_rule_standards() -> dict[str, Any]:
+    """列出所有可用的规则集。
+
+    返回格式：
+        {
+            "standards": [
+                {"id": "misra_c_2012", "name": "MISRA-C:2012", "language": "c", "version": "2012"},
+                {"id": "jsf_av_cpp", "name": "MISRA-C++ / JSF AV C++", "language": "cpp", "version": "2023"},
+                {"id": "python_safety", "name": "Python 军工软件编程规范", "language": "python", "version": "2023"}
+            ]
+        }
+    """
+    return {"standards": get_standards()}
+
+
+@router.get("/api/rules/search")
+async def rules_search(
+    q: str = Query(..., description="搜索关键词"),
+    standard_id: str = Query(
+        "misra_c_2012",
+        description="规则集 ID：misra_c_2012 / jsf_av_cpp / python_safety",
+    ),
+    top_k: int = Query(5, ge=1, le=50, description="返回最多 top_k 条规则"),
+) -> dict[str, Any]:
+    """搜索指定规则集的规则。
+
+    支持的 standard_id：
+    - misra_c_2012：MISRA-C:2012（C 语言）
+    - jsf_av_cpp：MISRA-C++/JSF AV C++/CERT C++（C++ 语言）
+    - python_safety：Python 军工软件编程规范（Python 语言）
+
+    支持中文/英文关键词、规则 ID（如 "Rule 8.1" / "Rule P-01" / "Rule JSF-001"）。
+    """
+    searcher = get_searcher(standard_id)
+    results = searcher.search(q, top_k=top_k)
+    return {
+        "query": q,
+        "standard_id": standard_id,
+        "top_k": top_k,
+        "count": len(results),
+        "rules": [r.to_dict() for r in results],
     }

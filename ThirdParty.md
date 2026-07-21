@@ -2,7 +2,7 @@
 
 > **项目**: SkyForge（天锻）— AI 智能体驱动的机载软件轻量化开发工具
 > **许可证**: MIT
-> **更新日期**: 2026-07-16
+> **更新日期**: 2026-07-18
 
 ---
 
@@ -65,7 +65,7 @@
 
 | 工具 | 许可证 | 用途 | 集成文件 | 安装方式 |
 |------|--------|------|---------|---------|
-| Cppcheck | GPL-3.0 | MISRA-C 静态扫描 | `tools/cppcheck_scanner.py` | `apt install cppcheck` |
+| Cppcheck | GPL-3.0 | MISRA-C 静态扫描 | `tools/cppcheck_scanner.py` | `apt install cppcheck` / `choco install cppcheck`(Win) |
 | GCC | GPL-3.0 | 代码编译 | `digital_twin/virtual_mcu.py` | 系统自带 |
 | Semgrep | LGPL-2.1 | 模式匹配 + 自定义 MISRA 规则 | `tools/semgrep_scanner.py` | `pip install semgrep` |
 
@@ -73,8 +73,8 @@
 
 | 工具 | 许可证 | 用途 | 集成文件 | 安装方式 |
 |------|--------|------|---------|---------|
-| CBMC | BSD-4-Clause | 有界模型检查 | `tools/cbmc_verifier.py` | `apt install cbmc` |
-| Z3 | MIT | SMT 约束求解 | `tools/z3_verifier.py` | `pip install z3-solver` |
+| CBMC | BSD-4-Clause | 有界模型检查 | `tools/cbmc_verifier.py` | `apt install cbmc`(Linux) / 双击 `tools/cbmc-6.9.0-win64.msi`(Win,管理员权限) |
+| Z3 | MIT | SMT 约束求解 | `tools/z3_verifier.py` | `pip install z3-solver`(`start.sh` 自动安装) |
 | Frama-C/WP | LGPL-2.1 | 演绎验证（远期） | — | `apt install frama-c` |
 
 ### 2.3 覆盖率

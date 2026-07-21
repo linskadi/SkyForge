@@ -2,9 +2,22 @@
 
 import json
 from enum import Enum
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 from typing import Optional
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _env_files(env: str) -> tuple[str, str, str]:
+    """Return repository-absolute env paths, independent of process cwd."""
+    return (
+        str(_REPO_ROOT / "config" / ".env"),
+        str(_REPO_ROOT / ".env"),
+        str(_REPO_ROOT / f".env.{env.lower()}"),
+    )
 
 
 class ApiType(str, Enum):
@@ -48,16 +61,41 @@ def parse_cors(value: str | list) -> list[str]:
 
 
 class Settings(BaseSettings):
-    """全局应用配置，从环境变量和 .env 文件加载。"""
+    """全局应用配置，从环境变量和 .env 文件加载。
+
+    字段分组：
+        - LLM：USE_LLM / LMSTUDIO_BASE_URL / LLM_MODEL 等，主 LLM 调用配置
+        - LLM 缓存：LLM_CACHE_ENABLED / LLM_CACHE_TTL
+        - 系统：MAX_RETRIES / LOG_LEVEL / DEBUG
+        - 数字孪生 / 虚拟 MCU：USE_REAL_GCC
+        - HIL：HIL_ENABLED / HIL_INTERFACE 等，真实硬件在环测试
+        - Agent LLM：REQ_PARSER_* / CON_GEN_* / CODE_GEN_* / REPAIR_*
+        - Redis / CORS / 服务地址
+        - 工具开关：USE_REAL_CPPCHECK / RAG_ENABLED
+        - 安全：SECURITY_SANITIZE_INPUT / SECURITY_AUDIT_ENABLED / SECURITY_VALIDATE_OUTPUT
+            - SECURITY_SANITIZE_INPUT：是否对 LLM 输入执行净化，默认 False。
+              关闭原因：净化可能破坏 LLM 对代码注释、版本号、字符串字面量的语义理解，
+              导致生成代码错乱；仅在受控场景下手动开启。
+            - SECURITY_AUDIT_ENABLED：是否记录 LLM 调用审计日志，默认 True。
+              启用原因：DO-178C 工具鉴定要求对工具操作留痕，审计日志是合规性证据。
+            - SECURITY_VALIDATE_OUTPUT：是否校验 LLM 输出禁止模式，默认 True。
+              启用原因：机载软件禁用 malloc/free/goto/system/exec 等不安全构造，
+              输出校验是阻断危险代码进入编译流程的最后一道防线。
+    """
 
     ENV: str = "dev"
 
-    # LLM 配置（默认开启真实 LLM；LM Studio 不可用时自动降级为 Mock）
+    # LLM 配置
     USE_LLM: bool = True
-    LMSTUDIO_BASE_URL: str = "http://localhost:1234/v1"
+    LMSTUDIO_BASE_URL: str = "http://localhost:11434/v1"
     LLM_MODEL: Optional[str] = None
     LLM_API_KEY: Optional[str] = None
     LLM_MAX_TOKENS: int = 8192
+    # 显式选择 mock 模式，非降级结果
+    SKYFORGE_LLM_MODE: str = "mock"
+    SKYFORGE_LLM_PROVIDER: Optional[str] = None
+    LOCAL_LLM_BASE_URL: str = "http://localhost:11434/v1"
+    SKYFORGE_LLM_WARMUP: bool = False
 
     # LLM 响应缓存配置（对相同 prompt + system_prompt 的非流式调用做缓存）
     LLM_CACHE_ENABLED: bool = True
@@ -67,9 +105,10 @@ class Settings(BaseSettings):
     MAX_RETRIES: int = 3
     LOG_LEVEL: str = "INFO"
     DEBUG: bool = True
+    STRICT_MODE: bool = True
 
     # 数字孪生 / 虚拟 MCU 配置
-    # USE_REAL_GCC=true 时启用真实 GCC 编译（需系统已安装 gcc），失败时降级到 Mock
+    # USE_REAL_GCC=true 时启用真实 GCC 编译（需系统已安装 gcc）
     USE_REAL_GCC: bool = False
 
     # HIL（Hardware-in-the-Loop）真实硬件测试配置
@@ -121,24 +160,32 @@ class Settings(BaseSettings):
     REDIS_MAX_CONNECTIONS: int = 10
 
     # CORS 配置
-    CORS_ALLOW_ORIGINS: str = "*"
+    CORS_ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # 服务地址
     SERVER_HOST: str = "http://localhost:8000"
 
-    # HIL 人机协作配置
-    HIL_ENABLED: bool = False
-    HIL_TIMEOUT: int = 300
+    # HITL（Human-in-the-Loop）人工审查配置。
+    # HIL_ENABLED 在上方只控制真实 Hardware-in-the-Loop，二者不得混用。
+    HITL_ENABLED: bool = False
+    HITL_TIMEOUT: int = 300
 
     # Cppcheck 扫描配置
-    # True（默认）：调用真实 cppcheck --addon=misra --dump；不可用或失败时优雅降级到 Mock
-    # False：使用基于代码模式匹配的 Mock 扫描，不依赖系统 cppcheck
+    # True（默认）：调用真实 cppcheck --addon=misra --dump
     USE_REAL_CPPCHECK: bool = True
 
     # RAG 知识库配置
     # True（默认）：MISRA-C 规则通过 RAG 注入代码修复 prompt，提升修复准确率
     # False：关闭 RAG 增强，仅使用 Agent 自身知识
     RAG_ENABLED: bool = True
+
+    # 安全配置（接入 security/ 子模块：审计日志、输出校验、输入净化）
+    # 是否对 LLM 输入执行净化（默认关闭：避免破坏 LLM 对代码注释/版本号/字符串字面量的语义理解）
+    SECURITY_SANITIZE_INPUT: bool = False
+    # 是否记录 LLM 调用审计日志（默认启用：DO-178C 工具鉴定要求对工具操作留痕）
+    SECURITY_AUDIT_ENABLED: bool = True
+    # 是否校验 LLM 输出禁止模式（默认启用：检测 malloc/free/goto/system/exec 等机载软件禁用构造）
+    SECURITY_VALIDATE_OUTPUT: bool = True
 
     model_config = SettingsConfigDict(
         env_file_encoding="utf-8",
@@ -153,10 +200,15 @@ class Settings(BaseSettings):
             env: 环境名称（如 dev、prod），默认从 ENV 环境变量获取。
         """
         env = env or os.getenv("ENV", "dev")
-        env_file = f".env.{env.lower()}"
-        return cls(_env_file=(".env", env_file), _env_file_encoding="utf-8")  # type: ignore[call-arg]
+        return cls(
+            _env_file=_env_files(env),
+            _env_file_encoding="utf-8",
+        )  # type: ignore[call-arg]
 
 
 # 根据 ENV 环境变量加载对应配置文件
 _env = os.getenv("ENV", "dev")
-settings = Settings(_env_file=(".env", f".env.{_env}"), _env_file_encoding="utf-8")
+settings = Settings(
+    _env_file=_env_files(_env),
+    _env_file_encoding="utf-8",
+)

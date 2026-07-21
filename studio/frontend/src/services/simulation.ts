@@ -3,6 +3,15 @@
  * 纯计算函数：波形生成、IIR 滤波、波形统计、故障注入
  */
 
+import {
+	ADC_CENTER,
+	FILTER_ALPHA,
+	MOCK_COMPOSED_CODE_FEEDBACK,
+	MOCK_COMPOSED_CODE_PARALLEL,
+	MOCK_COMPOSED_CODE_SEQUENTIAL,
+	SIM_STEPS,
+	SINE_AMP,
+} from "@/mock/data";
 import type {
 	AgentLog,
 	CompatibilityCheckItem,
@@ -14,16 +23,6 @@ import type {
 	SimulationResult,
 	SimulationStatistics,
 } from "@/types/domain";
-
-import {
-	ADC_CENTER,
-	FILTER_ALPHA,
-	MOCK_COMPOSED_CODE_FEEDBACK,
-	MOCK_COMPOSED_CODE_PARALLEL,
-	MOCK_COMPOSED_CODE_SEQUENTIAL,
-	SIM_STEPS,
-	SINE_AMP,
-} from "@/mock/data";
 
 /** 生成正常正弦输入波形：32768 + 20000*sin(2π·t/50) */
 export function genSineInput(steps: number): number[] {
@@ -322,14 +321,308 @@ export function runFaultInjection(
 			};
 			break;
 		}
+		case "saturation": {
+			// 饱和截断：输入超出 [lower_limit, upper_limit] 时被截断（设计性限幅，通常不违约）
+			const upper = params.upper_limit ?? 60000;
+			const lower = params.lower_limit ?? 5000;
+			faultedInput = input.map((v) => Math.max(lower, Math.min(upper, v)));
+			faultRange = { start: 0, end: SIM_STEPS - 1 };
+			logs = [
+				{
+					agent: "SYSTEM",
+					level: "info",
+					thought: `$ ./sim --fault saturation --upper ${upper} --lower ${lower}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] 全程启用饱和限幅，范围 [${lower}, ${upper}]`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "info",
+					thought: `[sim] step 0: 输入 ${input[0]} 限幅后 ${faultedInput[0]}`,
+				},
+				{
+					agent: "SYSTEM",
+					level: "success",
+					thought:
+						"✅ 设计性限幅生效，输出始终在 uint16 范围内，未触发契约违约",
+				},
+			];
+			violation = null;
+			break;
+		}
+		case "intermittent": {
+			// 间歇性故障：周期性（interval 步）出现故障值，持续 duration 步
+			const interval = params.interval ?? 20;
+			const dur = params.duration ?? 5;
+			const faultyVal = 65000; // 故障期间的固定异常值
+			faultedInput = input.map((v, t) => {
+				const phase = t % interval;
+				return phase < dur ? faultyVal : v;
+			});
+			faultRange = { start: 0, end: SIM_STEPS - 1 };
+			const triggerStep = interval; // 第一次故障触发步
+			logs = [
+				{
+					agent: "SYSTEM",
+					level: "info",
+					thought: `$ ./sim --fault intermittent --interval ${interval} --duration ${dur}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step ${triggerStep}: 间歇性故障触发，输入强制为 ${faultyVal}，持续 ${dur} 步`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step ${triggerStep + dur}: 故障恢复，等待下一周期（${interval} 步）`,
+				},
+				{
+					agent: "SYSTEM",
+					level: "warn",
+					thought: "⚠ 周期性故障已触发轻度跟踪误差警告，建议增加余度管理器",
+				},
+			];
+			violation = {
+				contract_id: "CON-001-POST-001",
+				assertion: "assert(fabs(filtered_value - expected) < 1e-6)",
+				timestep: triggerStep + 1,
+				actual_value: faultyVal,
+				message: `间歇性故障在周期 ${triggerStep} 步触发，输入跳变至 ${faultyVal} 导致 IIR 跟踪误差超阈值`,
+			};
+			break;
+		}
+		case "drift": {
+			// 渐变漂移：从 step 0 开始输入线性增加 drift_rate * t
+			const rate = params.drift_rate ?? 500;
+			faultedInput = input.map((v, t) =>
+				Math.min(65535, Math.max(0, v + rate * t)),
+			);
+			faultRange = { start: 0, end: SIM_STEPS - 1 };
+			// 找出首次溢出步
+			const overflowStep = faultedInput.findIndex((v) => v >= 65535);
+			const triggerStep = overflowStep > 0 ? overflowStep : SIM_STEPS - 1;
+			logs = [
+				{
+					agent: "SYSTEM",
+					level: "info",
+					thought: `$ ./sim --fault drift --rate ${rate}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step 0: 启动渐变漂移，每步增量 +${rate}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "error",
+					thought: `[sim] step ${triggerStep}: assert(filtered_value <= 65535) FAILED → 漂移累积导致输出溢出`,
+				},
+				{
+					agent: "SYSTEM",
+					level: "error",
+					thought:
+						"❌ 契约违约 [CON-001-POST-000]：渐变漂移累积导致输出超出 uint16 范围",
+				},
+			];
+			violation = {
+				contract_id: "CON-001-POST-000",
+				assertion: "assert(filtered_value <= 65535)",
+				timestep: triggerStep,
+				actual_value: faultedInput[triggerStep] ?? 65535,
+				message: `漂移速率 +${rate}/步累积 ${triggerStep} 步后导致滤波输出溢出 uint16 范围`,
+			};
+			break;
+		}
+		case "timeout": {
+			// 丢帧/延迟：从 timeout_start 步开始信号冻结（保持上一拍值）
+			const start = params.timeout_start ?? 50;
+			faultedInput = input.map((v, t) =>
+				t >= start ? (input[start - 1] ?? v) : v,
+			);
+			faultRange = { start, end: SIM_STEPS - 1 };
+			logs = [
+				{
+					agent: "SYSTEM",
+					level: "info",
+					thought: `$ ./sim --fault timeout --start ${start}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step ${start}: 总线超时，输入冻结在 step ${start - 1} 的值 ${input[start - 1] ?? 0}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step ${SIM_STEPS - 1}: 信号仍未恢复，持续冻结`,
+				},
+				{
+					agent: "SYSTEM",
+					level: "warn",
+					thought:
+						"⚠ 跟踪误差超出容差 1e-6（CON-001-POST-001），建议增加超时检测与余度切换",
+				},
+			];
+			violation = {
+				contract_id: "CON-001-POST-001",
+				assertion: "assert(fabs(filtered_value - expected) < 1e-6)",
+				timestep: start + 10,
+				actual_value: baseOutput[start + 10] ?? 0,
+				message: `从 step ${start} 起信号冻结，IIR 跟踪误差超出容差 1e-6`,
+			};
+			break;
+		}
+		case "glitch": {
+			// 跳变毛刺：随机 glitch_count 个时刻出现 glitch_magnitude 尖峰
+			const mag = params.glitch_magnitude ?? 30000;
+			const count = params.glitch_count ?? 5;
+			// 确定性选取 glitch 时刻：均匀分布在中后段，避免集中在开头
+			const glitchSteps = new Set<number>();
+			if (count > 0 && SIM_STEPS > 20) {
+				const span = SIM_STEPS - 20;
+				for (let i = 0; i < count; i++) {
+					const step = 10 + Math.floor((span * i) / Math.max(1, count));
+					glitchSteps.add(step);
+				}
+			}
+			faultedInput = input.map((v, t) =>
+				glitchSteps.has(t) ? Math.min(65535, Math.max(0, v + mag)) : v,
+			);
+			const sortedSteps = [...glitchSteps].sort((a, b) => a - b);
+			const firstStep = sortedSteps[0] ?? 10;
+			const lastStep = sortedSteps[sortedSteps.length - 1] ?? SIM_STEPS - 1;
+			faultRange = { start: firstStep, end: lastStep };
+			logs = [
+				{
+					agent: "SYSTEM",
+					level: "info",
+					thought: `$ ./sim --fault glitch --magnitude ${mag} --count ${count}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] 注入 ${count} 次毛刺，幅度 +${mag}，时刻 [${sortedSteps.join(", ")}]`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "error",
+					thought: `[sim] step ${firstStep}: assert(filtered_value <= 65535) FAILED → 毛刺尖峰导致瞬时溢出`,
+				},
+				{
+					agent: "SYSTEM",
+					level: "error",
+					thought: "❌ 契约违约 [CON-001-POST-000]：毛刺尖峰触发偶发输出越界",
+				},
+			];
+			violation = {
+				contract_id: "CON-001-POST-000",
+				assertion: "assert(filtered_value <= 65535)",
+				timestep: firstStep,
+				actual_value: faultedInput[firstStep] ?? 0,
+				message: `毛刺幅度 +${mag} 在 step ${firstStep} 触发瞬时输出溢出 uint16 范围`,
+			};
+			break;
+		}
+		case "stuck_zero": {
+			// 零输出：从 stuck_start 步开始输入恒为 0
+			const start = params.stuck_start ?? 40;
+			faultedInput = input.map((v, t) => (t >= start ? 0 : v));
+			faultRange = { start, end: SIM_STEPS - 1 };
+			logs = [
+				{
+					agent: "SYSTEM",
+					level: "info",
+					thought: `$ ./sim --fault stuck_zero --start ${start}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step ${start}: 传感器完全失效，输入恒为 0`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step ${start + 20}: 输出持续向 0 收敛，跟踪误差累积`,
+				},
+				{
+					agent: "SYSTEM",
+					level: "warn",
+					thought:
+						"⚠ 跟踪误差超出容差（CON-001-POST-001），建议余度管理器切换到备份传感器",
+				},
+			];
+			violation = {
+				contract_id: "CON-001-POST-001",
+				assertion: "assert(fabs(filtered_value - expected) < 1e-6)",
+				timestep: start + 5,
+				actual_value: baseOutput[start + 5] ?? 0,
+				message: `从 step ${start} 起输入恒为 0，IIR 输出跟踪误差超出容差 1e-6`,
+			};
+			break;
+		}
+		case "polarity": {
+			// 符号反转：全程信号取反（× -1），可能产生负值
+			faultedInput = input.map((v) => -v);
+			faultRange = { start: 0, end: SIM_STEPS - 1 };
+			logs = [
+				{
+					agent: "SYSTEM",
+					level: "info",
+					thought: `$ ./sim --fault polarity`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "warn",
+					thought: `[sim] step 0: 极性反转，输入 × -1 = ${faultedInput[0]}`,
+				},
+				{
+					agent: "TERMINAL",
+					level: "error",
+					thought: `[sim] step 0: assert(filtered_value >= 0) FAILED → 负值违反 uint16 范围契约`,
+				},
+				{
+					agent: "SYSTEM",
+					level: "error",
+					thought:
+						"❌ 契约违约 [CON-001-POST-000]：符号反转导致输入/输出为负，违反 uint16 范围",
+				},
+			];
+			violation = {
+				contract_id: "CON-001-POST-000",
+				assertion: "assert(filtered_value >= 0 && filtered_value <= 65535)",
+				timestep: 0,
+				actual_value: faultedInput[0],
+				message: `符号反转导致输入 ${input[0]} → ${faultedInput[0]}，违反 uint16 非负范围契约`,
+			};
+			break;
+		}
 	}
 
 	let finalOutput: number[];
-	if (faultType === "stuck" || faultType === "step" || faultType === "bias") {
+	if (
+		faultType === "stuck" ||
+		faultType === "step" ||
+		faultType === "bias" ||
+		// 限幅/噪声/漂移/毛刺类故障：直接对 faultedInput 做低通滤波
+		faultType === "noise" ||
+		faultType === "saturation" ||
+		faultType === "intermittent" ||
+		faultType === "drift" ||
+		faultType === "glitch"
+	) {
 		finalOutput = lowpassFilter(faultedInput, FILTER_ALPHA);
-	} else if (faultType === "noise") {
-		finalOutput = lowpassFilter(faultedInput, FILTER_ALPHA);
+	} else if (faultType === "polarity") {
+		// 符号反转：负值不能进入 uint16，强制截断到 0 后再滤波
+		finalOutput = lowpassFilter(
+			faultedInput.map((v) => Math.max(0, v)),
+			FILTER_ALPHA,
+		);
 	} else {
+		// signal_loss / timeout / stuck_zero：保持上一拍值（CON-001-FLT-000 故障处理生效）
 		finalOutput = [...baseOutput];
 		if (faultRange) {
 			for (

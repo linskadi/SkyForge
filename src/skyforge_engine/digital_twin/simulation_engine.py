@@ -77,10 +77,10 @@ class SimulationEngine:
         result = engine.run_simulation(code, contract_yaml, fault_type="bias", ...)
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, use_real_gcc: bool | None = None) -> None:
         self.sensor = VirtualSensor()
         self.fault_injector = FaultInjector()
-        self.mcu = VirtualMCU()
+        self.mcu = VirtualMCU(use_real_gcc=use_real_gcc)
 
     async def run_simulation_async(
         self,
@@ -177,6 +177,9 @@ class SimulationEngine:
             "success": compile_result.success,
             "errors": compile_result.errors,
             "used_mock": compile_result.used_mock,
+            "command": compile_result.command,
+            "version": compile_result.compiler_version,
+            "exit_code": compile_result.exit_code,
         }
         if compile_result.used_mock:
             log_lines.append("    GCC 未安装，使用 Python 模拟")

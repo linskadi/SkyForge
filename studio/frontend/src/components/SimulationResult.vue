@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import type { AgentType, LogLevel, SimulationResult } from "@/services/mockApi";
-import { agentColorMap, levelColorMap } from "@/utils/colors";
-import { AlertOctagon, CheckCircle2, Clock, XCircle } from "lucide-vue-next";
+import { AlertOctagon, CheckCircle2, Clock, XCircle } from "@lucide/vue";
 /**
  * SimulationResult 仿真结果面板（Day 3 数字孪生）
  *
@@ -14,6 +12,8 @@ import { AlertOctagon, CheckCircle2, Clock, XCircle } from "lucide-vue-next";
  * 参考文档第 6 章数字孪生、6.4.1 契约断言、6.6 沙盒隔离。
  */
 import { computed } from "vue";
+import type { AgentType, LogLevel, SimulationResult } from "@/services/mockApi";
+import { agentColorMap, levelColorMap } from "@/utils/colors";
 import WaveformChart from "./WaveformChart.vue";
 
 interface Props {
@@ -21,65 +21,86 @@ interface Props {
 	result: SimulationResult;
 	/** 是否正在仿真中（loading 状态） */
 	loading?: boolean;
+	/** 正常基线波形（用于故障注入对比） */
+	baselineWaveform?: { input: number[]; output: number[] };
 }
 
 const props = withDefaults(defineProps<Props>(), {
 	loading: false,
+	baselineWaveform: undefined,
 });
 
 /** Agent 徽章样式 */
 const badgeStyle = (agent: AgentType) => {
-	const c = agentColorMap[agent];
+	const c = agentColorMap[agent] ?? { bg: "#475569", fg: "#f1f5f9" };
 	return { backgroundColor: c.bg, color: c.fg };
 };
 
 /** 日志内容颜色 */
 const contentStyle = (level: LogLevel) => ({
-	color: levelColorMap[level],
+	color: levelColorMap[level] ?? "#94a3b8",
 });
 
 /** 统计卡片数据 */
 const statCards = computed(() => {
-	const s = props.result.statistics;
+	const s = props.result?.statistics ?? {};
+	const fmt = (v: unknown, def = "—") =>
+		v === undefined || v === null || Number.isNaN(Number(v)) ? def : String(v);
+	const fmtRange = (r: unknown) => {
+		if (!r || !Array.isArray(r) || r.length < 2) return "— ~ —";
+		const lo = r[0];
+		const hi = r[1];
+		if (
+			lo === undefined ||
+			lo === null ||
+			Number.isNaN(Number(lo)) ||
+			hi === undefined ||
+			hi === null ||
+			Number.isNaN(Number(hi))
+		) {
+			return "— ~ —";
+		}
+		return `${lo} ~ ${hi}`;
+	};
 	return [
 		{
 			label: "仿真步数",
-			value: s.total_steps.toString(),
+			value: fmt(s.total_steps),
 			unit: "steps",
 			color: "hsl(220, 70%, 45%)",
 			icon: "📊",
 		},
 		{
 			label: "输入范围",
-			value: `${s.input_range[0]} ~ ${s.input_range[1]}`,
+			value: fmtRange(s.input_range),
 			unit: "uint16",
 			color: "hsl(215, 80%, 55%)",
 			icon: "📥",
 		},
 		{
 			label: "输出范围",
-			value: `${s.output_range[0]} ~ ${s.output_range[1]}`,
+			value: fmtRange(s.output_range),
 			unit: "uint16",
 			color: "#059669",
 			icon: "📤",
 		},
 		{
 			label: "输出最大值",
-			value: s.output_max.toString(),
+			value: fmt(s.output_max),
 			unit: "max",
 			color: "#dc2626",
 			icon: "📈",
 		},
 		{
 			label: "输出最小值",
-			value: s.output_min.toString(),
+			value: fmt(s.output_min),
 			unit: "min",
 			color: "#0891b2",
 			icon: "📉",
 		},
 		{
 			label: "输出均值",
-			value: s.output_mean.toString(),
+			value: fmt(s.output_mean),
 			unit: "mean",
 			color: "#c2410c",
 			icon: "Σ",
@@ -87,7 +108,7 @@ const statCards = computed(() => {
 	];
 });
 
-/** 故障类型显示名 */
+/** 故障类型显示名（覆盖全部 12 种故障） */
 const faultDisplayName = computed(() => {
 	const map: Record<string, string> = {
 		bias: "传感器偏置 (Bias)",
@@ -95,8 +116,17 @@ const faultDisplayName = computed(() => {
 		noise: "高频噪声 (Noise)",
 		stuck: "卡死故障 (Stuck)",
 		step: "阶跃突变 (Step)",
+		saturation: "饱和截断 (Saturation)",
+		intermittent: "间歇性故障 (Intermittent)",
+		drift: "渐变漂移 (Drift)",
+		timeout: "丢帧/延迟 (Timeout)",
+		glitch: "跳变毛刺 (Glitch)",
+		stuck_zero: "零输出 (Stuck-at-Zero)",
+		polarity: "符号反转 (Polarity)",
 	};
-	return props.result.fault_type ? map[props.result.fault_type] : null;
+	return props.result.fault_type
+		? (map[props.result.fault_type] ?? props.result.fault_type)
+		: null;
 });
 </script>
 
@@ -176,17 +206,49 @@ const faultDisplayName = computed(() => {
       </div>
     </div>
 
-    <!-- 波形图 -->
-    <div v-if="!loading" class="waveform-section">
+    <!-- 故障注入对比区域（当有故障类型时显示） -->
+    <div v-if="!loading && result.fault_type" class="fault-comparison">
+      <div class="fault-comparison-header">
+        <span class="fault-comparison-title">故障注入对比</span>
+        <span class="fault-type-badge">{{ faultDisplayName }}</span>
+      </div>
+      <div class="fault-comparison-charts">
+        <div class="fault-chart-panel">
+          <div class="fault-chart-label">故障波形</div>
+          <WaveformChart
+            :input-data="result.input_waveform"
+            :output-data="result.output_waveform"
+            :fault-range="result.fault_range"
+            :height="260"
+          />
+        </div>
+        <div class="fault-chart-panel">
+          <div class="fault-chart-label">正常基线</div>
+          <WaveformChart
+            v-if="baselineWaveform"
+            :input-data="baselineWaveform.input"
+            :output-data="baselineWaveform.output"
+            :height="260"
+          />
+          <div v-else class="no-baseline-placeholder">
+            无基线数据
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 波形图（非故障时显示） -->
+    <div v-if="!loading && !result.fault_type" class="waveform-section">
       <WaveformChart
         :input-data="result.input_waveform"
         :output-data="result.output_waveform"
         :fault-range="result.fault_range"
+        :baseline-data="baselineWaveform?.output"
         :height="300"
       />
     </div>
 
-    <!-- 终端输出日志（复用 AgentTerminal 的 VSCode 终端样式） -->
+    <!-- 终端输出日志 -->
     <div class="sim-terminal">
       <div class="terminal-header">
         <div class="traffic-lights">
@@ -198,8 +260,9 @@ const faultDisplayName = computed(() => {
         <span v-if="faultDisplayName" class="fault-tag">{{ faultDisplayName }}</span>
       </div>
       <div class="terminal-body">
-        <div v-if="!result.logs.length && !loading" class="empty-hint">等待仿真日志...</div>
-        <div v-for="(log, i) in result.logs" :key="i" class="log-line">
+        <div v-if="!result.logs?.length && !loading" class="empty-hint">等待仿真日志...</div>
+        <div v-for="(log, i) in result.logs ?? []" :key="i" class="log-line">
+          <span v-if="log.thought.includes('[FAULT]')" class="log-fault-badge">FAULT</span>
           <span class="log-badge" :style="badgeStyle(log.agent)">{{ log.agent }}</span>
           <span class="log-content" :style="contentStyle(log.level)">{{ log.thought }}</span>
         </div>
@@ -246,6 +309,65 @@ const faultDisplayName = computed(() => {
 .stat-value { font-size: 16px; font-weight: 700; color: hsl(var(--foreground)); font-family: 'Consolas', monospace; margin-top: 2px; }
 .stat-unit { font-size: 10px; color: hsl(var(--muted-foreground)); font-family: 'Consolas', monospace; }
 
+/* 故障注入对比 */
+.fault-comparison {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 12px;
+}
+.fault-comparison-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.fault-comparison-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: hsl(var(--foreground));
+}
+.fault-type-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid #dc2626;
+  color: #991b1b;
+  background: hsl(0, 86%, 97%);
+  font-family: 'Consolas', monospace;
+  letter-spacing: 0.3px;
+}
+.fault-comparison-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.fault-chart-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fault-chart-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.no-baseline-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 260px;
+  background: hsl(var(--muted));
+  border: 1px dashed hsl(var(--border));
+  border-radius: 8px;
+  color: hsl(var(--muted-foreground));
+  font-size: 14px;
+  font-style: italic;
+}
+
 .waveform-section { background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 12px; }
 
 .sim-terminal { display: flex; flex-direction: column; background: hsl(220, 20%, 13%); border-radius: 8px; overflow: hidden; font-family: 'Consolas', 'Courier New', monospace; color: hsl(220, 10%, 70%); }
@@ -262,7 +384,19 @@ const faultDisplayName = computed(() => {
 .terminal-body::-webkit-scrollbar-track { background: transparent; }
 .terminal-body::-webkit-scrollbar-thumb { background: hsl(220, 15%, 25%); border-radius: 4px; }
 .empty-hint { color: hsl(220, 10%, 40%); font-style: italic; }
-.log-line { display: flex; align-items: flex-start; gap: 8px; padding: 2px 0; word-break: break-word; }
+.log-line { display: flex; align-items: flex-start; gap: 6px; padding: 2px 0; word-break: break-word; }
+.log-fault-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(220, 38, 38, 0.25);
+  color: #f87171;
+  border: 1px solid rgba(220, 38, 38, 0.5);
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
 .log-badge { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 3px; letter-spacing: 0.3px; margin-top: 1px; }
 .log-content { flex: 1; white-space: pre-wrap; min-width: 0; }
 </style>

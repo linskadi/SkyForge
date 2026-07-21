@@ -10,7 +10,6 @@
 import re
 import subprocess
 import shutil
-import tempfile
 import os
 from dataclasses import dataclass, field
 from typing import Any
@@ -19,6 +18,7 @@ import yaml
 
 from skyforge_engine.tools.contract_to_assert import contract_to_assert
 from skyforge_engine.utils.log_util import logger
+from skyforge_engine.utils.cleanup_util import safe_tempdir
 
 
 # ==================== 数据类定义 ====================
@@ -363,64 +363,60 @@ class CppcheckVerifier:
                 "message": "cppcheck 未安装",
             }
 
-        tmp_dir = tempfile.mkdtemp(prefix="airborne_contract_")
-        src_path = os.path.join(tmp_dir, "code.c")
+        with safe_tempdir(prefix="skyforge_contract_") as tmp_dir:
+            src_path = os.path.join(tmp_dir, "code.c")
 
-        try:
-            with open(src_path, "w", encoding="utf-8") as f:
-                f.write(code)
-
-            # 运行 cppcheck
-            template = "{file}|{line}|{column}|{severity}|{id}|{message}"
-            cmd = [
-                "cppcheck",
-                "--dump",
-                "--addon=misra",
-                f"--template={template}",
-                "--quiet",
-                src_path,
-            ]
-
-            proc = subprocess.run(
-                cmd,
-                cwd=tmp_dir,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                check=False,
-            )
-
-            combined = (proc.stdout or "") + (proc.stderr or "")
-            violations = self._parse_output(combined, src_path)
-
-            # 根据契约类型筛选相关违规
-            relevant_violations = self._filter_violations(violations, contract_type)
-
-            return {
-                "available": True,
-                "violations": relevant_violations,
-                "all_violations": violations,
-                "message": f"检测到 {len(relevant_violations)} 条相关违规",
-            }
-
-        except subprocess.TimeoutExpired:
-            return {
-                "available": True,
-                "violations": [],
-                "message": "cppcheck 扫描超时",
-            }
-        except Exception as e:
-            return {
-                "available": True,
-                "violations": [],
-                "message": f"cppcheck 扫描异常: {e}",
-            }
-        finally:
             try:
-                import shutil as shutil_mod
-                shutil_mod.rmtree(tmp_dir, ignore_errors=True)
-            except Exception:
-                pass
+                with open(src_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+
+                # 运行 cppcheck
+                template = "{file}|{line}|{column}|{severity}|{id}|{message}"
+                cmd = [
+                    "cppcheck",
+                    "--dump",
+                    "--addon=misra",
+                    f"--template={template}",
+                    "--quiet",
+                    src_path,
+                ]
+
+                proc = subprocess.run(
+                    cmd,
+                    cwd=tmp_dir,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=60,
+                    check=False,
+                )
+
+                combined = (proc.stdout or "") + (proc.stderr or "")
+                violations = self._parse_output(combined, src_path)
+
+                # 根据契约类型筛选相关违规
+                relevant_violations = self._filter_violations(violations, contract_type)
+
+                return {
+                    "available": True,
+                    "violations": relevant_violations,
+                    "all_violations": violations,
+                    "message": f"检测到 {len(relevant_violations)} 条相关违规",
+                }
+
+            except subprocess.TimeoutExpired:
+                return {
+                    "available": True,
+                    "violations": [],
+                    "message": "cppcheck 扫描超时",
+                }
+            except Exception as e:
+                return {
+                    "available": True,
+                    "violations": [],
+                    "message": f"cppcheck 扫描异常: {e}",
+                }
 
     def _parse_output(self, output: str, src_path: str) -> list[dict]:
         """解析 cppcheck 输出。"""
@@ -814,18 +810,19 @@ class SemanticChecker:
 
 # ==================== 主检查函数 ====================
 
-def check(code: str, contract_yaml: str, cid: str = "CON-001") -> CheckResult:
+def check(code: str, contract_yaml: str, cid: str = "CON-001", *, language: str = "c") -> CheckResult:
     """契约校验主入口（语义分析版）。
 
     1. 解析 YAML 契约
-    2. 使用 AST 分析器解析 C 代码结构
-    3. 使用 Cppcheck 进行静态分析验证
+    2. 使用 AST 分析器解析代码结构
+    3. 使用静态分析工具验证（C 用 Cppcheck，Python 用 Mypy+Ruff）
     4. 执行语义检查，生成置信度评分
 
     Args:
-        code: 待校验的 C 代码字符串。
+        code: 待校验的代码字符串。
         contract_yaml: .contract YAML 文本。
         cid: 契约 ID，用于断言追溯 Tag。
+        language: 代码语言 ("c", "cpp", "python")。
 
     Returns:
         CheckResult：包含各检查项结果 + 断言插桩代码 + 违规汇总。
@@ -875,11 +872,25 @@ def check(code: str, contract_yaml: str, cid: str = "CON-001") -> CheckResult:
         if not item.passed
     ]
 
-    # 收集 Cppcheck 违规
+    # 收集静态分析违规（根据语言选择工具）
     cppcheck_violations = []
-    if cppcheck_verifier.available:
-        cppcheck_result = cppcheck_verifier.verify(code)
-        cppcheck_violations = cppcheck_result.get("violations", [])
+    if language in ("c", "cpp"):
+        if cppcheck_verifier.available:
+            cppcheck_result = cppcheck_verifier.verify(code)
+            cppcheck_violations = cppcheck_result.get("violations", [])
+    else:
+        # 非 C/C++ 代码：使用 MultiLanguageScanner 做静态分析
+        try:
+            from skyforge_engine.tools.base_scanner import MultiLanguageScanner
+            scanner = MultiLanguageScanner()
+            violations = scanner.scan(code, language=language)
+            if violations:
+                cppcheck_violations = [
+                    {"id": v.rule_id, "desc": v.message, "passed": False}
+                    for v in violations
+                ]
+        except Exception as e:
+            logger.warning(f"ContractChecker:语言 {language} 静态分析失败: {e}")
 
     result = CheckResult(
         passed=passed,

@@ -1,4 +1,4 @@
-"""组合仿真验证：复用 Day 3 SimulationEngine 验证组合后契约是否满足。
+"""组合仿真验证：复用 SimulationEngine 验证组合后契约是否满足。
 
 参考设计文档第 6.5 节"可组合性验证"。
 组件组合后，需通过数字孪生仿真验证组合契约是否在实际运行中保持满足。
@@ -91,7 +91,7 @@ class CompositionSimulator:
             f"steps={steps}"
         )
 
-        # 复用 Day 3 SimulationEngine
+        # 复用 SimulationEngine
         sim_result: SimulationResult = self.engine.run_simulation(
             code=composed_code,
             contract_yaml=composed_contract,

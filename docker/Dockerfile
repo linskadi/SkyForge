@@ -17,8 +17,18 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv pip install --system -r <(uv pip compile pyproject.toml -o -) || \
     uv sync --no-install-project
 
+# 复制源代码
+COPY src/ ./src/
+COPY studio/ ./studio/
+
 EXPOSE 8000
 
-# 直接使用 uvicorn，因为依赖已安装到系统 Python
-ENV PYTHONPATH=/app/backend:/app/studio
+# 设置 Python 路径
+ENV PYTHONPATH=/app/src:/app/studio
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+# 启动服务
 CMD ["uv", "run", "uvicorn", "studio.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--ws-ping-interval", "60", "--ws-ping-timeout", "120"]

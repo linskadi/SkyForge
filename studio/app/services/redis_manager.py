@@ -96,7 +96,10 @@ class RedisManager:
     async def close(self):
         """关闭Redis连接"""
         if self._client:
-            await self._client.close()
+            close = getattr(self._client, "aclose", None)
+            if close is None:
+                close = self._client.close
+            await close()
             self._client = None
 
     async def ping(self) -> bool:

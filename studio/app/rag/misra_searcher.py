@@ -1,11 +1,15 @@
-"""MISRA-C 规则检索引擎：基于关键词匹配的轻量级检索，不依赖 ChromaDB / embedding。
+"""编码规则检索引擎：基于关键词匹配的轻量级检索，不依赖 ChromaDB / embedding。
 
 设计目标：
 - 离线可用：仅用 Python 标准库（re / collections）实现。
+- 多规则集支持：通过 get_searcher(standard_id) 工厂函数获取对应规则集的搜索器。
+  - misra_c_2012：MISRA-C:2012（C 语言）
+  - jsf_av_cpp：MISRA-C++/JSF AV C++/CERT C++（C++ 语言）
+  - python_safety：Python 军工软件编程规范 T/ZASDI 0002-2023（Python 语言）
 - 检索语义：
-  - 支持 "Rule 8.1" / "Dir 4.1" 等规则 ID 直接命中。
+  - 支持 "Rule 8.1" / "Dir 4.1" / "Rule P-01" / "Rule JSF-001" 等规则 ID 直接命中。
   - 支持 "函数声明"、"动态内存"、"隐式转换" 等中文关键词命中。
-  - 支持 "malloc"、"static"、"goto" 等英文/代码关键词命中。
+  - 支持 "malloc"、"static"、"goto"、"eval" 等英文/代码关键词命中。
 - 排序策略：基于 TF-IDF 思想的简化打分（关键词频次 + 字段权重 + 规则 ID 加分）。
 
 参考文档：1.6.4 节 MISRA-C 上下文注入策略、第 3 章 RAG 系统设计。
@@ -21,10 +25,40 @@ from app.rag.rule_parser import MisraRule, parse_misra_rules
 from app.utils.log_util import logger
 
 
-# misra_rules.txt 默认路径
-_DEFAULT_RULES_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "data", "misra_rules.txt"
-)
+# 规则数据文件目录
+_DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+# 各规则集对应的数据文件名
+_STANDARD_DATA_FILES: dict[str, str] = {
+    "misra_c_2012": "misra_rules.txt",
+    "jsf_av_cpp": "misra_cpp_rules.txt",
+    "python_safety": "python_safety_rules.txt",
+}
+
+# 各规则集的元数据（id / name / language / version）
+_STANDARDS_METADATA: list[dict[str, str]] = [
+    {
+        "id": "misra_c_2012",
+        "name": "MISRA-C:2012",
+        "language": "c",
+        "version": "2012",
+    },
+    {
+        "id": "jsf_av_cpp",
+        "name": "MISRA-C++ / JSF AV C++",
+        "language": "cpp",
+        "version": "2023",
+    },
+    {
+        "id": "python_safety",
+        "name": "Python 军工软件编程规范",
+        "language": "python",
+        "version": "2023",
+    },
+]
+
+# misra_rules.txt 默认路径（向后兼容）
+_DEFAULT_RULES_PATH = os.path.join(_DATA_DIR, "misra_rules.txt")
 
 # 字段权重（标题命中权重最高，其次描述，最后示例）
 _FIELD_WEIGHTS = {
@@ -249,13 +283,23 @@ class MisraRuleSearcher:
     _rules_by_id: dict[str, MisraRule]
     _idf: dict[str, float]
 
-    def __init__(self, rules_path: Optional[str] = None) -> None:
-        """初始化检索引擎，加载并解析 misra_rules.txt。
+    def __init__(
+        self,
+        rules_path: Optional[str] = None,
+        standard_id: str = "misra_c_2012",
+    ) -> None:
+        """初始化检索引擎，加载并解析对应规则集的数据文件。
 
         Args:
-            rules_path: misra_rules.txt 路径。默认使用模块内 data 目录下的文件。
+            rules_path: 规则数据文件路径。若不指定则根据 standard_id 选择默认文件。
+            standard_id: 规则集 ID，用于自动定位数据文件。
+                支持的取值：misra_c_2012 / jsf_av_cpp / python_safety。
         """
-        path = rules_path or _DEFAULT_RULES_PATH
+        if rules_path is None:
+            data_file = _STANDARD_DATA_FILES.get(standard_id, "misra_rules.txt")
+            path = os.path.join(_DATA_DIR, data_file)
+        else:
+            path = rules_path
         if not os.path.exists(path):
             logger.error(f"MisraRuleSearcher:规则文件不存在: {path}")
             self._rules = []
@@ -268,7 +312,10 @@ class MisraRuleSearcher:
             self._rules = parse_misra_rules(content)
             self._rules_by_id = {r.rule_id: r for r in self._rules}
             self._idf = _compute_idf(self._rules)
-            logger.info(f"MisraRuleSearcher:加载 {len(self._rules)} 条规则 from {path}")
+            logger.info(
+                f"MisraRuleSearcher:加载 {len(self._rules)} 条规则 from {path} "
+                f"(standard_id={standard_id})"
+            )
         except Exception as e:
             logger.error(f"MisraRuleSearcher:加载规则失败: {e}")
             self._rules = []
@@ -394,3 +441,46 @@ class MisraRuleSearcher:
 
     def __repr__(self) -> str:
         return f"<MisraRuleSearcher rules={len(self._rules)}>"
+
+
+# ============================================================================ #
+# 多规则集工厂函数
+# ============================================================================ #
+
+
+# 各规则集搜索器实例缓存（standard_id -> MisraRuleSearcher）
+_searcher_cache: dict[str, MisraRuleSearcher] = {}
+
+
+def get_searcher(standard_id: str = "misra_c_2012") -> MisraRuleSearcher:
+    """根据规则集 ID 获取对应的搜索器实例（带缓存）。
+
+    支持的 standard_id：
+    - misra_c_2012：MISRA-C:2012（C 语言）
+    - jsf_av_cpp：MISRA-C++/JSF AV C++/CERT C++（C++ 语言）
+    - python_safety：Python 军工软件编程规范（Python 语言）
+
+    Args:
+        standard_id: 规则集 ID，默认 "misra_c_2012"。
+
+    Returns:
+        对应规则集的 MisraRuleSearcher 实例。若 standard_id 不支持，
+        回退到 MISRA-C:2012 搜索器。
+    """
+    if standard_id not in _STANDARD_DATA_FILES:
+        logger.warning(
+            f"get_searcher:未知的 standard_id={standard_id}，回退到 misra_c_2012"
+        )
+        standard_id = "misra_c_2012"
+    if standard_id not in _searcher_cache:
+        _searcher_cache[standard_id] = MisraRuleSearcher(standard_id=standard_id)
+    return _searcher_cache[standard_id]
+
+
+def get_standards() -> list[dict[str, str]]:
+    """返回所有可用规则集的元数据列表。
+
+    Returns:
+        规则集元数据字典列表，每项包含 id / name / language / version。
+    """
+    return [dict(meta) for meta in _STANDARDS_METADATA]

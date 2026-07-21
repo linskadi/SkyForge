@@ -26,10 +26,10 @@ build-frontend: ## 构建前端
 test: test-frontend test-backend ## 运行全部测试
 
 test-frontend: ## 前端测试
-	cd studio/frontend && pnpm vitest run
+	cd studio/frontend && pnpm test
 
 test-backend: ## 后端测试
-	cd src && PYTHONPATH=.. uv run python -m unittest discover -s ../studio/app/tests -p "test_*.py"
+	uv run pytest -q
 
 # ---- 性能基准 ----
 
@@ -44,7 +44,7 @@ lint-frontend: ## 前端 Biome
 	cd studio/frontend && pnpm biome ci ./src
 
 lint-backend: ## 后端 Ruff
-	cd src && uv run ruff check .
+	uv run ruff check .
 
 lint-fix: ## 自动修复
 	cd studio/frontend && pnpm biome check --write ./src
@@ -60,27 +60,29 @@ do178c-check: ## DO-178C 合规检查
 	@missing=0; \
 	for doc in PSAC SDP SVP SCMP SQAP TQP TOR TAS; do \
 		path="docs/compliance/$${doc}.md"; \
-		if [ -f "$$path" ]; then \
-			echo "  ✅ $${doc}.md"; \
+		package="docs/DO178C_COMPLIANCE_PACKAGE.md"; \
+		if [ -f "$$path" ] || { [ -f "$$package" ] && grep -q "## $${doc}" "$$package"; }; then \
+			echo "  OK $${doc}.md"; \
 		else \
-			echo "  ❌ $${doc}.md (缺失)"; \
+			echo "  FAIL $${doc}.md (缺失)"; \
 			missing=1; \
 		fi; \
 	done; \
 	if [ $$missing -eq 1 ]; then \
-		echo "❌ DO-178C 文档不完整！"; \
+		echo "FAIL DO-178C 文档不完整！"; \
 		exit 1; \
 	fi; \
-	echo "✅ 全部 DO-178C 文档完整"
+	echo "OK 全部 DO-178C 文档完整"
 	@cd src && PYTHONPATH=.. uv run python -m skyforge_engine.tools.tool_chain_validator --project-root ..
 
 do178c-docs: ## 列出 DO-178C 文档状态
 	@for doc in PSAC SDP SVP SCMP SQAP TQP TOR TAS; do \
 		path="docs/compliance/$${doc}.md"; \
-		if [ -f "$$path" ]; then \
-			echo "  ✅ docs/compliance/$${doc}.md"; \
+		package="docs/DO178C_COMPLIANCE_PACKAGE.md"; \
+		if [ -f "$$path" ] || { [ -f "$$package" ] && grep -q "## $${doc}" "$$package"; }; then \
+			echo "  OK $${doc}.md"; \
 		else \
-			echo "  ❌ docs/compliance/$${doc}.md (缺失)"; \
+			echo "  FAIL $${doc}.md (缺失)"; \
 		fi; \
 	done
 

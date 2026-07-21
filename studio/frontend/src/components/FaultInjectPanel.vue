@@ -1,10 +1,4 @@
 <script setup lang="ts">
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import type { FaultParams, FaultType } from "@/services/mockApi";
 import {
 	AlertTriangle,
 	ArrowUpDown,
@@ -19,7 +13,7 @@ import {
 	TrendingUp,
 	Waves,
 	Zap,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 /**
  * FaultInjectPanel 故障注入面板（数字孪生沙盒）
  *
@@ -41,6 +35,12 @@ import {
  * 点击"注入故障"后依次叠加所有选中的故障。
  */
 import { computed, reactive } from "vue";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import type { FaultParams, FaultType } from "@/services/mockApi";
 
 /** 扩展故障类型（兼容后端已有类型 + 新增类型） */
 type ExtFaultType =

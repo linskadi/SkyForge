@@ -1,4 +1,4 @@
-"""Day 3 测试：数字孪生仿真引擎（虚拟传感器 + GCC 编译运行
+"""数字孪生仿真测试：数字孪生仿真引擎（虚拟传感器 + GCC 编译运行
 + 故障注入 + 契约断言 core dump）。
 
 测试覆盖：
@@ -307,12 +307,12 @@ class TestFaultInjector(unittest.TestCase):
         self.data = self.sensor.generate_normal(steps=100)
 
     def test_get_fault_types(self) -> None:
-        """get_fault_types 返回 5 类故障。"""
+        """get_fault_types 返回所有支持的故障类型。"""
         types = self.injector.get_fault_types()
-        self.assertEqual(len(types), 5)
         type_names = {t["type"] for t in types}
         expected = {"bias", "signal_loss", "noise", "stuck", "step"}
-        self.assertEqual(type_names, expected)
+        self.assertGreaterEqual(len(types), 5)
+        self.assertTrue(expected.issubset(type_names), f"缺失基础故障类型, 实际: {type_names}")
         for t in types:
             self.assertIn("name", t)
             self.assertIn("desc", t)

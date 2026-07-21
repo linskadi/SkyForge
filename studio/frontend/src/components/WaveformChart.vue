@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button } from "@/components/ui/button";
+import { Download, RotateCcw, ZoomIn, ZoomOut } from "@lucide/vue";
 import { LineChart } from "echarts/charts";
 import {
 	DataZoomComponent,
@@ -10,14 +10,13 @@ import {
 } from "echarts/components";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
-import { Download, RotateCcw, ZoomIn, ZoomOut } from "lucide-vue-next";
 /**
  * WaveformChart ECharts 波形图组件
  * 替换原有纯 Canvas 实现，提供更丰富的交互
  */
 import { computed, ref } from "vue";
-// biome-ignore lint/style/useImportType: VChart 在 <script setup> 中作为 <v-chart> 组件运行时使用，Biome 静态分析无法识别模板绑定
 import VChart from "vue-echarts";
+import { Button } from "@/components/ui/button";
 
 use([
 	CanvasRenderer,
@@ -34,6 +33,8 @@ interface Props {
 	inputData: number[];
 	/** 输出波形数据 */
 	outputData: number[];
+	/** 正常基线数据（可选，用于故障注入对比） */
+	baselineData?: number[];
 	/** 故障注入区间（红色高亮） */
 	faultRange?: { start: number; end: number } | null;
 	/** 画布高度（px） */
@@ -41,11 +42,51 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+	baselineData: undefined,
 	faultRange: null,
 	height: 320,
 });
 
 const chartRef = ref<InstanceType<typeof VChart> | null>(null);
+
+type LinearGradientColor = {
+	type: "linear";
+	x: number;
+	y: number;
+	x2: number;
+	y2: number;
+	colorStops: Array<{ offset: number; color: string }>;
+};
+
+type MarkAreaOption = {
+	silent: boolean;
+	data: Array<
+		[
+			{
+				xAxis: number;
+				itemStyle: {
+					color: string;
+					borderColor: string;
+					borderWidth: number;
+					borderType: "dashed";
+				};
+			},
+			{ xAxis: number },
+		]
+	>;
+};
+
+type WaveformSeries = {
+	name: string;
+	type: "line";
+	data: number[];
+	lineStyle: { color: string; width: number; type?: "dashed" };
+	itemStyle: { color: string };
+	showSymbol: boolean;
+	areaStyle?: { color: LinearGradientColor };
+	markArea?: MarkAreaOption;
+	animation: boolean;
+};
 
 /** ECharts 配置 */
 const option = computed(() => {
@@ -53,7 +94,7 @@ const option = computed(() => {
 	const xData = Array.from({ length: total }, (_, i) => i);
 
 	// 故障区间标记
-	const markArea = props.faultRange
+	const markArea: MarkAreaOption | undefined = props.faultRange
 		? {
 				silent: true,
 				data: [
@@ -74,6 +115,71 @@ const option = computed(() => {
 				],
 			}
 		: undefined;
+
+	const legendData = ["输入波形", "输出波形"];
+	if (props.baselineData) {
+		legendData.push("正常基线");
+	}
+
+	const seriesList: WaveformSeries[] = [
+		{
+			name: "输入波形",
+			type: "line",
+			data: props.inputData,
+			lineStyle: { color: "#0EA5E9", width: 2 },
+			itemStyle: { color: "#0EA5E9" },
+			showSymbol: false,
+			areaStyle: {
+				color: {
+					type: "linear",
+					x: 0,
+					y: 0,
+					x2: 0,
+					y2: 1,
+					colorStops: [
+						{ offset: 0, color: "rgba(59, 130, 246, 0.12)" },
+						{ offset: 1, color: "rgba(59, 130, 246, 0.02)" },
+					],
+				},
+			},
+			markArea,
+			animation: false,
+		},
+		{
+			name: "输出波形",
+			type: "line",
+			data: props.outputData,
+			lineStyle: { color: "#22c55e", width: 2 },
+			itemStyle: { color: "#22c55e" },
+			showSymbol: false,
+			areaStyle: {
+				color: {
+					type: "linear",
+					x: 0,
+					y: 0,
+					x2: 0,
+					y2: 1,
+					colorStops: [
+						{ offset: 0, color: "rgba(34, 197, 94, 0.12)" },
+						{ offset: 1, color: "rgba(34, 197, 94, 0.02)" },
+					],
+				},
+			},
+			animation: false,
+		},
+	];
+
+	if (props.baselineData) {
+		seriesList.push({
+			name: "正常基线",
+			type: "line",
+			data: props.baselineData,
+			lineStyle: { color: "#94a3b8", width: 2, type: "dashed" },
+			itemStyle: { color: "#94a3b8" },
+			showSymbol: false,
+			animation: false,
+		});
+	}
 
 	return {
 		tooltip: {
@@ -103,7 +209,7 @@ const option = computed(() => {
 			},
 		},
 		legend: {
-			data: ["输入波形", "输出波形"],
+			data: legendData,
 			right: 16,
 			top: 8,
 			textStyle: {
@@ -143,53 +249,7 @@ const option = computed(() => {
 				filterMode: "filter",
 			},
 		],
-		series: [
-			{
-				name: "输入波形",
-				type: "line",
-				data: props.inputData,
-				lineStyle: { color: "#0EA5E9", width: 2 },
-				itemStyle: { color: "#0EA5E9" },
-				showSymbol: false,
-				areaStyle: {
-					color: {
-						type: "linear",
-						x: 0,
-						y: 0,
-						x2: 0,
-						y2: 1,
-						colorStops: [
-							{ offset: 0, color: "rgba(59, 130, 246, 0.12)" },
-							{ offset: 1, color: "rgba(59, 130, 246, 0.02)" },
-						],
-					},
-				},
-				markArea,
-				animation: false,
-			},
-			{
-				name: "输出波形",
-				type: "line",
-				data: props.outputData,
-				lineStyle: { color: "#22c55e", width: 2 },
-				itemStyle: { color: "#22c55e" },
-				showSymbol: false,
-				areaStyle: {
-					color: {
-						type: "linear",
-						x: 0,
-						y: 0,
-						x2: 0,
-						y2: 1,
-						colorStops: [
-							{ offset: 0, color: "rgba(34, 197, 94, 0.12)" },
-							{ offset: 1, color: "rgba(34, 197, 94, 0.02)" },
-						],
-					},
-				},
-				animation: false,
-			},
-		],
+		series: seriesList,
 	};
 });
 
@@ -265,6 +325,10 @@ const exportPNG = () => {
         <span class="legend-item">
           <span class="legend-line output" />
           输出波形
+        </span>
+        <span v-if="baselineData" class="legend-item">
+          <span class="legend-line baseline" />
+          正常基线
         </span>
         <span v-if="faultRange" class="legend-item">
           <span class="legend-line fault" />
@@ -343,6 +407,18 @@ const exportPNG = () => {
 
 .legend-line.output {
   background: #22c55e;
+}
+
+.legend-line.baseline {
+  background: #94a3b8;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #94a3b8 0,
+    #94a3b8 6px,
+    transparent 6px,
+    transparent 10px
+  );
+  background-color: transparent;
 }
 
 .legend-line.fault {

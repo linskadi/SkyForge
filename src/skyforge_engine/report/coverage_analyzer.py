@@ -5,6 +5,7 @@ V3.3 增强:
   - 支持 switch 语句 case 覆盖统计
   - 改进的故障注入覆盖修正（基于实际判定类型）
   - 覆盖趋势分析（对比目标值）
+  - V0.4 P2: 集成 GCC 14.2+ lcov 2.0+ 真实覆盖率收集，工具不可用时回退静态分析
 """
 
 from __future__ import annotations
@@ -15,19 +16,48 @@ from skyforge_engine.dal.mcdc_calculator import analyze_coverage
 from skyforge_engine.utils.log_util import logger
 
 
+def _try_real_coverage(code: str, test_inputs: list | None) -> dict | None:
+    """尝试使用真实 GCC 14.2 + lcov 收集覆盖率。
+
+    Returns:
+        dict: 真实覆盖率结果（包含 method="gcov"），成功时返回。
+        None: 工具不可用或收集失败时返回 None，调用方应回退静态分析。
+    """
+    try:
+        from skyforge_engine.dal.gcov_collector import collect_coverage
+
+        real = collect_coverage(code, test_inputs or [])
+        if real.statement_coverage > 0 or real.branch_coverage > 0 or real.mcdc_coverage > 0:
+            return {
+                "statement_coverage": real.statement_coverage,
+                "decision_coverage": real.branch_coverage,
+                "mcdc_coverage": real.mcdc_coverage,
+                "method": "gcov",
+                "available": True,
+            }
+    except Exception as e:
+        logger.info(f"CoverageAnalyzer: 真实 gcov/lcov 不可用，回退静态分析: {e}")
+    return None
+
+
 def analyze_code_coverage(
     code: str,
     fault_injected: bool = False,
     dal: str = "C",
+    test_inputs: list | None = None,
+    use_real_coverage: bool = True,
 ) -> dict[str, Any]:
     """分析 C 代码的覆盖率（语句/判定/MC/DC）。
 
     V3.3 集成增强 MC/DC 计算器，支持括号感知条件拆分和测试向量生成。
+    V0.4 P2: 优先尝试 GCC 14.2+ lcov 2.0+ 真实收集，工具不可用时回退静态分析。
 
     Args:
         code: C 源代码字符串。
         fault_injected: 是否执行了故障注入测试。
         dal: DAL 等级（用于设定目标覆盖率阈值）。
+        test_inputs: 测试输入列表（用于真实覆盖率收集）。
+        use_real_coverage: 是否尝试使用真实 gcov/lcov（默认 True）。
 
     Returns:
         覆盖率结果字典:
@@ -41,17 +71,27 @@ def analyze_code_coverage(
             "decision_points": [...],
             "switch_cases": [...],
             "analyzed": bool,
-            "version": "V3.3-Enhanced",
+            "version": "V0.4-Real+Static",
+            "method": "gcov" | "static_analysis",
         }
     """
     if not code:
         return _empty_result("代码为空")
 
     try:
-        cov = analyze_coverage(code)
-
         # 设定目标阈值
         targets = _get_targets_for_dal(dal)
+
+        # V0.4 P2: 优先尝试真实 gcov/lcov
+        real_cov = None
+        method = "static_analysis"
+        if use_real_coverage:
+            real_cov = _try_real_coverage(code, test_inputs)
+            if real_cov:
+                method = "gcov"
+
+        # 静态分析作为基础（用于决策点详情）
+        cov = analyze_coverage(code)
 
         # 故障注入修正判定覆盖率
         decision_cov = cov.decision_coverage
@@ -59,13 +99,22 @@ def analyze_code_coverage(
             extra = min(20, 100 - decision_cov)
             decision_cov = min(100.0, round(decision_cov + extra, 1))
 
+        # 真实数据覆盖静态估算（如果真实数据可用）
+        if real_cov:
+            statement_cov = real_cov["statement_coverage"]
+            decision_cov = real_cov["decision_coverage"]
+            mcdc_cov = real_cov["mcdc_coverage"]
+        else:
+            statement_cov = cov.statement_coverage
+            mcdc_cov = cov.mcdc_coverage
+
         # 构建增强结果
         dp_enhanced = _enhance_decision_points(cov)
 
         result = {
-            "statement_coverage": cov.statement_coverage,
+            "statement_coverage": statement_cov,
             "decision_coverage": decision_cov,
-            "mcdc_coverage": cov.mcdc_coverage,
+            "mcdc_coverage": mcdc_cov,
             "statement_target": targets["statement"],
             "decision_target": targets["decision"],
             "mcdc_target": targets["mcdc"],
@@ -77,7 +126,8 @@ def analyze_code_coverage(
             "decision_points": dp_enhanced,
             "switch_cases": cov.switch_cases,
             "analyzed": True,
-            "version": "V3.3-Enhanced",
+            "version": "V0.4-Real+Static",
+            "method": method,
             "fault_injected": fault_injected,
             "dal": dal,
         }
@@ -86,10 +136,10 @@ def analyze_code_coverage(
         result["_trend"] = _analyze_trend(result, targets)
 
         logger.info(
-            f"CoverageAnalyzer(V3.3):DAL={dal} "
-            f"语句={cov.statement_coverage}%/{targets['statement']}% "
+            f"CoverageAnalyzer(V0.4):DAL={dal} method={method} "
+            f"语句={statement_cov}%/{targets['statement']}% "
             f"判定={decision_cov}%/{targets['decision']}% "
-            f"MC/DC={cov.mcdc_coverage}%/{targets['mcdc']}%"
+            f"MC/DC={mcdc_cov}%/{targets['mcdc']}%"
         )
         return result
 

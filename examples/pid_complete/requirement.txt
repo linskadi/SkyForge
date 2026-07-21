@@ -1,0 +1,31 @@
+实现一个增量式PID控制器，用于无人机电机转速控制。
+
+功能需求：
+- 输入：目标转速（RPM，范围0-10000）、当前转速（RPM）
+- 输出：控制输出（PWM值，范围0-1000）
+- 控制算法：增量式PID
+  - Δu = Kp*(e[n]-e[n-1]) + Ki*e[n] + Kd*(e[n]-2*e[n-1]+e[n-2])
+- 控制周期：10ms（100Hz）
+- 抗饱和：积分限幅
+
+安全需求：
+- 符合DO-178C DAL-B级别要求
+- 符合MISRA-C:2012编码标准
+- 禁止动态内存分配
+- 所有函数必须有明确的原型声明
+
+性能需求：
+- WCET < 500us
+- 内存占用 < 512B
+- 支持100Hz控制周期
+
+接口定义：
+- 初始化函数：void pid_controller_init(double kp, double ki, double kd)
+- 控制函数：double pid_controller_update(double setpoint, double actual)
+- 复位函数：void pid_controller_reset(void)
+
+参数范围：
+- Kp: 0.1-10.0（比例系数）
+- Ki: 0.01-1.0（积分系数）
+- Kd: 0.001-0.1（微分系数）
+- 积分限幅：[-1000, 1000]

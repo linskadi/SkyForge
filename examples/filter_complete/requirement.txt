@@ -1,0 +1,29 @@
+实现一个一阶IIR低通滤波器，用于飞行器高度传感器数据平滑处理。
+
+功能需求：
+- 输入：原始高度传感器数据（ADC值，范围0-20000）
+- 输出：滤波后的平滑高度值
+- 截止频率：10Hz
+- 采样率：100Hz
+- 滤波算法：一阶IIR低通滤波 y[n] = alpha * x[n] + (1-alpha) * y[n-1]
+
+安全需求：
+- 符合DO-178C DAL-A级别要求
+- 符合MISRA-C:2012编码标准
+- 禁止动态内存分配（Rule 21.3）
+- 所有函数必须有明确的原型声明
+- 所有全局变量必须使用static修饰
+
+性能需求：
+- WCET（最坏执行时间）< 1ms
+- 内存占用 < 1KB
+- 支持100Hz采样率实时处理
+
+接口定义：
+- 初始化函数：void lowpass_filter_init(void)
+- 处理函数：double lowpass_filter_apply(double raw_input)
+- 状态查询：bool lowpass_filter_get_fault(void)
+
+故障处理：
+- 输入超范围（<0 或 >20000）：设置故障标志，返回安全值0
+- NaN/Inf输入：设置故障标志，返回安全值0

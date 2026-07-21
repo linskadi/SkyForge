@@ -1,11 +1,16 @@
-"""MISRA-C 规则解析器：将 misra_rules.txt 解析为结构化的 MisraRule 列表。
+"""编码规则解析器：将规则数据文件解析为结构化的 MisraRule 列表。
 
-支持两种格式：
-1. 详解格式（文件前半部分）：
+支持多种规则文件格式：
+1. MISRA-C 详解格式（misra_rules.txt 前半部分）：
    - "Rule X.Y (强制/要求/建议): <标题>"
    - "Dir X.Y <标题>:" （含要求/解释/示例 段落）
-2. 速查手册表格格式（文件后半部分）：
+2. MISRA-C 速查手册表格格式（misra_rules.txt 后半部分）：
    - 5 行一组：<编号> / Rule X.Y / <标题> / <类别> / <可判定性> / <是否支持>
+3. MISRA-C++ / JSF AV C++ / CERT C++ 格式（misra_cpp_rules.txt）：
+   - "Rule X.Y <标题>: <描述>"（标题与描述同行）
+   - "Rule JSF-001: <标题>"（JSF 特有规则）
+4. Python 军工规范格式（python_safety_rules.txt）：
+   - "Rule P-01 <标题>"（含 "严重级:" / "描述:" 段落）
 
 仅使用标准库（re / collections），不引入新依赖，保证离线可用。
 """
@@ -39,19 +44,25 @@ class MisraRule:
         }
 
 
-# 详解格式中的规则头：如 "Rule 8.1 (强制): xxx" 或 "Dir 4.1 xxx:"
+# 详解格式中的规则头：支持多种规则编号格式
+# - MISRA-C: "Rule 8.1 (强制): xxx" 或 "Dir 4.1 xxx:"
+# - MISRA-C++: "Rule 14.1 内存分配: 描述"
+# - JSF AV C++: "Rule JSF-001: 禁止使用 goto"
+# - Python 军工规范: "Rule P-01 禁止使用 eval()" / "Rule SEC-01 xxx"
+# 编号格式：\d+\.\d+（MISRA-C/C++）或 [A-Z]+-\d+（Python/JSF）或 [A-Z]+\d+（兼容）
+_RULE_NUMBER_PATTERN = r"(?:\d+\.\d+|[A-Za-z]+-\d+|[A-Za-z]+\d+)"
 _DETAILED_RULE_HEAD = re.compile(
-    r"^(Rule|Dir)\s+(\d+\.\d+)\s*(?:\((强制|要求|建议)\))?\s*[:：]?\s*(.*)$"
+    rf"^(Rule|Dir)\s+({_RULE_NUMBER_PATTERN})\s*(?:\((强制|要求|建议|必须)\))?\s*[:：]?\s*(.*)$"
 )
 
-# 速查手册格式：单独一行 "Rule X.Y" 或 "Dir X.Y"
+# 速查手册格式：单独一行 "Rule X.Y" 或 "Dir X.Y"（仅 MISRA-C 速查手册使用）
 _QUICK_RULE_ID_LINE = re.compile(r"^(Rule|Dir)\s+(\d+\.\d+)\s*$")
 
 # 速查手册格式的 Analyze 编号行：如 "C2301"
 _QUICK_CODE_LINE = re.compile(r"^C\d{4}$")
 
-# 严重程度关键词
-_SEVERITY_KEYWORDS = {"强制": "强制", "要求": "要求", "建议": "建议"}
+# 严重程度关键词（含 Python 规范的 "必须"）
+_SEVERITY_KEYWORDS = {"强制": "强制", "要求": "要求", "建议": "建议", "必须": "必须"}
 
 # MISRA 章节号 → 默认分类（按规则号前缀）
 _RULE_PREFIX_CATEGORY = {
@@ -233,11 +244,11 @@ def _extract_examples(block_lines: list[str]) -> list[str]:
 
 
 def _extract_field(lines: list[str], field_name: str) -> str:
-    """从规则正文中提取指定字段（如 '要求'/'解释'）的内容。
+    """从规则正文中提取指定字段（如 '要求'/'解释'/'严重级'/'描述'）的内容。
 
     Args:
         lines: 规则正文行列表。
-        field_name: 字段名（"要求" / "解释"）。
+        field_name: 字段名（"要求" / "解释" / "严重级" / "描述"）。
 
     Returns:
         字段内容字符串（去除首尾空白）。
@@ -262,9 +273,11 @@ def _extract_field(lines: list[str], field_name: str) -> str:
             if in_field:
                 continue
         else:
-            # 终止条件：遇到下一个标签或空行+新段落
+            # 终止条件：遇到下一个字段标签或空行+新段落
+            # 包含 Python 规范的 "严重级" / "描述" 标签
             if re.match(
-                r"^(要求|解释|示例|非合规代码示例|合规代码示例|规则解释)", stripped
+                r"^(要求|解释|示例|非合规代码示例|合规代码示例|规则解释|严重级|描述)",
+                stripped,
             ):
                 break
             if stripped:
@@ -302,12 +315,32 @@ def _parse_detailed_rules(content: str) -> list[MisraRule]:
         if current_rule is None:
             current_block = []
             return
-        # 提取要求/解释
+        # 提取严重级（Python 规范的 "严重级: 必须" 字段）
+        if not current_rule.severity:
+            sev = _extract_field(current_block, "严重级")
+            if sev:
+                current_rule.severity = sev
+        # 提取要求/解释/描述
         if not current_rule.description:
             desc = _extract_field(current_block, "要求")
             if not desc:
                 desc = _extract_field(current_block, "解释")
+            if not desc:
+                desc = _extract_field(current_block, "描述")
             current_rule.description = desc
+        # C++/JSF 格式：标题中可能含 ": <描述>"（如 "内存分配: 禁止使用 new/delete"）
+        # 若标题含冒号且未提取到描述，则按首个冒号拆分标题与描述
+        if not current_rule.description and ("：" in current_rule.title or ":" in current_rule.title):
+            # 优先使用中文冒号，其次英文冒号
+            for sep in ("：", ":"):
+                if sep in current_rule.title:
+                    title_part, _, desc_part = current_rule.title.partition(sep)
+                    title_part = title_part.strip()
+                    desc_part = desc_part.strip()
+                    if title_part and desc_part:
+                        current_rule.title = title_part
+                        current_rule.description = desc_part
+                        break
         # 提取示例
         if not current_rule.examples:
             current_rule.examples = _extract_examples(current_block)

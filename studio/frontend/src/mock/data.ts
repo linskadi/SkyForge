@@ -7,11 +7,12 @@ import type {
 	AgentLog,
 	Contract,
 	ContractCheckResult,
-	HILApproval,
+	HITLApproval,
 	LLMStatus,
 	MisraRule,
 	MisraViolation,
 	RepairIteration,
+	RuleStandard,
 } from "@/types/domain";
 
 // ===================== Agent 日志 =====================
@@ -209,6 +210,95 @@ float filter_get_alpha(const LowPassFilter_t *f)  /* [MISRA-Rule-8.13] fixed */
 {
     return f->alpha;
 }
+`;
+
+// ===================== 多语言 mock 代码模板 =====================
+
+/** mock 的 C++ 代码模板：PID 控制器（用于 language='cpp'） */
+export const MOCK_CODE_CPP_PID = `/**
+ * @file pid_controller.cpp
+ * @brief PID 控制器实现（C++）
+ * @requirement [REQ-001] Kp=2.0, Ki=0.5, Kd=0.1
+ * @requirement [REQ-002] 控制无人机俯仰角
+ */
+
+#include <cstdint>
+#include <limits>
+
+/* PID 控制器状态结构体 [REQ-001] */
+struct PIDController {
+    float kp;            /* 比例系数 */
+    float ki;            /* 积分系数 */
+    float kd;            /* 微分系数 */
+    float integral;      /* 积分累计 */
+    float prev_error;    /* 上一次误差 */
+};
+
+/**
+ * @brief 初始化 PID 控制器
+ * @requirement [REQ-001] */
+void pid_init(PIDController &pid, float kp, float ki, float kd)
+{
+    pid.kp = kp;
+    pid.ki = ki;
+    pid.kd = kd;
+    pid.integral = 0.0f;
+    pid.prev_error = 0.0f;
+}
+
+/**
+ * @brief 执行一次 PID 控制
+ * @requirement [REQ-001] [REQ-002] */
+float pid_update(PIDController &pid, float setpoint, float measured)
+{
+    float error = setpoint - measured;
+    pid.integral += error;
+    float derivative = error - pid.prev_error;
+    float output = pid.kp * error + pid.ki * pid.integral + pid.kd * derivative;
+    pid.prev_error = error;
+    return output;
+}
+`;
+
+/** mock 的 Python 代码模板：数据预处理函数（用于 language='python'） */
+export const MOCK_CODE_PY_PREPROCESS = `"""
+@file preprocess.py
+@brief 传感器数据预处理函数（Python）
+@requirement [REQ-001] 滑动窗口均值滤波
+@requirement [REQ-002] 异常值剔除（3-sigma）
+"""
+
+from collections import deque
+from statistics import mean, stdev
+
+
+def preprocess_sensor_data(samples, window_size=5):
+    """对传感器采样序列做滑动窗口均值滤波 + 3-sigma 异常值剔除。
+
+    Args:
+        samples: 原始采样值列表。
+        window_size: 滑动窗口大小，默认 5。
+
+    Returns:
+        预处理后的采样值列表。
+    """
+    if not samples:
+        return []
+
+    # [REQ-002] 3-sigma 异常值剔除
+    mu = mean(samples)
+    sigma = stdev(samples) if len(samples) > 1 else 0.0
+    upper = mu + 3 * sigma
+    lower = mu - 3 * sigma
+    cleaned = [x for x in samples if lower <= x <= upper]
+
+    # [REQ-001] 滑动窗口均值滤波
+    window = deque(maxlen=window_size)
+    result = []
+    for x in cleaned:
+        window.append(x)
+        result.append(mean(window))
+    return result
 `;
 
 // ===================== MISRA 违规 =====================
@@ -843,12 +933,145 @@ float b = (float)a + 5.0f;  /* 显式类型转换 */`,
 	},
 ];
 
-// ===================== HIL 审批数据 =====================
+// ===================== MISRA-C++ / JSF AV C++ 规则库 =====================
 
-/** mock HIL 待审批列表 */
-export const MOCK_HIL_PENDING: HILApproval[] = [
+/** mock 的 MISRA-C++ / JSF AV C++ 规则库样例 */
+export const MOCK_MISRA_CPP_RULES: MisraRule[] = [
 	{
-		request_id: "HIL-REQ-001",
+		rule_id: "MISRA-CPP-Rule-14.1",
+		title: "禁止使用 new/delete",
+		description:
+			"禁止使用 new/delete 进行动态内存分配，应使用智能指针（unique_ptr / shared_ptr）或容器管理生命周期。",
+		category: "Mandatory",
+		section: "14.1 Memory allocation",
+		bad_example: `Foo *foo = new Foo();
+// ... 使用 foo ...
+delete foo;  /* 容易忘记 delete 或重复 delete */`,
+		good_example: `#include <memory>
+std::unique_ptr<Foo> foo = std::make_unique<Foo>();
+// foo 离开作用域时自动释放，无需手动 delete`,
+	},
+	{
+		rule_id: "MISRA-CPP-Rule-13.5",
+		title: "析构函数必须 noexcept",
+		description:
+			"析构函数不能抛出异常，必须声明为 noexcept，防止栈展开期间触发未定义行为。",
+		category: "Mandatory",
+		section: "13.5 Exception in destructor",
+		bad_example: `class Resource {
+public:
+    ~Resource() {
+        if (!release()) {
+            throw std::runtime_error("释放失败");  /* 析构抛异常 */
+        }
+    }
+};`,
+		good_example: `class Resource {
+public:
+    ~Resource() noexcept {
+        if (!release()) {
+            std::cerr << "释放失败" << std::endl;  /* 记录日志，不抛异常 */
+        }
+    }
+};`,
+	},
+	{
+		rule_id: "JSF-Rule-6.6.1",
+		title: "禁止使用 goto 语句",
+		description:
+			"JSF AV C++ 规则：禁止使用 goto 语句，应使用结构化控制流（if/while/for/break/continue）替代。",
+		category: "Mandatory",
+		section: "6.6.1 Jump statements",
+		bad_example: `for (int i = 0; i < n; ++i) {
+    if (found) {
+        goto done;  /* goto 跳出循环 */
+    }
+}
+done:;`,
+		good_example: `for (int i = 0; i < n; ++i) {
+    if (found) {
+        break;  /* 使用 break 替代 goto */
+    }
+}`,
+	},
+];
+
+// ===================== Python 军工软件编程规范 =====================
+
+/** mock 的 Python 军工软件编程规范（T/ZASDI 0002-2023）规则样例 */
+export const MOCK_PYTHON_SAFETY_RULES: MisraRule[] = [
+	{
+		rule_id: "Python-Rule-P-01",
+		title: "禁止使用 eval() 和 exec()",
+		description:
+			"禁止使用 eval() 和 exec() 执行动态代码，防止代码注入攻击。应使用安全的解析方式或字面量构造。",
+		category: "必须",
+		section: "1. 禁止使用的特性",
+		bad_example: `user_input = input("请输入表达式：")
+result = eval(user_input)  /* 任意代码执行风险 */`,
+		good_example: `import ast
+user_input = input("请输入数字：")
+result = int(user_input)  /* 显式类型转换，无注入风险 */`,
+	},
+	{
+		rule_id: "Python-Rule-P-02",
+		title: "禁止使用 global 和 nonlocal",
+		description:
+			"禁止使用 global 和 nonlocal 声明，确保变量作用域明确。应通过函数参数和返回值传递状态。",
+		category: "必须",
+		section: "1. 禁止使用的特性",
+		bad_example: `counter = 0
+def increment():
+    global counter  /* 全局状态难以追踪 */
+    counter += 1`,
+		good_example: `def increment(counter: int) -> int:
+    return counter + 1  /* 通过参数和返回值传递 */`,
+	},
+	{
+		rule_id: "Python-Rule-SEC-05",
+		title: "禁止使用 importlib 动态导入",
+		description:
+			"禁止使用 importlib 进行动态导入模块，防止代码注入。应使用静态 import 语句。",
+		category: "必须",
+		section: "6. 安全性",
+		bad_example: `import importlib
+module_name = "os"
+mod = importlib.import_module(module_name)  /* 动态导入，存在风险 */`,
+		good_example: `import os  /* 静态导入，模块名在编译期确定 */
+mod = os`,
+	},
+];
+
+// ===================== 规则集元数据 =====================
+
+/** mock 的规则集列表（对应后端 /api/rules/standards） */
+export const MOCK_RULE_STANDARDS: RuleStandard[] = [
+	{
+		id: "misra_c_2012",
+		name: "MISRA-C:2012",
+		language: "c",
+		version: "2012",
+	},
+	{
+		id: "jsf_av_cpp",
+		name: "MISRA-C++ / JSF AV C++",
+		language: "cpp",
+		version: "2023",
+	},
+	{
+		id: "python_safety",
+		name: "Python 军工软件编程规范",
+		language: "python",
+		version: "2023",
+	},
+];
+
+// ===================== HITL 审批数据 =====================
+
+/** mock HITL 待审批列表 */
+export const MOCK_HITL_PENDING: HITLApproval[] = [
+	{
+		request_id: "HITL-REQ-001",
 		checkpoint: "requirement_review",
 		checkpoint_name: "需求审查",
 		content_preview:
@@ -860,7 +1083,7 @@ export const MOCK_HIL_PENDING: HILApproval[] = [
 		status: "pending",
 	},
 	{
-		request_id: "HIL-REQ-002",
+		request_id: "HITL-REQ-002",
 		checkpoint: "contract_review",
 		checkpoint_name: "契约审查",
 		content_preview:

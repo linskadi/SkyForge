@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import type { ContractCheckResult } from "@/services/mockApi";
-import { parseConTags } from "@/utils/tagParser";
 import {
 	CheckCircle2,
 	ChevronDown,
 	ChevronRight,
 	Code2,
 	XCircle,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 /**
  * ContractCheckResult 契约校验结果组件（Patch 2 契约转断言）
  *
@@ -18,6 +16,8 @@ import {
  * - 展示自动生成的 assert 代码片段（Patch 2 断言插桩）
  */
 import { computed, ref } from "vue";
+import type { ContractCheckResult } from "@/services/mockApi";
+import { parseConTags } from "@/utils/tagParser";
 
 interface Props {
 	result: ContractCheckResult;

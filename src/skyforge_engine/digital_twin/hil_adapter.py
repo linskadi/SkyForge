@@ -596,6 +596,8 @@ class JtagHilAdapter(HilAdapter):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
 
             # 等待连接
@@ -653,6 +655,8 @@ class JtagHilAdapter(HilAdapter):
                 input=gdb_input,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.config.flash_timeout,
             )
 
@@ -705,6 +709,8 @@ class JtagHilAdapter(HilAdapter):
                 cmd,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.config.flash_timeout,
             )
             success = result.returncode == 0

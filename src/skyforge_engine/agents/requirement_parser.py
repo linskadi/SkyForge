@@ -10,10 +10,10 @@ try:
 except ImportError:
     def safe_parse_llm_json(x):
         return {} 
-try:
-    from skyforge_llm.client import get_lmstudio_client
-except ImportError:
-    get_lmstudio_client = None
+# LLM 客户端 — 通过 L0 provider 注入（L3 启动时注册自己的单例，
+# 引擎独立运行时回退到 L1 skyforge_llm.client）。详见 llm_provider.py。
+from skyforge_engine.config import settings as settings  # noqa: F401
+from skyforge_engine.llm_provider import get_llm_client as get_lmstudio_client
 from skyforge_engine.utils.log_util import logger
 
 # 需求类型关键词映射表（机载软件典型模块）
@@ -71,6 +71,14 @@ _TYPE_KEYWORDS: dict[str, list[str]] = {
         "battery",
         "energy management",
     ],
+    "redundancy": [
+        "余度",
+        "冗余",
+        "redundancy",
+        "双通道",
+        "voting",
+        "表决",
+    ],
 }
 
 # System Prompt（参考设计文档 1.6 节，四段式骨架：角色/工具/输出/禁忌）
@@ -106,13 +114,18 @@ class RequirementParserAgent:
     输入：自然语言需求字符串。
     输出：结构化需求 JSON（dict），强制打 Tag `[REQ-xxx]` 供 Patch 3 追溯链使用。
 
-    LM Studio 可用（USE_LLM=true）时调用真实 LLM 做语义解析；
-    否则降级为正则 Mock 实现。
+    由 ``SKYFORGE_LLM_MODE`` 决定运行方式：
+    - ``mock``：直接调用正则 Mock 实现。
+    - ``api`` / ``local``：调用真实 LLM，异常直接抛出，禁止静默降级。
     """
 
-    def __init__(self) -> None:
+    def __init__(self, strategy=None) -> None:
         # 进程内自增计数器，保证单次 pipeline 内 REQ-xxx 唯一
         self._counter = 0
+        if strategy is None:
+            from skyforge_engine.core.strategies import get_strategy_for_mode
+            strategy = get_strategy_for_mode()
+        self.strategy = strategy
 
     async def run(self, requirement: str) -> dict[str, Any]:
         """解析自然语言需求，返回结构化需求字典。
@@ -127,35 +140,36 @@ class RequirementParserAgent:
         self._counter += 1
         req_id = f"REQ-{self._counter:03d}"
 
-        # 检查 LM Studio 是否可用
-        client = get_lmstudio_client()
-        if client.is_available():
-            logger.info("RequirementParserAgent:使用真实 LLM")
-            try:
-                response = await client.chat_async(
-                    prompt=f"请解析以下机载软件需求：\n{requirement}",
-                    system_prompt=_SYSTEM_PROMPT,
-                    temperature=0.3,
-                )
-                if response:
-                    result = self._parse_llm_response(response, requirement, req_id)
-                    if result is not None:
-                        result["req_id"] = req_id
-                        result["desc"] = requirement.strip()
-                        logger.info(
-                            f"RequirementParserAgent:完成:生成 {req_id} "
-                            f"(type={result.get('type')}) [LLM]"
-                        )
-                        return result
-                logger.warning("RequirementParserAgent:LLM 调用失败，降级为 Mock")
-            except Exception as e:
-                logger.error(f"RequirementParserAgent:LLM 异常，降级为 Mock: {e}")
-
-        # 降级为 Mock
-        result = self._mock_run(requirement, req_id)
-        logger.info(
-            f"RequirementParserAgent:完成:生成 {req_id} (type={result['type']}) [Mock]"
+        result = await self.strategy.run(
+            requirement, req_id=req_id, input_type="requirement"
         )
+        if not result.success:
+            if len(result.warnings) == 1:
+                raise RuntimeError(result.warnings[0])
+            raise RuntimeError(
+                f"RequirementParserAgent 执行失败: {result.warnings}"
+            )
+        logger.info(
+            f"RequirementParserAgent:完成:生成 {req_id} "
+            f"(type={result.output.get('type')})"
+        )
+        return result.output
+
+    async def _llm_run(self, requirement: str, req_id: str) -> dict[str, Any]:
+        """LLM 实现：调用 LLM 解析需求。"""
+        client = get_lmstudio_client()
+        response = await client.chat_async(
+            prompt=f"请解析以下机载软件需求：\n{requirement}",
+            system_prompt=_SYSTEM_PROMPT,
+            temperature=0.3,
+        )
+        if not response:
+            raise RuntimeError("RequirementParserAgent:LLM 调用返回空响应")
+        result = self._parse_llm_response(response, requirement, req_id)
+        if result is None:
+            raise RuntimeError("RequirementParserAgent:LLM 输出解析失败")
+        result["req_id"] = req_id
+        result["desc"] = requirement.strip()
         return result
 
     def _mock_run(self, requirement: str, req_id: str) -> dict[str, Any]:
@@ -177,14 +191,15 @@ class RequirementParserAgent:
     def _parse_llm_response(
         self, response: str, requirement: str, req_id: str
     ) -> dict[str, Any] | None:
-        """解析 LLM 输出为结构化需求字典（三级降级，失败返回 None）。"""
-        parsed = safe_parse_llm_json(response)
-        if parsed is None:
-            logger.warning("RequirementParserAgent:LLM 输出解析失败，降级为 Mock")
+        """解析 LLM 输出为结构化需求字典（失败返回 None）。"""
+        try:
+            parsed = safe_parse_llm_json(response)
+        except ValueError:
+            logger.warning("RequirementParserAgent:LLM 输出解析失败")
             return None
 
         # 校验并补全必要字段
-        req_type = parsed.get("type", "filter")
+        req_type = parsed.get("type", "generic")
         if req_type not in (
             "filter",
             "control",
@@ -194,6 +209,8 @@ class RequirementParserAgent:
             "mission_planning",
             "navigation",
             "power",
+            "redundancy",
+            "generic",
         ):
             req_type = self._detect_type(requirement)
 
@@ -238,8 +255,8 @@ class RequirementParserAgent:
         for rtype, keywords in _TYPE_KEYWORDS.items():
             if any(kw.lower() in lower for kw in keywords):
                 return rtype
-        # 默认归为 filter（机载信号处理最常见）
-        return "filter"
+        # 默认归为 generic（通用类型，Task 8 会完善模板）
+        return "generic"
 
     def _extract_params(self, text: str) -> dict[str, Any]:
         """正则提取数值参数（截止频率/采样率等）。"""
@@ -318,7 +335,9 @@ class RequirementParserAgent:
             return "navigation_module"
         if req_type == "power":
             return "power_management"
-        return "unknown_module"
+        if req_type == "redundancy":
+            return "redundancy_manager"
+        return "generic_module"
 
     def _derive_constraints(self, req_type: str, params: dict[str, Any]) -> list[str]:
         """推导非功能约束。"""
@@ -340,4 +359,8 @@ class RequirementParserAgent:
         elif req_type == "power":
             cons.append("电源效率 >= 90%")
             cons.append("电池管理精度 <= 5%")
+        elif req_type == "redundancy":
+            cons.append("双通道表决延迟 <= 5ms")
+            cons.append("通道间同步偏差 <= 1ms")
+            cons.append("故障切换时间 <= 50ms")
         return cons

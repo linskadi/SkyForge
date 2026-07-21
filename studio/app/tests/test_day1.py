@@ -1,4 +1,4 @@
-"""Day 1 核心链路测试：需求解析→契约生成→代码生成→Cppcheck 扫描。
+"""核心链路测试：需求解析→契约生成→代码生成→Cppcheck 扫描。
 
 验证输入"实现一个低通滤波器，截止频率10Hz"后，返回包含 contract YAML + C 代码。
 """
@@ -11,7 +11,7 @@ from skyforge_engine.tools.contract_to_assert import contract_to_assert
 
 
 class TestDay1Pipeline(unittest.TestCase):
-    """Day 1 核心流水线测试。"""
+    """核心流水线测试。"""
 
     def test_lowpass_filter_pipeline(self) -> None:
         """输入低通滤波器需求，验证返回包含契约 YAML + C 代码。"""

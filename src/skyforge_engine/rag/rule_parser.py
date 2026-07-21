@@ -1,4 +1,4 @@
-"""MISRA-C 规则解析器：将 misra_rules.txt 解析为结构化的 MisraRule 列表。
+"""编码规则解析器：将规则数据文件解析为结构化的 Rule 列表。
 
 支持两种格式：
 1. 详解格式（文件前半部分）：
@@ -106,7 +106,11 @@ _KEYWORD_CATEGORY_MAP = [
 ]
 
 
-def categorize_rule(title: str, description: str = "") -> str:
+def categorize_rule(
+    title: str,
+    description: str = "",
+    language: str = "c",
+) -> str:
     """根据规则标题和描述自动分类。
 
     分类优先级：
@@ -118,17 +122,28 @@ def categorize_rule(title: str, description: str = "") -> str:
     Args:
         title: 规则标题（如 "Types shall be explicitly specified"）。
         description: 规则描述（可选）。
+        language: 目标语言（默认 "c"），用于从注册表获取对应分类映射。
 
     Returns:
         分类字符串（type/memory/control/expression/declaration/
         preprocessor/std_library 之一）。
     """
+    from skyforge_engine.coding_standards.base import get_registry
+
     text = f"{title} {description}"
     text_lower = text.lower()
 
+    # 从注册表获取分类映射
+    prefix_category = get_registry().get_rule_prefix_category(language)
+    if not prefix_category:
+        prefix_category = _RULE_PREFIX_CATEGORY
+
+    keyword_category_map = get_registry().get_keyword_category_map(language)
+    if not keyword_category_map:
+        keyword_category_map = _KEYWORD_CATEGORY_MAP
+
     # 1) memory 关键词优先匹配（跨章节主题）
-    # _KEYWORD_CATEGORY_MAP[0] = (keywords_list, "memory")
-    memory_keywords = _KEYWORD_CATEGORY_MAP[0][0]
+    memory_keywords = keyword_category_map[0][0]
     for kw in memory_keywords:
         if kw.lower() in text_lower:
             return "memory"
@@ -137,12 +152,12 @@ def categorize_rule(title: str, description: str = "") -> str:
     rule_id_match = re.search(r"(?:Rule|Dir)\s*(\d+)\.\d+", text)
     if rule_id_match:
         prefix = rule_id_match.group(1)
-        category = _RULE_PREFIX_CATEGORY.get(prefix, "")
+        category = prefix_category.get(prefix, "")
         if category in _CORE_CATEGORIES:
             return category
 
     # 3) 其他关键词匹配
-    for keywords, category in _KEYWORD_CATEGORY_MAP[1:]:
+    for keywords, category in keyword_category_map[1:]:
         for kw in keywords:
             if kw.lower() in text_lower:
                 return category

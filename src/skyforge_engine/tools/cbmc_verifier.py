@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import os
 import shutil
-import subprocess
-import tempfile
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from skyforge_engine.utils.log_util import logger
+
+import warnings
+from skyforge_engine.core.verifiers.cbmc_verifier import CBMCVerifier as _CBMCVerifier
 
 
 @dataclass
@@ -67,8 +67,8 @@ def run_cbmc_verification(
 ) -> CBMCResult:
     """对 C 代码运行 CBMC 有界模型检查。
 
-    自动注入 CBMC 断言（__CPROVER_assert / __CPROVER_assume），
-    检查内存安全、数组越界、指针安全和用户自定义断言。
+    .. deprecated::
+        使用 ``CBMCVerifier().verify(code, unwind=..., function=...)`` 替代。
 
     Args:
         code: C 源代码字符串。
@@ -79,6 +79,12 @@ def run_cbmc_verification(
     Returns:
         CBMCResult: 验证结果。
     """
+    warnings.warn(
+        "run_cbmc_verification is deprecated, use CBMCVerifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
     if not _is_enabled():
         return CBMCResult(
             passed=True,
@@ -86,85 +92,27 @@ def run_cbmc_verification(
             tool_available=False,
         )
 
-    cbmc_path = _find_cbmc()
-    if not cbmc_path:
+    verifier = _CBMCVerifier()
+    if not verifier.is_available():
         return CBMCResult(
             passed=True,
             status="SKIPPED",
             tool_available=False,
         )
 
-    # 注入 CBMC 注解
-    code = _inject_cbmc_assertions(code)
-
-    import time
-    start = time.time()
-
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            src = Path(tmpdir) / "verify.c"
-            src.write_text(code, encoding="utf-8")
-
-            cmd = [
-                cbmc_path,
-                str(src),
-                "--unwind", str(unwind),
-                "--xml-ui",
-                "--trace",
-            ]
-            if function:
-                cmd.extend(["--function", function])
-            if property_flags:
-                cmd.extend(property_flags)
-
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=60,
-            )
-
-            elapsed = (time.time() - start) * 1000
-
-            # 解析 XML 输出
-            import xml.etree.ElementTree as ET
-
-            root = ET.fromstring(result.stdout) if result.stdout else ET.Element("results")
-            status = root.findtext(".//cprover-status", "UNKNOWN")
-
-            violations: list[str] = []
-            trace = ""
-            if status != "SUCCESS":
-                for prop in root.iter("property"):
-                    if prop.get("status") == "FAILURE":
-                        desc = prop.findtext("description", "unknown")
-                        file_attr = prop.get("file", "")
-                        line_attr = prop.get("line", "")
-                        violations.append(f"{desc} at {file_attr}:{line_attr}")
-                # 反例追踪
-                trace_elem = root.find(".//counterexample")
-                if trace_elem is not None:
-                    trace = ET.tostring(trace_elem, encoding="unicode")[:2000]
-
-            logger.info(
-                f"CBMC:验证{'通过' if status == 'SUCCESS' else '失败'}: "
-                f"{len(violations)} violations, {elapsed:.0f}ms"
-            )
-
-            return CBMCResult(
-                passed=status == "SUCCESS",
-                status=status,
-                violations=violations,
-                trace=trace,
-                time_ms=elapsed,
-                tool_available=True,
-            )
-
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        logger.warning(f"CBMC:执行失败: {e}")
+        result = verifier.verify(
+            code,
+            unwind=unwind,
+            function=function,
+            property_flags=property_flags,
+        )
         return CBMCResult(
-            passed=True,
-            status="TIMEOUT",
+            passed=result.passed,
+            status=result.metadata.get("status", "UNKNOWN"),
+            violations=[v.get("message", "") for v in result.violations],
+            trace=result.metadata.get("trace", ""),
+            time_ms=result.duration_ms,
             tool_available=True,
         )
     except Exception as e:
@@ -208,7 +156,16 @@ def _inject_cbmc_assertions(code: str) -> str:
 
 # 便捷函数
 def verify_code(code: str, unwind: int = 10) -> dict:
-    """便捷函数：验证代码并返回字典结果。"""
+    """便捷函数：验证代码并返回字典结果。
+
+    .. deprecated::
+        使用 ``CBMCVerifier().verify(code, unwind=...)`` 替代。
+    """
+    warnings.warn(
+        "verify_code is deprecated, use CBMCVerifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     result = run_cbmc_verification(code, unwind=unwind)
     return {
         "passed": result.passed,

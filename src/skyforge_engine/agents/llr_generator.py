@@ -23,10 +23,9 @@ try:
 except ImportError:
     def safe_parse_llm_json(x):
         return {} 
-try:
-    from skyforge_llm.client import get_lmstudio_client
-except ImportError:
-    get_lmstudio_client = None
+# LLM 客户端 — 通过 L0 provider 注入（L3 启动时注册自己的单例，
+# 引擎独立运行时回退到 L1 skyforge_llm.client）。详见 llm_provider.py。
+from skyforge_engine.llm_provider import get_llm_client as get_lmstudio_client
 from skyforge_engine.utils.log_util import logger
 
 _SYSTEM_PROMPT = """你是 DO-178C 机载系统低层需求工程师，专职从高层需求（HLR）
@@ -106,8 +105,12 @@ class LLRGeneratorAgent:
         "constraint",
     )
 
-    def __init__(self) -> None:
+    def __init__(self, strategy=None) -> None:
         self.system_prompt = _SYSTEM_PROMPT
+        if strategy is None:
+            from skyforge_engine.core.strategies import get_strategy_for_mode
+            strategy = get_strategy_for_mode()
+        self.strategy = strategy
 
     async def generate(
         self,
@@ -141,24 +144,45 @@ class LLRGeneratorAgent:
                 "reason": "HLR 列表为空",
             }
 
-        client = get_lmstudio_client()
-        if not client:
-            logger.warning("LLRGenerator:LM Studio 不可用，使用规则引擎降级")
-            return self._fallback_generate(hlr_list, safety_level, module_name)
-
-        # 构建 user prompt
-        user_prompt = self._build_prompt(hlr_list, safety_level, module_name)
-
-        try:
-            raw = await client.chat(
-                system=self.system_prompt,
-                user=user_prompt,
-                temperature=0.3,
+        result = await self.strategy.run(
+            hlr_list,
+            safety_level=safety_level,
+            module_name=module_name,
+            input_type="llr",
+        )
+        if not result.success:
+            if len(result.warnings) == 1:
+                raise RuntimeError(result.warnings[0])
+            raise RuntimeError(
+                f"LLRGenerator 执行失败: {result.warnings}"
             )
-            result = safe_parse_llm_json(raw)
-        except Exception as e:
-            logger.warning(f"LLRGenerator:LLM 生成失败: {e}，降级为规则引擎")
-            return self._fallback_generate(hlr_list, safety_level, module_name)
+        logger.info(
+            f"LLRGenerator:生成完成: HLR {result.output['hlr_count']} 条 "
+            f"→ LLR {result.output['llr_count']} 条 (method={result.output.get('method')})"
+        )
+        return result.output
+
+    async def _llm_run(
+        self,
+        hlr_list: list[dict[str, Any]],
+        safety_level: str,
+        module_name: str,
+    ) -> dict[str, Any]:
+        """LLM 实现：调用 LLM 生成 LLR。"""
+        client = get_lmstudio_client()
+        if not client or not client.is_available():
+            raise RuntimeError("LLRGenerator:本地 LLM 不可用")
+
+        user_prompt = self._build_prompt(hlr_list, safety_level, module_name)
+        raw = await client.chat_async(
+            prompt=user_prompt,
+            system_prompt=self.system_prompt,
+            temperature=0.3,
+        )
+
+        result = safe_parse_llm_json(raw)
+        if not result:
+            raise RuntimeError("LLRGenerator:LLM 输出解析失败")
 
         # 补全元数据
         result["hlr_count"] = len(hlr_list)
@@ -167,11 +191,6 @@ class LLRGeneratorAgent:
         result["module_name"] = module_name or result.get("module_name", "")
         result["generated"] = True
         result["method"] = "llm"
-
-        logger.info(
-            f"LLRGenerator:生成完成: HLR {result['hlr_count']} 条 "
-            f"→ LLR {result['llr_count']} 条 (method=llm)"
-        )
         return result
 
     def _build_prompt(

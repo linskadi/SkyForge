@@ -44,6 +44,10 @@ def contract_to_assert(yaml_str: str, cid: str = "CON-001") -> str:
     postconditions = _extract_postconditions(contract, cid)
     traceability = contract.get("traceability", "")
 
+    # 统一替换变量名：将契约中的变量名映射到函数参数名
+    for post in postconditions:
+        post["expr"] = post["expr"].replace("filtered_output", "output").replace("out_val", "output")
+
     rendered = ASSERT_TEMPLATE.render(
         cid=cid,
         traceability=traceability,

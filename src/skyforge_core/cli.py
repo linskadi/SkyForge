@@ -89,14 +89,14 @@ def cmd_check(args: argparse.Namespace) -> int:
         contract_result = contract_check(code, contract)
 
     # 输出结果
-    print(f"=== MISRA-C 扫描 ===")
+    print("=== MISRA-C 扫描 ===")
     print(f"违规数: {len(violations)}")
     for v in violations:
         print(f"  [{v.rule_id}] L{v.line}: {v.message}")
 
     if contract_result:
         passed = contract_result.passed if hasattr(contract_result, 'passed') else contract_result.get("passed", False)
-        print(f"\n=== 契约校验 ===")
+        print("\n=== 契约校验 ===")
         print(f"结果: {'✅ 通过' if passed else '❌ 未通过'}")
 
     return 0 if len(violations) == 0 else 1
@@ -121,7 +121,7 @@ def cmd_simulate(args: argparse.Namespace) -> int:
 
     # 输出结果
     passed = result.passed if hasattr(result, 'passed') else result.get("passed", False)
-    print(f"=== 数字孪生仿真 ===")
+    print("=== 数字孪生仿真 ===")
     print(f"结果: {'✅ 通过' if passed else '❌ 未通过'}")
     print(f"步数: {result.total_steps if hasattr(result, 'total_steps') else result.get('total_steps', '?')}")
 
@@ -157,7 +157,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     from skyforge_engine.report.traceability_matrix import build_matrix
     from skyforge_engine.report.do178_objectives import check_objectives
 
-    logger.info(f"SkyForge Core: 开始生成报告")
+    logger.info("SkyForge Core: 开始生成报告")
 
     matrix = build_matrix(pipeline_result)
     objectives = check_objectives(pipeline_result)
@@ -175,7 +175,7 @@ def cmd_report(args: argparse.Namespace) -> int:
     # 统计
     pass_count = sum(1 for o in objectives if o.status == "满足")
     total = len(objectives)
-    print(f"=== DO-178C 合规报告 ===")
+    print("=== DO-178C 合规报告 ===")
     print(f"目标符合性: {pass_count}/{total} 满足")
     print(f"报告位置: {output_path}")
     return 0

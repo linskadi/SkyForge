@@ -1,11 +1,18 @@
 /**
- * Provider Store — OpenCode 风格的多供应商配置管理。
- *
- * 支持: DeepSeek / Qwen / OpenAI / Anthropic / Ollama / LM Studio / 通用兼容
- * 每个 Provider 独立 API Key + Model 列表，localStorage 持久化。
+ * Provider Store — LLM 供应商配置 + 派生模式（Phase 1 状态管理统一）
+ * ====================================================================
+ * Phase 1 重构要点：
+ * 1. 移除旧的 `mode` ref 与 `setMode` action：mode 改为 `derivedMode` 计算属性，
+ *    来源唯一为 `executionStore.profileId`（demo → mock, cloud → api, local → local）；
+ * 2. localStorage key 不再使用 `skyforge-llm-mode`，统一改为
+ *    `skyforge-execution-profile`（由 executionStore 负责写入）；
+ * 3. 保留 Provider / Model 选择（baseURL / model）相关字段，因为后端 LLM 配置
+ *    仍需要它们作为 `LLMConfig` 的 provider / model / baseUrl 字段；
+ * 4. `getLLMConfig()` 返回的 `mode` 字段来源于 derivedMode。
  */
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
+import { useExecutionStore } from "@/stores/executionStore";
 
 export interface ProviderConfig {
 	id: string;
@@ -24,6 +31,14 @@ export interface ProviderModel {
 	name: string;
 	isDefault: boolean;
 }
+
+/**
+ * LLM 运行模式
+ * - mock: 使用 mock 适配器，前端独立可用
+ * - api: 调用真实云端 API
+ * - local: 使用本地模型（Ollama 等 OpenAI 兼容端点）
+ */
+export type LLMMode = "mock" | "api" | "local";
 
 const DEFAULT_PROVIDERS: ProviderConfig[] = [
 	{
@@ -107,23 +122,42 @@ const DEFAULT_PROVIDERS: ProviderConfig[] = [
 		description: "本地推理，数据不出内网",
 	},
 	{
-		id: "lmstudio",
-		name: "LM Studio (本地)",
+		id: "local",
+		name: "本地 LLM",
 		icon: "💻",
-		baseURL: "http://localhost:1234/v1",
-		apiKey: "lm-studio",
-		models: [{ id: "auto", name: "自动检测 (Loaded Model)", isDefault: true }],
+		baseURL: "http://localhost:11434/v1",
+		apiKey: "local",
+		models: [{ id: "auto", name: "自动检测", isDefault: true }],
 		enabled: false,
 		isLocal: true,
-		description: "本地推理，GUI 管理模型",
+		description: "本地推理（Ollama / LM Studio 等 OpenAI 兼容端点）",
 	},
 ];
+
+/**
+ * 将 ExecutionProfileId 映射为 LLMMode：
+ * - demo  → mock
+ * - cloud → api
+ * - local → local
+ */
+function profileIdToMode(profileId: "demo" | "cloud" | "local"): LLMMode {
+	if (profileId === "demo") return "mock";
+	if (profileId === "cloud") return "api";
+	return "local";
+}
 
 export const useProviderStore = defineStore("provider", () => {
 	// Load from localStorage or use defaults
 	const saved = localStorage.getItem("skyforge-providers");
 	const providers = ref<ProviderConfig[]>(
-		saved ? JSON.parse(saved) : DEFAULT_PROVIDERS,
+		(saved ? JSON.parse(saved) : DEFAULT_PROVIDERS).map(
+			(provider: ProviderConfig) => ({
+				...provider,
+				// Browser persistence of secrets is intentionally retired. Existing
+				// plaintext keys are scrubbed on first load.
+				apiKey: provider.isLocal ? provider.apiKey : "",
+			}),
+		),
 	);
 
 	const selectedProviderId = ref(
@@ -144,6 +178,17 @@ export const useProviderStore = defineStore("provider", () => {
 		providers.value.filter((p) => p.enabled),
 	);
 	const isLocalModel = computed(() => selectedProvider.value?.isLocal ?? false);
+
+	/**
+	 * 派生模式：唯一权威来源为 executionStore.profileId。
+	 *
+	 * 旧版 `providerStore.mode` ref 与 `setMode` action 已被移除，调用方应使用：
+	 * - `derivedMode`：mode 的响应式只读视图
+	 * - `executionStore.setProfile(...)`：修改 mode 的唯一通道
+	 */
+	const derivedMode = computed<LLMMode>(() =>
+		profileIdToMode(useExecutionStore().profileId),
+	);
 
 	// Actions
 	function setProvider(providerId: string) {
@@ -172,6 +217,8 @@ export const useProviderStore = defineStore("provider", () => {
 		if (provider) {
 			provider.apiKey = key;
 			provider.enabled = key.length > 0;
+			// Kept in memory only for legacy dialogs. Competition profiles obtain
+			// cloud credentials from the backend and never persist the key here.
 			persist();
 		}
 	}
@@ -185,7 +232,15 @@ export const useProviderStore = defineStore("provider", () => {
 	}
 
 	function persist() {
-		localStorage.setItem("skyforge-providers", JSON.stringify(providers.value));
+		localStorage.setItem(
+			"skyforge-providers",
+			JSON.stringify(
+				providers.value.map((provider) => ({
+					...provider,
+					apiKey: provider.isLocal ? provider.apiKey : "",
+				})),
+			),
+		);
 	}
 
 	// Get current provider info for API calls
@@ -201,10 +256,37 @@ export const useProviderStore = defineStore("provider", () => {
 		};
 	}
 
+	/**
+	 * 聚合 derivedMode 与 providerStore 现有字段，返回统一的 LLM 配置结构
+	 *
+	 * - mode: 由 executionStore.profileId 派生（仅只读）
+	 * - provider: 当前 selectedProvider 的 id（无则为 null）
+	 * - apiKey: 当前 provider 的 apiKey
+	 * - baseUrl: 当前 provider 的 baseURL
+	 * - model: 当前 selectedModel 的 id（无则为 null）
+	 */
+	function getLLMConfig(): {
+		mode: LLMMode;
+		provider: string | null;
+		apiKey: string;
+		baseUrl: string;
+		model: string | null;
+	} {
+		const provider = selectedProvider.value;
+		return {
+			mode: derivedMode.value,
+			provider: provider?.id ?? null,
+			apiKey: provider?.apiKey ?? "",
+			baseUrl: provider?.baseURL ?? "",
+			model: selectedModel.value?.id ?? null,
+		};
+	}
+
 	return {
 		providers,
 		selectedProviderId,
 		selectedModelId,
+		derivedMode,
 		selectedProvider,
 		selectedModel,
 		enabledProviders,
@@ -214,5 +296,6 @@ export const useProviderStore = defineStore("provider", () => {
 		setApiKey,
 		toggleProvider,
 		getCurrentProviderConfig,
+		getLLMConfig,
 	};
 });

@@ -3,11 +3,13 @@
  * Agent 徽章颜色 + 日志级别颜色，统一管理
  */
 
-import type { AgentType, LogLevel } from "@/services/mockApi";
+import type { LogLevel } from "@/services/mockApi";
 
 /** Agent 徽章颜色（航空信号灯语义系统 - 深沉专业色调） */
-export const agentColorMap: Record<AgentType, { bg: string; fg: string }> = {
+export const agentColorMap: Record<string, { bg: string; fg: string }> = {
 	"REQ-Parser": { bg: "#1d4ed8", fg: "#dbeafe" } /* 深蓝色 - 需求解析 */,
+	"LLR-Gen": { bg: "#2563eb", fg: "#dbeafe" } /* 亮蓝色 - LLR 生成 */,
+	"ARCH-Designer": { bg: "#7c3aed", fg: "#ede9fe" } /* 紫蓝色 - 架构设计 */,
 	"CON-Gen": { bg: "#6d28d9", fg: "#ede9fe" } /* 紫色 - 合约生成 */,
 	"CODE-Gen": { bg: "#047857", fg: "#d1fae5" } /* 深绿色 - 代码生成 */,
 	REPAIR: { bg: "#c2410c", fg: "#ffedd5" } /* 深橙色 - 修复 */,
@@ -24,8 +26,8 @@ export const levelColorMap: Record<LogLevel, string> = {
 };
 
 /** Agent 徽章样式 */
-export const badgeStyle = (agent: AgentType) => {
-	const c = agentColorMap[agent];
+export const badgeStyle = (agent: string) => {
+	const c = agentColorMap[agent] ?? { bg: "#475569", fg: "#f1f5f9" };
 	return { backgroundColor: c.bg, color: c.fg };
 };
 

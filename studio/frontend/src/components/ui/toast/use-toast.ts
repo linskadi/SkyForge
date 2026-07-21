@@ -1,5 +1,5 @@
 import type { Component, VNode } from "vue";
-import { computed, ref } from "vue";
+import { computed, shallowRef } from "vue";
 import type { ToastProps } from ".";
 
 const TOAST_LIMIT = 1;
@@ -68,18 +68,19 @@ function addToRemoveQueue(toastId: string) {
 	toastTimeouts.set(toastId, timeout);
 }
 
-const state = ref<State>({
+const state = shallowRef<State>({
 	toasts: [],
 });
 
 function dispatch(action: Action) {
 	switch (action.type) {
-		case actionTypes.ADD_TOAST:
+		case actionTypes.ADD_TOAST: {
 			state.value.toasts = [action.toast, ...state.value.toasts].slice(
 				0,
 				TOAST_LIMIT,
 			);
 			break;
+		}
 
 		case actionTypes.UPDATE_TOAST:
 			state.value.toasts = state.value.toasts.map((t) =>
@@ -118,6 +119,9 @@ function dispatch(action: Action) {
 
 			break;
 	}
+	// shallowRef avoids recursively expanding Vue VNode/Component types while
+	// still notifying consumers after an intentional state mutation.
+	state.value = { ...state.value };
 }
 
 function useToast() {

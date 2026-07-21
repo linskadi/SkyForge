@@ -1,0 +1,50 @@
+component: lowpass_filter_10hz
+version: 1.0.0
+safety_level: DAL-A
+traceability: [REQ-001]
+
+interface:
+  inputs:
+    - name: raw_input
+      type: double
+      range: [0, 20000]
+      unit: "ADC counts"
+      description: "原始高度传感器数据"
+  outputs:
+    - name: filtered_output
+      type: double
+      range: [0, 20000]
+      unit: "ADC counts"
+      description: "滤波后的平滑高度值"
+
+contracts:
+  preconditions:
+    - "raw_input >= 0"
+    - "raw_input <= 20000"
+    - "sample_rate == 100.0"
+  
+  postconditions:
+    - "filtered_output >= 0"
+    - "filtered_output <= 20000"
+    - "filtered_output is finite"
+  
+  invariants:
+    - "alpha >= 0"
+    - "alpha <= 1"
+    - "sample_rate == 100.0"
+  
+  fault_handling:
+    - "if raw_input < 0 or raw_input > 20000: set fault_detected = true"
+    - "if isnan(raw_input) or isinf(raw_input): set fault_detected = true"
+    - "if fault_detected: return 0.0"
+
+performance:
+  - "wcet < 1ms"
+  - "memory_usage < 1KB"
+  - "sample_rate >= 100Hz"
+
+verification:
+  - "MISRA-C:2012 compliant"
+  - "DO-178C DAL-A level"
+  - "Static analysis passed"
+  - "Digital twin simulation passed"

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import type { Contract, ContractCondition } from "@/services/mockApi";
-import { parseConTags } from "@/utils/tagParser";
 /**
  * ContractViewer 契约展示组件
  *
@@ -9,6 +7,8 @@ import { parseConTags } from "@/utils/tagParser";
  * - 每个条件标 [CON-xxx] Tag（紫色徽章）
  */
 import { computed } from "vue";
+import type { Contract, ContractCondition } from "@/services/mockApi";
+import { parseConTags } from "@/utils/tagParser";
 
 interface Props {
 	contract: Contract | null;

@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { RepairIteration } from "@/services/mockApi";
 import {
 	AlertTriangle,
 	CheckCircle2,
 	ChevronDown,
 	ChevronRight,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 /**
  * RepairTimeline 修复闭环时间线组件（Patch 1 查改解耦可视化）
  *
@@ -15,6 +14,7 @@ import {
  * - 最终轮高亮"✅ 0 违规"或"⚠️ 仍有 N 个违规"
  */
 import { ref } from "vue";
+import type { RepairIteration } from "@/services/mockApi";
 import CodeDiff from "./CodeDiff.vue";
 
 interface Props {

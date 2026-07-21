@@ -8,7 +8,8 @@ pip install skyforge-llm
 
 ## 功能
 
-- **多 Provider 支持** — DeepSeek / Qwen / OpenAI / Anthropic / LM Studio / 通用兼容
+- **多 Provider 支持** — DeepSeek / Qwen / OpenAI / Anthropic / Ollama / LM Studio / 通用兼容
+- **本地 Provider 自动检测** — 根据 Base URL 端口自动识别：11434→ollama，1234→lmstudio，其他→local
 - **安全封装** — sanitizer (输入脱敏) + validator (输出验证) + auditor (审计日志)
 - **智能降级** — LLM 不可用时 Agent 自动降级为规则引擎 Mock
 - **响应缓存** — 进程级 TTL 缓存，相同 prompt 命中即返回
@@ -44,8 +45,9 @@ else:
 | Qwen (通义千问) | OpenAI 兼容 API | 国产首选 |
 | OpenAI GPT-4o | OpenAI API | 最高精度 |
 | Anthropic Claude | Anthropic API | 备选 |
-| LM Studio | 本地 localhost:1234 | 离线降级 |
-| 通用兼容 | 任何 `/v1/chat/completions` | ollama/vLLM 等 |
+| **Ollama** | 本地 localhost:11434/v1 | 离线推理，默认推荐 |
+| LM Studio | 本地 localhost:1234/v1 | 离线降级 |
+| 通用兼容 | 任何 `/v1/chat/completions` | vLLM / 其他 |
 
 ## 架构
 

@@ -33,7 +33,7 @@ os.environ["USE_LLM"] = "false"
 os.environ["USE_REAL_GCC"] = "false"
 os.environ["USE_REAL_CPPCHECK"] = "false"
 os.environ["HIL_ENABLED"] = "false"
-os.environ["LMSTUDIO_BASE_URL"] = "http://localhost:9999/v1"
+os.environ["LOCAL_LLM_BASE_URL"] = "http://localhost:9999/v1"
 
 # 可选依赖：psutil 用于资源监控
 try:
@@ -207,7 +207,7 @@ class BenchmarkRunner:
         self.started_at = datetime.now()
         examples = sorted(self.examples_dir.glob("*.txt"))
         print(f"找到 {len(examples)} 个示例文件")
-        print(f"Mock 模式: USE_LLM=false, HIL_ENABLED=false")
+        print("Mock 模式: USE_LLM=false, HIL_ENABLED=false")
         print(f"psutil 可用: {_HAS_PSUTIL}")
         print("-" * 60)
 

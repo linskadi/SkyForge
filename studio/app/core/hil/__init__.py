@@ -10,6 +10,11 @@
 
 模块导出：
 - HILManager / ApprovalRequest / ApprovalResult / get_hil_manager
+
+L0→L3 反向依赖修复：本模块加载时通过
+``skyforge_engine.hil_provider.set_hil_manager_provider`` 把 L3 的
+``get_hil_manager`` 注册为 L0 pipeline 的 HIL provider，使 L0 不再
+反向 import L3。
 """
 
 from app.core.hil.hil_manager import (
@@ -18,6 +23,10 @@ from app.core.hil.hil_manager import (
     HILManager,
     get_hil_manager,
 )
+from skyforge_engine.hil_provider import set_hil_manager_provider
+
+# 注册 L3 HIL 管理器为 L0 pipeline 的 HIL provider（覆盖 L0 默认的空实现）
+set_hil_manager_provider(get_hil_manager)
 
 __all__ = [
     "HILManager",

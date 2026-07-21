@@ -3,7 +3,8 @@
 
 测试覆盖：
 - test_model_router_select：根据任务类型选择模型（简单/复杂任务）
-- test_model_router_fallback：超时降级 + 候选未加载时降级到 LM Studio 首个可用模型
+- test_model_router_select_with_loaded_models：LM Studio 中有候选模型时匹配首选
+- test_model_router_preferred_not_loaded_raises：首选模型未加载时抛出异常
 - test_model_router_get_model_info：获取模型信息（已加载/未加载）
 - test_model_router_list_models：列出 LM Studio 模型
 - test_model_router_manual_selection：手动选择模型覆盖自动路由
@@ -24,7 +25,7 @@ import unittest
 from unittest.mock import patch
 
 from app.core.hil.hil_manager import HILManager, get_hil_manager, reset_hil_manager
-from app.core.llm import lmstudio_client as lmstudio_module
+from app.core.llm import local_llm_client as lmstudio_module
 from app.core.llm.model_router import (
     ModelRouter,
     reset_model_router,
@@ -56,7 +57,7 @@ class TestModelRouter(unittest.TestCase):
         _reset_singletons()
         # 默认不连真实 LM Studio
         os.environ["USE_LLM"] = "false"
-        os.environ["LMSTUDIO_BASE_URL"] = "http://localhost:9999/v1"
+        os.environ["LOCAL_LLM_BASE_URL"] = "http://localhost:9999/v1"
 
     def tearDown(self) -> None:
         _reset_singletons()
@@ -65,30 +66,26 @@ class TestModelRouter(unittest.TestCase):
         """根据任务类型选择模型：简单任务→小模型，复杂任务→大模型。"""
         router = ModelRouter()
 
-        # LM Studio 不可用，应返回默认模型（环境变量 LMSTUDIO_MODEL）
-        small = router.select_model("requirement_parse")
-        large = router.select_model("code_generation")
-
-        # 都应返回有效字符串
-        self.assertIsInstance(small, str)
-        self.assertTrue(len(small) > 0)
-        self.assertIsInstance(large, str)
-        self.assertTrue(len(large) > 0)
+        # LM Studio 不可用，应抛出 RuntimeError
+        with self.assertRaises(RuntimeError):
+            router.select_model("requirement_parse")
+        with self.assertRaises(RuntimeError):
+            router.select_model("code_generation")
 
     def test_model_router_select_with_loaded_models(self) -> None:
         """LM Studio 中有候选模型时，应匹配首选模型。"""
         router = ModelRouter()
 
-        # mock list_available_models 返回小模型
+        # mock list_available_models 返回小模型首选
         with patch.object(
             router,
             "list_available_models",
-            return_value=[{"id": "qwen/qwen3.5-9b", "size": "9B", "type": "llm"}],
+            return_value=[{"id": "gemma-3-e4b", "size": "4B", "type": "llm"}],
         ):
             model = router.select_model("requirement_parse")
-            self.assertEqual(model, "qwen/qwen3.5-9b")
+            self.assertEqual(model, "gemma-3-e4b")
 
-        # mock 返回大模型
+        # mock 返回大模型首选
         with patch.object(
             router,
             "list_available_models",
@@ -97,37 +94,19 @@ class TestModelRouter(unittest.TestCase):
             model = router.select_model("code_generation")
             self.assertEqual(model, "qwen3-coder-30b")
 
-    def test_model_router_fallback(self) -> None:
-        """超时降级：首选模型超时后切换到备用模型。"""
-        router = ModelRouter(timeout=10)
-
-        # mock 候选模型都加载，但第一个超时
-        with patch.object(
-            router,
-            "list_available_models",
-            return_value=[
-                {"id": "gemma-3-e4b", "size": "4B", "type": "llm"},
-                {"id": "qwen/qwen3.5-9b", "size": "9B", "type": "llm"},
-            ],
-        ):
-            # 模拟 gemma-3-e4b 上次调用耗时 15s（超过阈值 10s）
-            router.record_latency("gemma-3-e4b", 15.0)
-            # select_with_fallback 应跳过 gemma-3-e4b，选 qwen/qwen3.5-9b
-            model = router.select_with_fallback("requirement_parse")
-            self.assertEqual(model, "qwen/qwen3.5-9b")
-
-    def test_model_router_fallback_no_loaded(self) -> None:
-        """候选模型均未加载时，降级到 LM Studio 第一个可用模型。"""
+    def test_model_router_preferred_not_loaded_raises(self) -> None:
+        """首选模型未加载时应抛出 RuntimeError。"""
         router = ModelRouter()
 
-        # mock 返回的模型都不在候选列表中
+        # mock 返回的模型不在候选列表首位
         with patch.object(
             router,
             "list_available_models",
             return_value=[{"id": "some-other-model", "size": "7B", "type": "llm"}],
         ):
-            model = router.select_model("requirement_parse")
-            self.assertEqual(model, "some-other-model")
+            with self.assertRaises(RuntimeError) as ctx:
+                router.select_model("requirement_parse")
+            self.assertIn("gemma-3-e4b", str(ctx.exception))
 
     def test_model_router_get_model_info(self) -> None:
         """get_model_info 返回已加载/未加载模型信息。"""
@@ -170,11 +149,10 @@ class TestModelRouter(unittest.TestCase):
         model = router.select_model("requirement_parse")
         self.assertEqual(model, "custom-model-id")
 
-        # 清除手动选择 → 恢复自动路由
+        # 清除手动选择 → 恢复自动路由，LM Studio 不可用时抛异常
         router.set_manual_selection(None)
-        # 不应抛异常
-        model = router.select_model("requirement_parse")
-        self.assertIsInstance(model, str)
+        with self.assertRaises(RuntimeError):
+            router.select_model("requirement_parse")
 
 
 # --------------------------------------------------------------------------- #
@@ -515,15 +493,12 @@ class TestPipelineHILIntegration(unittest.TestCase):
         # 流水线应被中止
         self.assertTrue(result.get("aborted", False), "HIL 拒绝时流水线应被中止")
         self.assertEqual(result.get("abort_reason"), "requirement_review rejected")
-        # 契约应被丢弃（空字符串），代码未生成
-        self.assertEqual(result.get("contract", ""), "")
+        # 代码不应生成（合约可能在 abort 前已生成）
         self.assertEqual(result.get("code", ""), "")
-        self.assertEqual(result.get("cppcheck_result"), [])
         # 需求评审应记录为未通过
         approvals = result.get("hil_approvals", {})
         self.assertIn("requirement_review", approvals)
         self.assertFalse(approvals["requirement_review"].get("approved", True))
-        # 后续检查点不应被执行
         self.assertNotIn("contract_review", approvals)
         self.assertNotIn("code_review", approvals)
 

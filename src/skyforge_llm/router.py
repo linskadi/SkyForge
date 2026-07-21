@@ -13,11 +13,28 @@ LM Studio 一次可加载多个模型，本路由器按任务复杂度路由：
 """
 
 import os
+import warnings
 from typing import Any, Optional
 
 import httpx
 
 from skyforge_engine.utils.log_util import logger
+
+
+def _resolve_local_llm_base_url(default: str = "http://localhost:11434/v1") -> str:
+    """读取本地 LLM 服务地址，优先 LOCAL_LLM_BASE_URL，回退到已弃用的 LMSTUDIO_BASE_URL。"""
+    new_url = os.environ.get("LOCAL_LLM_BASE_URL")
+    if new_url:
+        return new_url
+    legacy_url = os.environ.get("LMSTUDIO_BASE_URL")
+    if legacy_url:
+        warnings.warn(
+            "LMSTUDIO_BASE_URL 已弃用，请改用 LOCAL_LLM_BASE_URL",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return legacy_url
+    return default
 
 
 # 任务类型 → 模型规模偏好
@@ -67,12 +84,11 @@ class ModelRouter:
         """初始化模型路由器。
 
         Args:
-            base_url: LM Studio API 地址，默认从环境变量 LMSTUDIO_BASE_URL 读取。
+            base_url: 本地 LLM API 地址，默认从环境变量 LOCAL_LLM_BASE_URL 读取
+                （旧名 LMSTUDIO_BASE_URL 仍兼容，会触发 DeprecationWarning）。
             timeout: 单次模型调用超时阈值（秒），超过则触发降级。
         """
-        self.base_url = base_url or os.getenv(
-            "LMSTUDIO_BASE_URL", "http://localhost:1234/v1"
-        )
+        self.base_url = base_url or _resolve_local_llm_base_url()
         self.timeout = timeout
         # 模型调用耗时记录：{model_id: last_latency_seconds}
         self._latency: dict[str, float] = {}

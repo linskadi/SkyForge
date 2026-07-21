@@ -1,10 +1,14 @@
 """通用工具函数模块，提供任务 ID 生成、文件操作等功能。"""
 
-import os
 import datetime
-import hashlib
-from app.utils.log_util import logger
+import os
 import re
+import secrets
+from pathlib import Path
+
+from app.utils.log_util import logger
+
+WORK_DIR_ROOT = Path("project/work_dir").resolve()
 
 
 def transform_link(task_id: str, content: str) -> str:
@@ -61,10 +65,10 @@ TASK_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 
 def create_task_id() -> str:
-    """生成基于时间戳和随机哈希的唯一任务 ID。"""
+    """生成基于时间戳和密码学随机数的唯一任务 ID。"""
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    random_hash = hashlib.md5(str(datetime.datetime.now()).encode()).hexdigest()[:8]
-    return f"{timestamp}-{random_hash}"
+    random_part = secrets.token_hex(4)
+    return f"{timestamp}-{random_part}"
 
 
 def ensure_safe_task_id(task_id: str) -> str:
@@ -145,3 +149,26 @@ def get_current_files(folder_path: str, type: str = "all") -> list[str]:
             file for file in files if file.endswith(".png") or file.endswith(".jpg")
         ]
     return []
+
+
+def safe_resolve_workdir(relative_path: str) -> Path:
+    """安全地将相对路径解析到工作目录内，拒绝遍历。
+
+    Args:
+        relative_path: 相对于工作目录的路径。
+
+    Returns:
+        解析后的绝对路径。
+
+    Raises:
+        ValueError: 路径为空、为绝对路径、或解析后超出工作目录。
+    """
+    if not relative_path or not relative_path.strip():
+        raise ValueError("path must not be empty")
+    candidate = Path(relative_path)
+    if candidate.is_absolute():
+        raise ValueError(f"absolute path not allowed: {relative_path}")
+    resolved = (WORK_DIR_ROOT / candidate).resolve()
+    if not resolved.is_relative_to(WORK_DIR_ROOT):
+        raise ValueError(f"path escapes work dir: {relative_path}")
+    return resolved

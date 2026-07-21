@@ -2,9 +2,9 @@ import { createPinia } from "pinia";
 import { createApp } from "vue";
 import "@/assets/style.css";
 import "@/assets/styles/global.css";
+import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import App from "@/App.vue";
 import router from "@/router";
-import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 
 const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);

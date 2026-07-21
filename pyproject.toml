@@ -8,7 +8,7 @@ authors = [{name = "SkyForge Team"}]
 
 dependencies = [
     # Layer 0 — Engine
-    "skyforge-engine==0.4.0",
+    "skyforge-engine==0.5.0",
     # Layer 1 — LLM (optional)
     "skyforge-llm==0.4.0",
     # Layer 2 — CLI
@@ -24,6 +24,7 @@ dependencies = [
     "markdown>=3.6",
     "slowapi>=0.1.9",
     "python-multipart>=0.0.9",
+    "sqlalchemy>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -48,3 +49,10 @@ members = [
 skyforge-engine = { workspace = true }
 skyforge-llm = { workspace = true }
 skyforge-core = { workspace = true }
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "studio"]
+# 过滤第三方库弃用警告（fastapi testclient 依赖 httpx，待 httpx2 稳定后移除）
+filterwarnings = [
+    "ignore:Using .*httpx.* with .*starlette.testclient.* is deprecated",
+]

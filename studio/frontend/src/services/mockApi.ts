@@ -12,21 +12,20 @@
 
 import type {
 	AgentLog,
+	AgentType,
 	CompatibilityResult,
 	ComposeConnection,
 	ComposeResult,
-	ContractCheckResult,
+	DashboardTaskRecord,
 	FaultParams,
 	FaultType,
 	GenerateResult,
-	HILApproval,
-	HILHistoryItem,
-	LLMModel,
-	LLMStatus,
+	HITLApproval,
+	HITLHistoryItem,
+	LogLevel,
 	MisraRule,
-	RepairResult,
 	ReportResult,
-	ScadeParseResult,
+	RuleStandard,
 	SimulationResult,
 } from "@/types/domain";
 import type {
@@ -34,47 +33,50 @@ import type {
 	VerificationResult,
 	VerifyRequest,
 } from "@/types/verification";
+import type {
+	ApiClient,
+	ComposeInput,
+	LLMConfig,
+	LLMTestResult,
+} from "./apiProtocol";
 
 // Re-export all types for backward compatibility
 export type {
 	AgentLog,
 	AgentType,
-	LogLevel,
+	CompatibilityCheckItem,
+	CompatibilityResult,
+	ComposeConnection,
+	ComposeResult,
 	Contract,
-	ContractCondition,
 	ContractCheckResult,
+	ContractCondition,
 	ContractViolation,
 	FaultParams,
 	FaultType,
 	GenerateResult,
+	HITLApproval,
+	HITLCheckpointType,
+	HITLHistoryItem,
+	LogLevel,
+	MisraRule,
 	MisraViolation,
 	RepairIteration,
+	ReportResult,
+	ReportSummary,
+	RuleStandard,
+	ScadeEquation,
+	ScadeVariable,
 	SimulationResult,
 	SimulationStatistics,
-	ComposeConnection,
-	ComposeResult,
-	CompatibilityResult,
-	CompatibilityCheckItem,
-	LLMStatus,
-	LLMModel,
-	ScadeVariable,
-	ScadeEquation,
-	ScadeParseResult,
-	HILApproval,
-	HILHistoryItem,
-	HILCheckpointType,
-	ReportSummary,
-	ReportResult,
-	MisraRule,
-	RepairResult,
 } from "@/types/domain";
 
 // Re-export verification types for backward compatibility
 export type {
-	VerifyRequest,
 	VerificationCheck,
 	VerificationResult,
 	VerificationStatus,
+	VerifyRequest,
 } from "@/types/verification";
 
 // ===================== 数据常量导入 =====================
@@ -82,16 +84,20 @@ import {
 	MOCK_AGENT_LOGS,
 	MOCK_API_BASE_URL,
 	MOCK_CODE,
+	MOCK_CODE_CPP_PID,
+	MOCK_CODE_PY_PREPROCESS,
 	MOCK_CONTRACT,
 	MOCK_CONTRACT_CHECK_RESULT,
-	MOCK_HIL_PENDING,
+	MOCK_HITL_PENDING,
 	MOCK_HP_CODE,
 	MOCK_HP_CONTRACT,
-	MOCK_LLM_STATUS,
 	MOCK_LP_CODE,
 	MOCK_LP_CONTRACT,
+	MOCK_MISRA_CPP_RULES,
 	MOCK_MISRA_RULES,
+	MOCK_PYTHON_SAFETY_RULES,
 	MOCK_REPAIR_HISTORY,
+	MOCK_RULE_STANDARDS,
 	MOCK_SIM_LOGS,
 	MOCK_TRACEABILITY,
 	MOCK_VIOLATIONS,
@@ -102,6 +108,26 @@ import {
 export {
 	EXAMPLE_REQUIREMENTS,
 	MISRA_RULE_DOCS,
+	MOCK_AGENT_LOGS,
+	MOCK_CODE,
+	MOCK_CODE_CPP_PID,
+	MOCK_CODE_PY_PREPROCESS,
+	MOCK_CONTRACT,
+	MOCK_CONTRACT_CHECK_RESULT,
+	MOCK_HITL_PENDING,
+	MOCK_HP_CODE,
+	MOCK_HP_CONTRACT,
+	MOCK_LP_CODE,
+	MOCK_LP_CONTRACT,
+	MOCK_MISRA_CPP_RULES,
+	MOCK_MISRA_RULES,
+	MOCK_PYTHON_SAFETY_RULES,
+	MOCK_REPAIR_HISTORY,
+	MOCK_RULE_STANDARDS,
+	MOCK_SIM_LOGS,
+	MOCK_TRACEABILITY,
+	MOCK_VIOLATIONS,
+	SIM_STEPS,
 } from "@/mock/data";
 
 // Re-export preset code/contract aliases
@@ -110,6 +136,8 @@ export const PRESET_LP_CONTRACT = MOCK_LP_CONTRACT;
 export const PRESET_HP_CODE = MOCK_HP_CODE;
 export const PRESET_HP_CONTRACT = MOCK_HP_CONTRACT;
 
+// ===================== 报告生成导入 =====================
+import { buildReport } from "./reportGenerator";
 // ===================== 仿真逻辑导入 =====================
 import {
 	buildCompatibility,
@@ -119,46 +147,105 @@ import {
 	runFaultInjection,
 } from "./simulation";
 
-// ===================== 报告生成导入 =====================
-import { buildReport } from "./reportGenerator";
-
 // ===================== 辅助数据 =====================
-
-/** 当前 LLM 状态（响应式副本，便于 mock 切换） */
-let mockLLMState: LLMStatus = { ...MOCK_LLM_STATUS };
 
 /** mock 的正常仿真结果（无故障，200 步，契约全部通过） */
 const MOCK_SIMULATION_RESULT: SimulationResult =
 	generateNormalSimulationResult(MOCK_SIM_LOGS);
 
-/** mock HIL 待审批列表（运行时可变） */
-const mockHILPending: HILApproval[] = MOCK_HIL_PENDING.map((item) => ({
+/** mock HITL 待审批列表（运行时可变） */
+const mockHITLPending: HITLApproval[] = MOCK_HITL_PENDING.map((item) => ({
 	...item,
 	submitted_at: Date.now() - 1000 * 60 * 5,
 	deadline: Date.now() + 1000 * 60 * 25,
 }));
 
-/** mock HIL 审批历史 */
-const mockHILHistory: HILHistoryItem[] = [];
+/** mock HITL 审批历史 */
+const mockHITLHistory: HITLHistoryItem[] = [];
 
 // ===================== Mock API 函数 =====================
 
-/** 生成结果：模拟 POST /api/generate 的响应（延迟 1.5s） */
-export function mockGenerate(requirement: string): Promise<GenerateResult> {
-	console.log("[mockApi] 调用 mockGenerate，需求：", requirement);
+/**
+ * Mock Agent 流的日志推送间隔（秒）。
+ *
+ * 由 mockAgentStream 与 mockGenerate 共享，确保 mockGenerate 的延迟与
+ * mockAgentStream 全部日志推送完毕的总时长一致，避免出现"Agent 还在思考、
+ * 结果已显示"的时序错乱。详见 SkyForge Spec 修复 A Task 3。
+ */
+export const MOCK_AGENT_INTERVAL_SEC = 1.5;
+
+/**
+ * Mock Agent 流的总播放时长（毫秒）= 日志条数 × 间隔。
+ *
+ * mockGenerate 等待此时长后再 resolve，使结果展示与 AgentTerminal 日志播放同步。
+ */
+export const MOCK_AGENT_TOTAL_DURATION_MS =
+	MOCK_AGENT_INTERVAL_SEC * MOCK_AGENT_LOGS.length * 1000;
+
+/** 生成结果：模拟 POST /api/generate 的响应
+ *
+ * 延迟与 mockAgentStream 的总播放时长一致，确保 AgentTerminal 日志播放完毕后才显示结果。
+ *
+ * 参数回显（T3.1）：mock 模式下用户选择的 scadeFile/language 会参与生成结果：
+ * - 代码顶部注入 `// mock: language=..., scadeFile=..., requirement=...` 注释，
+ *   使 mock 结果与用户选项可见地关联（不再"完全不参与生成"）。
+ * - 根据 language 选择不同 mock 代码模板：
+ *   - c → 一阶低通滤波器（默认，使用 MOCK_CODE）
+ *   - cpp → PID 控制器（MOCK_CODE_CPP_PID）
+ *   - python → 数据预处理函数（MOCK_CODE_PY_PREPROCESS）
+ *   - 其他 → 默认低通滤波器
+ * - degraded 固定为 false：mock 模式不触发 LLM 降级路径（T3.2）。
+ */
+export function mockGenerate(
+	requirement: string,
+	scadeFile?: string,
+	language = "c",
+): Promise<GenerateResult> {
+	const lang = language || "c";
+	console.log(
+		"[mockApi] 调用 mockGenerate，需求：",
+		requirement,
+		"语言:",
+		lang,
+		"scadeFile:",
+		scadeFile ? "provided" : "none",
+	);
+	const originalMockCode = pickMockCodeByLanguage(lang);
+	const header = `// mock: language=${lang}, scadeFile=${scadeFile ? "provided" : "none"}, requirement=${requirement.slice(0, 50)}`;
+	const code = `${header}\n${originalMockCode}`;
 	return new Promise((resolve) => {
 		setTimeout(() => {
 			resolve({
 				contract: MOCK_CONTRACT,
-				code: MOCK_CODE,
+				code,
 				violations: MOCK_VIOLATIONS,
 				traceability: MOCK_TRACEABILITY,
 				repair_history: MOCK_REPAIR_HISTORY,
 				contract_check_result: MOCK_CONTRACT_CHECK_RESULT,
 				simulation_result: MOCK_SIMULATION_RESULT,
+				degraded: false,
 			});
-		}, 1500);
+		}, MOCK_AGENT_TOTAL_DURATION_MS);
 	});
+}
+
+/**
+ * 根据目标语言选择对应的 mock 代码模板（T3.1）
+ *
+ * - c → 一阶低通滤波器（默认）
+ * - cpp → PID 控制器
+ * - python → 数据预处理函数
+ * - 其他 → 默认低通滤波器
+ */
+export function pickMockCodeByLanguage(language: string): string {
+	switch (language) {
+		case "cpp":
+			return MOCK_CODE_CPP_PID;
+		case "python":
+			return MOCK_CODE_PY_PREPROCESS;
+		default:
+			return MOCK_CODE;
+	}
 }
 
 /**
@@ -195,16 +282,42 @@ export function mockSimulate(
 }
 
 /**
+ * WebSocket complete 信号携带的数据
+ *
+ * 由 `connectAgentStream` 在收到后端 `level: "complete"` 消息时填充并透传给
+ * `onDone` 回调；`mockAgentStream` 不会填充此 payload（mock 模式无 result）。
+ * `result` 字段结构与后端 `run_full_pipeline` 返回值一致，可用于 HTTP 失败时
+ * 的降级 fallback。
+ */
+export interface StreamCompletePayload {
+	result?: unknown;
+	degraded?: boolean;
+}
+
+/**
+ * 默认 WebSocket URL：优先使用环境变量 VITE_WS_URL（须包含完整路径），
+ * 否则基于当前页面 location.host 拼接 `/ws/agent-stream`，适配 dev proxy 与生产同源部署。
+ *
+ * .. deprecated::
+ *   ``/ws/agent-stream`` is deprecated. New code should connect to the V1
+ *   task events socket at ``/api/v1/tasks/{task_id}/events`` via
+ *   ``connectV1TaskEvents``. This constant is kept for one release as a
+ *   fallback for clients that have not migrated yet.
+ */
+export const DEFAULT_WS_URL =
+	import.meta.env.VITE_WS_URL || `ws://${location.host}/ws/agent-stream`;
+
+/**
  * 模拟 WebSocket 推送 6 个 Agent 的思考日志
  */
 export function mockAgentStream(
 	onLog: (log: AgentLog) => void,
-	onDone?: () => void,
+	onDone?: (data?: StreamCompletePayload) => void,
 ): () => void {
 	let stopped = false;
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
-	const interval = 5;
+	const interval = MOCK_AGENT_INTERVAL_SEC;
 
 	const next = (index: number) => {
 		if (stopped) return;
@@ -227,45 +340,244 @@ export function mockAgentStream(
 
 /**
  * 真实 WebSocket 连接（后端完成后启用）
+ *
+ * 两种模式：
+ * - 生成模式（默认）：发送 `{requirement, language}` 触发后端 `/ws/agent-stream` 新 pipeline。
+ * - 订阅模式：传入 `taskId` 时发送 `{task_id, action: "subscribe"}` 订阅已有运行中的 task，
+ *   不启动新 pipeline。立即收到历史日志回放，并继续接收实时输出。
+ *
+ * 兼容多种后端消息字段：agent/agent_name、thought/message/content、level/type=complete。
+ *
+ * complete 信号处理：当收到 `level: "complete"` 或 `type: "complete"` 消息时，
+ * 把后端透传的 `result` / `degraded` 字段通过 onDone 回调返回给调用方，
+ * 供 Generate.vue 在 HTTP 失败时作为降级 fallback 使用。
  */
 export function connectAgentStream(
 	onLog: (log: AgentLog) => void,
-	onStatus?: (status: "connecting" | "connected" | "disconnected") => void,
-	url = "ws://localhost:8000/ws/agent-stream",
+	onDone?: (data?: StreamCompletePayload) => void,
+	wsUrl: string = DEFAULT_WS_URL,
+	requirement?: string,
+	language = "c",
+	taskId?: string,
 ): () => void {
-	onStatus?.("connecting");
+	let stopped = false;
 	let ws: WebSocket | null = null;
 	try {
-		ws = new WebSocket(url);
+		ws = new WebSocket(wsUrl);
 	} catch (err) {
-		console.error("[mockApi] WebSocket 连接失败：", err);
-		onStatus?.("disconnected");
+		console.error("[mockApi] WebSocket 创建失败：", err);
+		onDone?.();
 		return () => {};
 	}
 
 	ws.onopen = () => {
-		console.log("[mockApi] WebSocket 已连接:", url);
-		onStatus?.("connected");
-	};
-	ws.onmessage = (event) => {
-		try {
-			const data = JSON.parse(event.data) as AgentLog;
-			onLog({ ...data, ts: Date.now() });
-		} catch (err) {
-			console.error("[mockApi] 解析 WebSocket 消息失败：", err);
+		console.log("[mockApi] WebSocket 已连接:", wsUrl);
+		// 订阅模式：发送 {task_id, action: "subscribe"} 不启动新 pipeline
+		if (taskId) {
+			ws?.send(JSON.stringify({ task_id: taskId, action: "subscribe" }));
+			console.log(`[mockApi] 已发送订阅请求: task_id=${taskId}`);
+			return;
+		}
+		// 生成模式：发送 requirement 触发后端独立 pipeline
+		if (requirement) {
+			ws?.send(JSON.stringify({ requirement, language }));
 		}
 	};
+
+	ws.onmessage = (event) => {
+		if (stopped) return;
+		try {
+			const data = JSON.parse(event.data) as {
+				agent?: AgentType;
+				agent_name?: AgentType;
+				level?: string;
+				type?: string;
+				thought?: string;
+				message?: string;
+				content?: string;
+				time?: number;
+				result?: unknown;
+				degraded?: boolean;
+			};
+			// 兼容现有消息格式：complete 信号触发结束并透传 result/degraded 字段
+			if (data.level === "complete" || data.type === "complete") {
+				onDone?.({ result: data.result, degraded: data.degraded });
+				return;
+			}
+			onLog({
+				agent: data.agent ?? data.agent_name ?? "SYSTEM",
+				level: (data.level ?? "info") as LogLevel,
+				thought: data.thought ?? data.message ?? data.content ?? "",
+				ts: data.time ?? Date.now(),
+			});
+		} catch (err) {
+			console.warn("[mockApi] 消息解析失败：", err);
+		}
+	};
+
 	ws.onerror = (err) => {
 		console.error("[mockApi] WebSocket 错误：", err);
 	};
+
 	ws.onclose = () => {
 		console.log("[mockApi] WebSocket 已关闭");
-		onStatus?.("disconnected");
+		if (!stopped) onDone?.();
 	};
 
 	return () => {
-		ws?.close();
+		stopped = true;
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			ws.close();
+		}
 	};
+}
+
+/**
+ * V1 task events WebSocket 连接（Phase 5 优先通道）
+ *
+ * 通过 `wsBase/api/v1/tasks/{task_id}/events?after_seq=...` 订阅指定 task 的
+ * 事件流。该通道为单一实时事件通道，**推荐替代** ``/ws/agent-stream``。
+ *
+ * 行为：
+ * - 收到后端透传的 V1 事件对象，转换为 `AgentLog` 推送给 `onLog`。
+ * - 收到 `type === "complete"` 事件时填充 `result/degraded` 并通过 `onDone` 回调。
+ * - 支持 `afterSeq` 从指定 seq 之后重放（断线重连场景）。
+ * - 不会触发新 pipeline；pipeline 由 POST `/api/v1/tasks` 启动。
+ */
+export function connectV1TaskEvents(
+	taskId: string,
+	onLog: (log: AgentLog) => void,
+	onDone?: (data?: StreamCompletePayload) => void,
+	afterSeq = 0,
+	wsBaseOverride?: string,
+	onFirstMessage?: () => void,
+): () => void {
+	let stopped = false;
+	let ws: WebSocket | null = null;
+	let firstMessageFired = false;
+	// 优先使用 VITE_API_BASE_URL；缺省时退回 location.host（dev proxy / 同源部署）。
+	const apiBase =
+		wsBaseOverride ??
+		(import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+		`http://${location.host}`;
+	const wsBase = apiBase.replace(/^http/, "ws");
+	const url = `${wsBase}/api/v1/tasks/${encodeURIComponent(taskId)}/events?after_seq=${afterSeq}`;
+	try {
+		ws = new WebSocket(url);
+	} catch (err) {
+		console.error("[mockApi] V1 WebSocket 创建失败：", err);
+		onDone?.();
+		return () => {};
+	}
+
+	ws.onopen = () => {
+		console.log("[mockApi] V1 WebSocket 已连接:", url);
+	};
+
+	ws.onmessage = (event) => {
+		if (stopped) return;
+		if (!firstMessageFired) {
+			firstMessageFired = true;
+			onFirstMessage?.();
+		}
+		try {
+			const data = JSON.parse(event.data) as {
+				agent?: AgentType;
+				level?: string;
+				type?: string;
+				stage?: string;
+				message?: string;
+				thought?: string;
+				created_at?: string;
+				result?: unknown;
+				task?: { result?: unknown };
+				degraded?: boolean;
+			};
+			if (data.type === "complete" || data.level === "complete") {
+				// V1 complete: result 嵌套在 data.task.result 中
+				onDone?.({
+					result: data.result ?? data.task?.result,
+					degraded: data.degraded,
+				});
+				return;
+			}
+			onLog({
+				agent: data.agent ?? "SYSTEM",
+				level: ((data.level as LogLevel) ?? "info") as LogLevel,
+				thought: data.message ?? data.thought ?? `[${data.stage ?? "stage"}]`,
+				ts: data.created_at ? Date.parse(data.created_at) : Date.now(),
+			});
+		} catch (err) {
+			console.warn("[mockApi] V1 消息解析失败：", err);
+		}
+	};
+
+	ws.onerror = (err) => {
+		console.error("[mockApi] V1 WebSocket 错误：", err);
+	};
+
+	ws.onclose = () => {
+		console.log("[mockApi] V1 WebSocket 已关闭");
+		// 不在此处调 onDone：只在收到完整 complete 消息时才算完成。
+		// WS 关闭（任务未完成/已完成但 WS 连晚了）由 AgentTerminal 的 5s fallback 或重试机制处理。
+	};
+
+	return () => {
+		stopped = true;
+		if (ws && ws.readyState === WebSocket.OPEN) {
+			ws.close();
+		}
+	};
+}
+
+/**
+ * 通过 V1 通道创建 task 并订阅 events（Phase 5 推荐路径）。
+ *
+ * 先 POST `/api/v1/tasks` 拿到 `task_id`，再连接 V1 events WebSocket。
+ * 返回 disconnect 函数与 task_id，方便 UI 在重置/卸载时清理。
+ *
+ * @returns ``{ taskId, stop }``；taskId 在创建失败时为 null。
+ */
+export async function createTaskAndSubscribeV1(
+	requirement: string,
+	language: "c" | "cpp" | "python",
+	profileId: "cloud" | "local" = "local",
+	onLog: (log: AgentLog) => void,
+	onDone?: (data?: StreamCompletePayload) => void,
+	onFirstMessage?: () => void,
+): Promise<{ taskId: string | null; stop: () => void }> {
+	try {
+		const { postJSON } = await import("@/services/client");
+		const idempotencyKey = `studio-${Date.now()}-${Math.random()
+			.toString(36)
+			.slice(2, 10)}`;
+		const handle = await postJSON<{ id: string; events_url?: string }>(
+			"/api/v1/tasks",
+			{
+				requirement,
+				language,
+				profile_id: profileId,
+				idempotency_key: idempotencyKey,
+			},
+		);
+		if (!handle?.id) {
+			onDone?.();
+			return { taskId: null, stop: () => {} };
+		}
+		const stop = connectV1TaskEvents(
+			handle.id,
+			onLog,
+			onDone,
+			0,
+			undefined,
+			onFirstMessage,
+		);
+		return { taskId: handle.id, stop };
+	} catch (err) {
+		console.error("[mockApi] V1 创建任务失败：", err);
+		onDone?.();
+		return { taskId: null, stop: () => {} };
+	}
 }
 
 /**
@@ -408,144 +720,19 @@ export function mockCheckCompatibility(
 }
 
 /**
- * mock 获取 LLM 状态
- */
-export function mockGetLLMStatus(): Promise<LLMStatus> {
-	console.log("[mockApi] 调用 mockGetLLMStatus");
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve({ ...mockLLMState });
-		}, 300);
-	});
-}
-
-/**
- * mock 切换 LLM 开关
- */
-export function mockSwitchLLM(useLLM: boolean): Promise<LLMStatus> {
-	console.log("[mockApi] 调用 mockSwitchLLM，启用 LLM:", useLLM);
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			mockLLMState = {
-				...mockLLMState,
-				use_llm: useLLM,
-				available: useLLM,
-			};
-			resolve({ ...mockLLMState });
-		}, 400);
-	});
-}
-
-/**
- * mock 获取可用模型列表
- */
-export function mockGetModels(): Promise<LLMModel[]> {
-	console.log("[mockApi] 调用 mockGetModels");
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve([...MOCK_LLM_STATUS.models]);
-		}, 300);
-	});
-}
-
-/**
- * mock 选择模型
- */
-export function mockSelectModel(modelId: string): Promise<LLMStatus> {
-	console.log("[mockApi] 调用 mockSelectModel，模型 ID:", modelId);
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			mockLLMState = {
-				...mockLLMState,
-				current_model: modelId,
-			};
-			resolve({ ...mockLLMState });
-		}, 300);
-	});
-}
-
-/**
- * mock 上传 SCADE 文件并解析
- */
-export function mockUploadScade(file: File): Promise<ScadeParseResult> {
-	console.log(
-		"[mockApi] 调用 mockUploadScade，文件名:",
-		file.name,
-		"大小:",
-		file.size,
-	);
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve({
-				node_name: "LowPassFilter",
-				inputs: [
-					{ name: "raw_value", type: "uint16", description: "原始 ADC 采样值" },
-					{ name: "sample_rate", type: "uint16", description: "采样率 (Hz)" },
-				],
-				outputs: [
-					{
-						name: "filtered_value",
-						type: "uint16",
-						description: "滤波后输出值",
-					},
-				],
-				locals: [
-					{ name: "alpha", type: "float", description: "滤波系数" },
-					{ name: "prev_out", type: "uint16", description: "上一拍输出" },
-				],
-				equations: [
-					{
-						lhs: "alpha",
-						rhs: "10.0 / (10.0 + sample_rate)",
-					},
-					{
-						lhs: "filtered_value",
-						rhs: "alpha * raw_value + (1.0 - alpha) * prev_out",
-					},
-				],
-				natural_language_requirement:
-					"实现一个一阶低通滤波器，截止频率 10Hz，输入为 uint16 原始 ADC 采样值和 uint16 采样率，输出为 uint16 滤波后值。" +
-					"滤波公式：y[n] = alpha * x[n] + (1 - alpha) * y[n-1]，其中 alpha = fc / (fc + fs)。",
-				contract_yaml:
-					"component: LowPassFilter\n" +
-					"description: 一阶低通滤波器，截止频率 10Hz\n" +
-					"inputs:\n" +
-					"  raw_value: uint16  // 原始 ADC 采样值\n" +
-					"  sample_rate: uint16  // 采样率 (Hz)\n" +
-					"outputs:\n" +
-					"  filtered_value: uint16  // 滤波后输出值\n" +
-					"preconditions:\n" +
-					"  - id: CON-LP-PRE-000\n" +
-					'    expression: "sample_rate > 0"\n' +
-					"    description: 采样率必须大于 0\n" +
-					"postconditions:\n" +
-					"  - id: CON-LP-POST-000\n" +
-					'    expression: "0 <= filtered_value <= 65535"\n' +
-					"    description: 输出值在 uint16 范围内\n" +
-					"invariants:\n" +
-					"  - id: CON-LP-INV-000\n" +
-					'    expression: "0.0 <= alpha <= 1.0"\n' +
-					"    description: 滤波系数 alpha 始终在 [0,1] 范围\n",
-				source_file: file.name,
-			});
-		}, 1000);
-	});
-}
-
-/**
  * mock 获取待审批列表
  */
-export function mockGetPendingApprovals(): Promise<HILApproval[]> {
+export function mockGetPendingApprovals(): Promise<HITLApproval[]> {
 	console.log("[mockApi] 调用 mockGetPendingApprovals");
 	return new Promise((resolve) => {
 		setTimeout(() => {
-			resolve([...mockHILPending]);
+			resolve([...mockHITLPending]);
 		}, 300);
 	});
 }
 
 /**
- * mock 批准 HIL 请求
+ * mock 批准 HITL 请求
  */
 export function mockApprove(
 	requestId: string,
@@ -559,11 +746,11 @@ export function mockApprove(
 	);
 	return new Promise((resolve) => {
 		setTimeout(() => {
-			const idx = mockHILPending.findIndex((p) => p.request_id === requestId);
+			const idx = mockHITLPending.findIndex((p) => p.request_id === requestId);
 			if (idx >= 0) {
-				const item = mockHILPending[idx];
-				mockHILPending.splice(idx, 1);
-				mockHILHistory.unshift({
+				const item = mockHITLPending[idx];
+				mockHITLPending.splice(idx, 1);
+				mockHITLHistory.unshift({
 					...item,
 					status: "approved",
 					reviewer: "mock-user",
@@ -581,7 +768,7 @@ export function mockApprove(
 }
 
 /**
- * mock 拒绝 HIL 请求
+ * mock 拒绝 HITL 请求
  */
 export function mockReject(
 	requestId: string,
@@ -595,11 +782,11 @@ export function mockReject(
 	);
 	return new Promise((resolve) => {
 		setTimeout(() => {
-			const idx = mockHILPending.findIndex((p) => p.request_id === requestId);
+			const idx = mockHITLPending.findIndex((p) => p.request_id === requestId);
 			if (idx >= 0) {
-				const item = mockHILPending[idx];
-				mockHILPending.splice(idx, 1);
-				mockHILHistory.unshift({
+				const item = mockHITLPending[idx];
+				mockHITLPending.splice(idx, 1);
+				mockHITLHistory.unshift({
 					...item,
 					status: "rejected",
 					reviewer: "mock-user",
@@ -617,13 +804,13 @@ export function mockReject(
 }
 
 /**
- * mock 获取 HIL 审批历史
+ * mock 获取 HITL 审批历史
  */
-export function mockGetHILHistory(): Promise<HILHistoryItem[]> {
-	console.log("[mockApi] 调用 mockGetHILHistory");
+export function mockGetHITLHistory(): Promise<HITLHistoryItem[]> {
+	console.log("[mockApi] 调用 mockGetHITLHistory");
 	return new Promise((resolve) => {
 		setTimeout(() => {
-			resolve([...mockHILHistory]);
+			resolve([...mockHITLHistory]);
 		}, 300);
 	});
 }
@@ -669,46 +856,63 @@ export function mockSearchMisra(query: string): Promise<MisraRule[]> {
 	});
 }
 
-/** mock 获取单条 MISRA 规则 */
-export function mockGetMisraRule(ruleId: string): Promise<MisraRule> {
-	console.log("[mockApi] 调用 mockGetMisraRule，ruleId：", ruleId);
-	return new Promise((resolve, reject) => {
+/**
+ * mock 搜索指定规则集的规则
+ *
+ * 根据 standardId 返回对应规则集的 mock 数据：
+ * - misra_c_2012：MISRA-C:2012 规则
+ * - jsf_av_cpp：MISRA-C++ / JSF AV C++ 规则
+ * - python_safety：Python 军工规范规则
+ */
+export function mockSearchRules(
+	query: string,
+	standardId?: string,
+): Promise<MisraRule[]> {
+	console.log(
+		"[mockApi] 调用 mockSearchRules，查询：",
+		query,
+		"规则集：",
+		standardId,
+	);
+	return new Promise((resolve) => {
 		setTimeout(() => {
-			const rule = MOCK_MISRA_RULES.find((r) => r.rule_id === ruleId);
-			if (rule) {
-				resolve(rule);
-			} else {
-				reject(new Error(`未找到规则：${ruleId}`));
+			// 根据规则集 ID 选择对应 mock 数据
+			let pool: MisraRule[];
+			switch (standardId) {
+				case "jsf_av_cpp":
+					pool = MOCK_MISRA_CPP_RULES;
+					break;
+				case "python_safety":
+					pool = MOCK_PYTHON_SAFETY_RULES;
+					break;
+				default:
+					pool = MOCK_MISRA_RULES;
+					break;
 			}
+			const q = query.trim().toLowerCase();
+			if (!q) {
+				resolve([...pool]);
+				return;
+			}
+			const filtered = pool.filter(
+				(r) =>
+					r.rule_id.toLowerCase().includes(q) ||
+					r.title.toLowerCase().includes(q) ||
+					r.description.toLowerCase().includes(q) ||
+					(r.section?.toLowerCase().includes(q) ?? false),
+			);
+			resolve(filtered);
+		}, 300);
+	});
+}
+
+/** mock 获取所有可用规则集列表 */
+export function mockGetRuleStandards(): Promise<RuleStandard[]> {
+	console.log("[mockApi] 调用 mockGetRuleStandards");
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve([...MOCK_RULE_STANDARDS]);
 		}, 200);
-	});
-}
-
-/** mock 修复接口 */
-export function mockRepair(code: string): Promise<RepairResult> {
-	console.log("[mockApi] 调用 mockRepair，代码长度：", code.length);
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve({
-				final_code: code,
-				repair_history: MOCK_REPAIR_HISTORY,
-				final_violations: [],
-				contract_check_result: MOCK_CONTRACT_CHECK_RESULT,
-			});
-		}, 1000);
-	});
-}
-
-/** mock 契约校验（与代码 + 契约 YAML） */
-export function mockCheckContract(
-	code: string,
-	_contract: string,
-): Promise<ContractCheckResult> {
-	console.log("[mockApi] 调用 mockCheckContract，代码长度：", code.length);
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(MOCK_CONTRACT_CHECK_RESULT);
-		}, 600);
 	});
 }
 
@@ -740,7 +944,20 @@ export function mockGetFaultTypes(): Promise<FaultType[]> {
 	console.log("[mockApi] 调用 mockGetFaultTypes");
 	return new Promise((resolve) => {
 		setTimeout(() => {
-			resolve(["bias", "signal_loss", "noise", "stuck", "step"]);
+			resolve([
+				"bias",
+				"signal_loss",
+				"noise",
+				"stuck",
+				"step",
+				"saturation",
+				"intermittent",
+				"drift",
+				"timeout",
+				"glitch",
+				"stuck_zero",
+				"polarity",
+			]);
 		}, 200);
 	});
 }
@@ -843,3 +1060,117 @@ export function mockVerifyContract(
 		setTimeout(() => resolve(result), 900);
 	});
 }
+
+// ====================================================================
+// ApiClient 协议实现（mockApiClient）
+// ====================================================================
+
+/** HITL 状态 mock（默认 false） */
+let mockHITLEnabled = false;
+
+async function mockToggleHITL(enabled: boolean): Promise<boolean> {
+	mockHITLEnabled = enabled;
+	return enabled;
+}
+
+async function mockGetHITLStatus(): Promise<boolean> {
+	return mockHITLEnabled;
+}
+
+/** LLMConfig mock（仅用于 SettingsDialog 兼容） */
+function mockGetLLMConfig(): Promise<LLMConfig> {
+	return Promise.resolve({
+		mode: "mock",
+		provider: null,
+		apiKey: "",
+		baseUrl: "",
+		model: null,
+		remember: true,
+	});
+}
+
+async function mockSaveLLMConfig(
+	config: LLMConfig,
+): Promise<{ ok: boolean; message: string }> {
+	console.log("[mockApi] mockSaveLLMConfig", config);
+	return { ok: true, message: "mock saved" };
+}
+
+async function mockTestLLMConnection(): Promise<LLMTestResult> {
+	return {
+		ok: true,
+		latency_ms: 10,
+		message: "mock",
+		model: "mock-model",
+		models: ["mock-model-1", "mock-model-2"],
+	};
+}
+
+async function mockGetTaskDetail(taskId: string): Promise<DashboardTaskRecord> {
+	return {
+		id: taskId,
+		requirement: "mock requirement",
+		language: "c",
+		status: "done",
+		degraded: false,
+		code_hash: "",
+		violation_count: 0,
+		mandatory_count: 0,
+		required_count: 0,
+		advisory_count: 0,
+		stage_reached: "done",
+		duration_ms: 0,
+		created_at: null,
+	};
+}
+
+/**
+ * mockApi 的 ApiClient 实例。
+ *
+ * 大部分方法直接转发到本文件中的 mockXxx 函数；
+ * - mockApprove / mockReject 返回带数据的 Promise，ApiClient 要求 Promise<void>，此处丢弃返回值；
+ * - mockCompose / mockCheckCompatibility 的 connection 参数类型严格为 ComposeConnection，
+ *   ApiClient 声明为 string，此处做类型断言保持兼容；
+ * - LLMConfig / HITL 状态 / 任务详情 由本地 mock 状态提供。
+ *   注意：HITL（Human-in-the-Loop 人工审查）与 HIL（Hardware-in-the-Loop 硬件在环，digital_twin/）无关。
+ */
+export const mockApiClient: ApiClient = {
+	generate: (requirement, scadeFile, language = "c") =>
+		mockGenerate(requirement, scadeFile, language),
+	simulate: mockSimulateByCode,
+	generateReport: mockGenerateReportByPipeline,
+	downloadReport: mockDownloadReport,
+	compose: (compA: ComposeInput, compB: ComposeInput, connection: string) =>
+		mockCompose(
+			typeof compA === "string" ? compA : (compA?.name ?? "ComponentA"),
+			typeof compB === "string" ? compB : (compB?.name ?? "ComponentB"),
+			connection as ComposeConnection,
+		),
+	checkCompatibility: (
+		contractA: string,
+		contractB: string,
+		connection: string,
+	) =>
+		mockCheckCompatibility(
+			contractA,
+			contractB,
+			connection as ComposeConnection,
+		),
+	getHITLStatus: mockGetHITLStatus,
+	toggleHITL: mockToggleHITL,
+	getHITLPendingApprovals: mockGetPendingApprovals,
+	getHITLHistory: mockGetHITLHistory,
+	hitlApprove: async (requestId, comments) => {
+		await mockApprove(requestId, comments);
+	},
+	hitlReject: async (requestId, comments) => {
+		await mockReject(requestId, comments);
+	},
+	verifyContract: mockVerifyContract,
+	searchRules: mockSearchRules,
+	getRuleStandards: mockGetRuleStandards,
+	getLLMConfig: mockGetLLMConfig,
+	saveLLMConfig: mockSaveLLMConfig,
+	testLLMConnection: mockTestLLMConnection,
+	getTaskDetail: mockGetTaskDetail,
+};

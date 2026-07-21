@@ -10,10 +10,10 @@ try:
 except ImportError:
     def safe_parse_llm_json(x):
         return {} 
-try:
-    from skyforge_llm.client import get_lmstudio_client
-except ImportError:
-    get_lmstudio_client = None
+# LLM 客户端 — 通过 L0 provider 注入（L3 启动时注册自己的单例，
+# 引擎独立运行时回退到 L1 skyforge_llm.client）。详见 llm_provider.py。
+from skyforge_engine.config import settings as settings  # noqa: F401
+from skyforge_engine.llm_provider import get_llm_client as get_lmstudio_client
 from skyforge_engine.utils.log_util import logger
 
 # System Prompt（参考设计文档 1.6 节，四段式骨架：角色/工具/输出/禁忌）
@@ -63,9 +63,15 @@ class ContractGeneratorAgent:
     输入：RequirementParserAgent 产出的结构化需求 JSON。
     输出：.contract YAML 文件内容（字符串），格式参考设计文档第 6.3 节。
 
-    LM Studio 可用（USE_LLM=true）时调用真实 LLM 做契约补全；
-    否则降级为按类型套用机载契约模板的 Mock 实现。
+    mock 模式直接套用机载契约模板；
+    api/local 模式调用真实 LLM，异常直接抛出。
     """
+
+    def __init__(self, strategy=None) -> None:
+        if strategy is None:
+            from skyforge_engine.core.strategies import get_strategy_for_mode
+            strategy = get_strategy_for_mode()
+        self.strategy = strategy
 
     async def run(self, requirement_json: dict[str, Any]) -> str:
         """根据结构化需求生成 .contract YAML 字符串。
@@ -80,50 +86,51 @@ class ContractGeneratorAgent:
             f"ContractGeneratorAgent:开始:为 {requirement_json.get('req_id')} 生成契约"
         )
 
-        # 检查 LM Studio 是否可用
-        client = get_lmstudio_client()
-        if client.is_available():
-            logger.info("ContractGeneratorAgent:使用真实 LLM")
-            try:
-                prompt = (
-                    f"请依据以下结构化需求生成 .contract YAML：\n"
-                    f"{json.dumps(requirement_json, ensure_ascii=False, indent=2)}"
-                )
-                response = await client.chat_async(
-                    prompt=prompt,
-                    system_prompt=_SYSTEM_PROMPT,
-                    temperature=0.4,
-                )
-                if response:
-                    result = self._parse_llm_response(response)
-                    if result:
-                        logger.info(
-                            f"ContractGeneratorAgent:完成:契约已生成 [LLM] "
-                            f"(component={requirement_json.get('module_name')})"
-                        )
-                        return result
-                logger.warning("ContractGeneratorAgent:LLM 调用失败，降级为 Mock")
-            except Exception as e:
-                logger.error(f"ContractGeneratorAgent:LLM 异常，降级为 Mock: {e}")
-
-        # 降级为 Mock
-        yaml_str = self._mock_run(requirement_json)
-        logger.info(
-            f"ContractGeneratorAgent:完成:契约已生成 [Mock] "
-            f"(component={requirement_json.get('module_name')})"
+        result = await self.strategy.run(
+            requirement_json, input_type="contract"
         )
-        return yaml_str
+        if not result.success:
+            if len(result.warnings) == 1:
+                raise RuntimeError(result.warnings[0])
+            raise RuntimeError(
+                f"ContractGeneratorAgent 执行失败: {result.warnings}"
+            )
+        logger.info(
+            f"ContractGeneratorAgent:完成:契约已生成 (component={requirement_json.get('module_name')})"
+        )
+        return result.output
+
+    async def _llm_run(self, requirement_json: dict[str, Any]) -> str:
+        """LLM 实现：调用 LLM 生成契约。"""
+        client = get_lmstudio_client()
+        prompt = (
+            f"请依据以下结构化需求生成 .contract YAML：\n"
+            f"{json.dumps(requirement_json, ensure_ascii=False, indent=2)}"
+        )
+        response = await client.chat_async(
+            prompt=prompt,
+            system_prompt=_SYSTEM_PROMPT,
+            temperature=0.4,
+        )
+        if not response:
+            raise RuntimeError("ContractGeneratorAgent:LLM 调用返回空响应")
+        result = self._parse_llm_response(response)
+        if result is None:
+            raise RuntimeError("ContractGeneratorAgent:LLM 输出解析失败")
+        return result
 
     def _mock_run(self, requirement_json: dict[str, Any]) -> str:
         """Mock 实现：按需求类型套用机载契约模板。"""
-        req_type = requirement_json.get("type", "filter")
+        req_type = requirement_json.get("type", "generic")
         generator = {
             "filter": self._gen_filter_contract,
             "control": self._gen_control_contract,
             "comms": self._gen_comms_contract,
             "navigation": self._gen_navigation_contract,
             "power": self._gen_power_contract,
-        }.get(req_type, self._gen_filter_contract)
+            "generic": self._gen_generic_contract,
+            "redundancy": self._gen_redundancy_contract,
+        }.get(req_type, self._gen_generic_contract)
         return generator(requirement_json)
 
     def _parse_llm_response(self, response: str) -> str | None:
@@ -156,7 +163,10 @@ class ContractGeneratorAgent:
         missing = [k for k in required_keys if k not in stripped]
         if missing:
             # 尝试从 JSON 解析中提取（LLM 可能返回 JSON 而非 YAML）
-            parsed = safe_parse_llm_json(text)
+            try:
+                parsed = safe_parse_llm_json(text)
+            except ValueError:
+                parsed = None
             if parsed and "component" in parsed:
                 # 简单的 dict → YAML 文本拼接（保证可解析）
                 return self._dict_to_yaml(parsed)
@@ -423,4 +433,143 @@ composability:
   timing:
     wcet: 1ms
     period: 1000ms
+"""
+
+    def _gen_generic_contract(self, req: dict[str, Any]) -> str:
+        """通用契约模板：component 名基于需求文本提取。
+
+        生成包含前置/后置/不变式/故障处理的完整契约，component 名从
+        需求文本启发式提取（PascalCase），回显需求原文供追溯。
+        """
+        req_id = req.get("req_id", "REQ-001")
+        safety = req.get("safety_level", "DAL-B")
+        req_text = str(req.get("desc", req.get("description", "")))
+        module = req.get("module_name", "generic_module")
+        component_name = self._derive_component_name(req_text, default=module)
+
+        return f"""component: {component_name}
+version: 1.0.0
+safety_level: {safety}
+traceability: [{req_id}]
+description: {req_text[:100]}
+
+interface:
+  inputs:
+    - name: input_value
+      type: int32_t
+      range: [-2147483648, 2147483647]
+      description: 输入值
+  outputs:
+    - name: output_value
+      type: int32_t
+      range: [-2147483648, 2147483647]
+      description: 处理后的输出值
+
+contracts:
+  preconditions:
+    - "input_value >= INT32_MIN"
+    - "input_value <= INT32_MAX"
+    - "module_initialized == true"
+  postconditions:
+    - "output_value == process(input_value)"
+    - "output_value within valid range"
+  invariants:
+    - "module state consistent across calls"
+    - "no dynamic memory allocated"
+  fault_handling:
+    - "if input_value == 0 then return 0"
+    - "if module not initialized then auto-init and continue"
+
+composability:
+  depends_on: []
+  provides: [output_value]
+  consumes: [input_value]
+  timing:
+    wcet: 1ms
+    period: 10ms
+# 需求原文: {req_text}
+"""
+
+    def _derive_component_name(self, req_text: str, default: str = "GenericModule") -> str:
+        """从需求文本提取组件名（PascalCase，简单启发式）。
+
+        取需求文本前 15 字符，去除标点后转 PascalCase；
+        若结果为空则回退到 default（通常为 module_name）。
+        """
+        import re
+
+        clean = re.sub(r"[^\w\s]", "", req_text[:15]).strip()
+        if not clean:
+            return default
+        # 转 PascalCase：单词首字母大写后拼接
+        pascal = clean.replace("_", " ").title().replace(" ", "")
+        return pascal[:20]
+
+    def _gen_redundancy_contract(self, req: dict[str, Any]) -> str:
+        """余度管理契约模板：双通道均值+偏差报警。
+
+        定义 channel_a/channel_b 双通道输入与 average_value/alarm_active 输出，
+        前置条件约束输入范围，后置条件约束均值与报警状态，符合机载余度管理设计。
+        """
+        req_id = req.get("req_id", "REQ-001")
+        safety = req.get("safety_level", "DAL-A")
+        req_text = str(req.get("desc", req.get("description", "")))
+        module = req.get("module_name", "redundancy_manager")
+
+        return f"""component: {module}
+version: 1.0.0
+safety_level: {safety}
+traceability: [{req_id}]
+description: 余度管理器，双通道输入取均值，偏差 > 5% 时报警
+
+interface:
+  inputs:
+    - name: channel_a
+      type: float
+      range: [-1000000.0, 1000000.0]
+      description: 通道 A 输入值
+    - name: channel_b
+      type: float
+      range: [-1000000.0, 1000000.0]
+      description: 通道 B 输入值
+  outputs:
+    - name: average_value
+      type: float
+      range: [-1000000.0, 1000000.0]
+      description: 双通道均值
+    - name: alarm_active
+      type: bool
+      range: [false, true]
+      description: 报警状态（true=偏差超 5% 阈值）
+    - name: alarm_count
+      type: uint32_t
+      range: [0, 4294967295]
+      description: 累计报警计数
+
+contracts:
+  preconditions:
+    - "channel_a >= -1e6 && channel_a <= 1e6"
+    - "channel_b >= -1e6 && channel_b <= 1e6"
+    - "module_initialized == true"
+  postconditions:
+    - "average_value == (channel_a + channel_b) / 2"
+    - "alarm_active == (abs(channel_a - channel_b) / max(abs(average_value), 1e-6) * 100 > 5)"
+    - "alarm_count >= previous_alarm_count"
+  invariants:
+    - "alarm_count >= 0"
+    - "DEVIATION_THRESHOLD_PERCENT == 5.0"
+    - "dual_channel_mode == true"
+  fault_handling:
+    - "if average_value == 0 then return channel_a to avoid divide-by-zero"
+    - "if both channels out of range then trigger fail-safe shutdown"
+    - "if alarm_count > 10 then log persistent fault"
+
+composability:
+  depends_on: []
+  provides: [average_value, alarm_active, alarm_count]
+  consumes: [channel_a, channel_b]
+  timing:
+    wcet: 2ms
+    period: 10ms
+# 需求原文: {req_text}
 """

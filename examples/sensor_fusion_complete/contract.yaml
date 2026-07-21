@@ -1,0 +1,99 @@
+component: sensor_fusion_ekf
+version: 1.0.0
+safety_level: DAL-A
+traceability: [REQ-001]
+
+interface:
+  inputs:
+    - name: ax
+      type: float
+      range: [-16.0, 16.0]
+      unit: "g"
+      description: "X轴加速度"
+    - name: ay
+      type: float
+      range: [-16.0, 16.0]
+      unit: "g"
+      description: "Y轴加速度"
+    - name: az
+      type: float
+      range: [-16.0, 16.0]
+      unit: "g"
+      description: "Z轴加速度"
+    - name: gx
+      type: float
+      range: [-2000.0, 2000.0]
+      unit: "deg/s"
+      description: "X轴角速度"
+    - name: gy
+      type: float
+      range: [-2000.0, 2000.0]
+      unit: "deg/s"
+      description: "Y轴角速度"
+    - name: gz
+      type: float
+      range: [-2000.0, 2000.0]
+      unit: "deg/s"
+      description: "Z轴角速度"
+    - name: mx
+      type: float
+      range: [-1300.0, 1300.0]
+      unit: "uT"
+      description: "X轴磁场"
+    - name: my
+      type: float
+      range: [-1300.0, 1300.0]
+      unit: "uT"
+      description: "Y轴磁场"
+    - name: mz
+      type: float
+      range: [-1300.0, 1300.0]
+      unit: "uT"
+      description: "Z轴磁场"
+  outputs:
+    - name: q0
+      type: float
+      range: [-1.0, 1.0]
+      description: "四元数w分量"
+    - name: q1
+      type: float
+      range: [-1.0, 1.0]
+      description: "四元数x分量"
+    - name: q2
+      type: float
+      range: [-1.0, 1.0]
+      description: "四元数y分量"
+    - name: q3
+      type: float
+      range: [-1.0, 1.0]
+      description: "四元数z分量"
+
+contracts:
+  preconditions:
+    - "sample_rate == 100Hz"
+    - "传感器已校准"
+  
+  postconditions:
+    - "q0^2 + q1^2 + q2^2 + q3^2 == 1.0"
+    - "confidence >= 0.0"
+    - "confidence <= 1.0"
+  
+  invariants:
+    - "四元数单位化约束"
+    - "状态向量维度 == 9"
+    - "协方差矩阵对称正定"
+  
+  fault_handling:
+    - "if sensor_invalid: use prediction"
+    - "if isnan(value): use last_valid"
+    - "if sensor_failed: degrade to integration"
+
+performance:
+  - "fusion_time < 1ms"
+  - "cpu_usage < 5%"
+  - "memory_usage < 10KB"
+
+verification:
+  - "MISRA-C:2012 compliant"
+  - "DO-178C DAL-A level"
+  - "EKF convergence verified"

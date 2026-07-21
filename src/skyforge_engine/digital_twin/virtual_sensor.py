@@ -1,4 +1,4 @@
-"""虚拟传感器（信号模拟器）：生成正常传感器数据 + 注入 5 类故障。
+"""虚拟传感器（信号模拟器）：生成正常传感器数据 + 注入 12 类故障。
 
 参考设计文档第 6.5 节"虚拟传感器与 C 代码的数据流对接"。
 
@@ -9,12 +9,21 @@
 - constant：常量
 - noise：高斯噪声
 
-支持 5 类故障注入：
+支持 12 类故障注入（与 FaultInjector.FAULT_TYPES_INFO 对齐）：
+基础 5 类：
 - bias：传感器偏置（data + bias_value）
 - signal_loss：信号丢失（指定区间设为 0）
 - noise：高频噪声（data + random_noise * amplitude）
 - stuck：信号卡死（指定区间设为固定值）
 - step：阶跃突变（指定时间点突变）
+扩展 7 类：
+- saturation：饱和截断（超出阈值截断）
+- intermittent：间歇性故障（周期性丢值）
+- drift：渐变漂移（线性漂移）
+- timeout：丢帧/延迟（数据置零）
+- glitch：跳变毛刺（瞬时跳变）
+- stuck_zero：零输出（指定区间强制归零）
+- polarity：符号反转（乘 -1）
 """
 
 from typing import Any
@@ -36,12 +45,27 @@ DEFAULT_CONFIG: dict[str, Any] = {
 # 支持的波形类型
 WAVE_TYPES = ("sine", "ramp", "step", "constant", "noise")
 
-# 支持的故障类型
-FAULT_TYPES = ("bias", "signal_loss", "noise", "stuck", "step")
+# 支持的故障类型（12 类，与 FaultInjector.FAULT_TYPES_INFO 对齐）
+FAULT_TYPES = (
+    # 基础 5 类
+    "bias",
+    "signal_loss",
+    "noise",
+    "stuck",
+    "step",
+    # 扩展 7 类
+    "saturation",
+    "intermittent",
+    "drift",
+    "timeout",
+    "glitch",
+    "stuck_zero",
+    "polarity",
+)
 
 
 class VirtualSensor:
-    """虚拟传感器：生成正常传感器数据 + 注入 5 类故障。
+    """虚拟传感器：生成正常传感器数据 + 注入 12 类故障。
 
     所有方法均无副作用（不修改输入数组），返回新数组。
     """
@@ -120,13 +144,20 @@ class VirtualSensor:
 
         Args:
             data: 原始正常数据数组。
-            fault_type: 故障类型（bias/signal_loss/noise/stuck/step）。
+            fault_type: 故障类型（12 类之一，见 FAULT_TYPES）。
             params: 故障参数字典：
                 - bias: {"bias_value": float}
                 - signal_loss: {"start": int, "end": int}
                 - noise: {"amplitude": float}
                 - stuck: {"start": int, "end": int, "stuck_value": float}
                 - step: {"step_at": int, "step_value": float}
+                - saturation: {"min_val": float, "max_val": float}
+                - intermittent: {"probability": float (0-1)}
+                - drift: {"drift_rate": float (per step)}
+                - timeout: {"start": int, "end": int}
+                - glitch: {"glitch_at": int, "glitch_value": float}
+                - stuck_zero: {"start": int, "end": int}
+                - polarity: {}（无参数）
 
         Returns:
             注入故障后的新数组（float64）。
@@ -174,6 +205,58 @@ class VirtualSensor:
             step_at = max(0, min(step_at, len(out)))
             out[step_at:] = out[step_at:] + step_value
             logger.info(f"VirtualSensor:inject step at={step_at} value={step_value}")
+
+        # ===== 扩展 7 类故障 =====
+        elif fault_type == "saturation":
+            min_val = float(params.get("min_val", -1000.0))
+            max_val = float(params.get("max_val", 1000.0))
+            out = np.clip(out, min_val, max_val)
+            logger.info(
+                f"VirtualSensor:inject saturation=[{min_val},{max_val}]"
+            )
+
+        elif fault_type == "intermittent":
+            probability = float(params.get("probability", 0.1))
+            probability = max(0.0, min(probability, 1.0))
+            rng = np.random.default_rng(seed=456)
+            mask = rng.random(size=len(out)) < probability
+            out[mask] = 0.0
+            logger.info(
+                f"VirtualSensor:inject intermittent prob={probability} lost={int(mask.sum())}"
+            )
+
+        elif fault_type == "drift":
+            drift_rate = float(params.get("drift_rate", 0.5))
+            ramp = np.arange(len(out), dtype=np.float64) * drift_rate
+            out = out + ramp
+            logger.info(f"VirtualSensor:inject drift rate={drift_rate}")
+
+        elif fault_type == "timeout":
+            start = int(params.get("start", 0))
+            end = int(params.get("end", len(out)))
+            start, end = self._clamp_range(start, end, len(out))
+            out[start:end] = 0.0
+            logger.info(f"VirtualSensor:inject timeout=[{start},{end})")
+
+        elif fault_type == "glitch":
+            glitch_at = int(params.get("glitch_at", len(out) // 2))
+            glitch_value = float(params.get("glitch_value", 5000.0))
+            glitch_at = max(0, min(glitch_at, len(out) - 1))
+            out[glitch_at] = out[glitch_at] + glitch_value
+            logger.info(
+                f"VirtualSensor:inject glitch at={glitch_at} value={glitch_value}"
+            )
+
+        elif fault_type == "stuck_zero":
+            start = int(params.get("start", 0))
+            end = int(params.get("end", len(out)))
+            start, end = self._clamp_range(start, end, len(out))
+            out[start:end] = 0.0
+            logger.info(f"VirtualSensor:inject stuck_zero=[{start},{end})")
+
+        elif fault_type == "polarity":
+            out = -out
+            logger.info("VirtualSensor:inject polarity (sign-reversed)")
 
         return out
 

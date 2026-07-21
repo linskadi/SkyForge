@@ -1,53 +1,18 @@
-"""RAG 增强 Agent prompt 构建器：根据任务检索相关 MISRA 规则注入到 Agent prompt。
-
-参考文档：
-- 1.6.4 节 MISRA-C 上下文注入策略（静态红线规则 + 动态检索规则 + 去重）
-- 第 3 章 RAG 系统设计
+"""RAG 增强 Agent prompt 构建器：根据任务检索相关编码规则注入到 Agent prompt。
 
 策略：
-- 静态红线规则：每次必注入的高优先级规则（如 Rule 21.3 禁动态内存、Rule 8.1 类型声明）。
+- 静态红线规则：每次必注入的高优先级规则（从编码标准注册表动态获取）。
 - 动态检索规则：根据 Agent 任务类型检索的 top-K 规则。
 - 去重：rule_id 集合去重，避免重复注入。
 """
 
 from typing import Optional
 
+from skyforge_engine.coding_standards.base import get_registry
 from skyforge_engine.config import settings
 from skyforge_engine.rag.misra_searcher import MisraRuleSearcher
 from skyforge_engine.rag.rule_parser import MisraRule
 from skyforge_engine.utils.log_util import logger
-
-
-# 静态红线规则 ID 列表（每次必注入）
-# 参考 1.6.4 节：航空软件不可妥协的核心规则
-_RED_LINE_RULE_IDS: list[str] = [
-    "Rule 21.3",  # 不得使用 malloc/free（动态内存）
-    "Rule 21.6",  # 不得使用标准库输入/输出函数
-    "Rule 8.1",  # 类型应明确指定
-    "Rule 8.7",  # 内部链接对象应使用 static
-    "Rule 17.7",  # 函数返回值必须被使用
-    "Rule 1.3",  # 避免未定义行为
-    "Rule 20.4",  # 不得使用动态内存分配宏
-    "Rule 8.4",  # 外部链接对象需可见声明
-    "Rule 9.1",  # 自动变量使用前必须初始化
-    "Dir 4.1",  # 运行时故障必须最小化
-]
-
-# Agent 名称 → 默认检索查询关键词
-_AGENT_DEFAULT_QUERIES: dict[str, list[str]] = {
-    "requirement_parser": ["需求", "可追溯性", "需求分析"],
-    "contract_generator": ["契约", "前置条件", "后置条件", "断言"],
-    "code_generator": ["函数声明", "类型声明", "命名规范", "static"],
-    "code_repairer": ["隐式转换", "动态内存", "未初始化", "返回值"],
-}
-
-# Agent 名称 → 中文友好名
-_AGENT_DISPLAY_NAMES: dict[str, str] = {
-    "requirement_parser": "需求解析 Agent",
-    "contract_generator": "契约生成 Agent",
-    "code_generator": "代码生成 Agent",
-    "code_repairer": "代码修复 Agent",
-}
 
 
 def _format_rule_for_context(rule: MisraRule) -> str:
@@ -127,9 +92,9 @@ class RagEnhancer:
             logger.warning("RagEnhancer:无可用规则，跳过增强")
             return ""
 
-        agent_display = _AGENT_DISPLAY_NAMES.get(agent_name, agent_name)
+        agent_display = get_registry().get_agent_display_name("c", agent_name)
         # 1) 获取该 Agent 默认查询关键词
-        default_queries = _AGENT_DEFAULT_QUERIES.get(agent_name, [])
+        default_queries = get_registry().get_agent_queries("c", agent_name)
         # 2) 将任务本身作为查询
         task_query = task.strip() if task else ""
 
@@ -159,7 +124,7 @@ class RagEnhancer:
 
         # 4) 静态红线规则
         red_line_rules: list[MisraRule] = []
-        for rule_id in _RED_LINE_RULE_IDS:
+        for rule_id in get_registry().get_red_line_rules("c"):
             rule = self._searcher.get_rule(rule_id)
             if rule and rule.rule_id not in seen_ids:
                 seen_ids.add(rule.rule_id)
@@ -202,7 +167,7 @@ class RagEnhancer:
         # 1) 静态红线规则（去重）
         seen_ids: set[str] = set()
         red_line_rules: list[MisraRule] = []
-        for rule_id in _RED_LINE_RULE_IDS:
+        for rule_id in get_registry().get_red_line_rules("c"):
             rule = self._searcher.get_rule(rule_id)
             if rule and rule.rule_id not in seen_ids:
                 seen_ids.add(rule.rule_id)

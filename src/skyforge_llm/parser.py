@@ -8,28 +8,32 @@
   1. 直接 json.loads
   2. 剥离 Markdown 代码块包裹（```json ... ```）
   3. 正则提取首个完整花括号块后再 json.loads
-
-解析失败时返回 None（便于上层优雅降级为 mock，不抛异常）。
 """
 
 import json
 import re
-from typing import Optional
 
 from skyforge_engine.utils.log_util import logger
 
 
-def safe_parse_llm_json(text: str) -> Optional[dict]:
+class JSONParseError(ValueError):
+    """LLM 输出 JSON 解析失败异常。"""
+
+
+def safe_parse_llm_json(text: str) -> dict:
     """三级降级解析 LLM 输出的 JSON。
 
     Args:
         text: LLM 输出的原始文本。
 
     Returns:
-        解析成功返回 dict，失败返回 None。
+        解析成功返回 dict。
+
+    Raises:
+        JSONParseError: 三级解析均失败时抛出。
     """
     if not text or not text.strip():
-        return None
+        raise JSONParseError("输入文本为空或仅含空白字符")
 
     text = text.strip()
 
@@ -68,4 +72,4 @@ def safe_parse_llm_json(text: str) -> Optional[dict]:
     logger.warning(
         f"safe_parse_llm_json: 三级解析均失败，文本前 200 字符: {text[:200]}"
     )
-    return None
+    raise JSONParseError(f"三级 JSON 解析均失败，文本前 200 字符: {text[:200]}")

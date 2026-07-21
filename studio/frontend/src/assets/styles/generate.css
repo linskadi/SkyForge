@@ -4,12 +4,12 @@
 
 /* ===================== 页面整体布局 ===================== */
 .generate-page {
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 24px 32px 48px;
+  padding: 32px 40px 80px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   min-height: 100vh;
   color: hsl(var(--foreground));
   background: hsl(var(--background));
@@ -159,17 +159,17 @@
 }
 
 /* ===================== 通用卡片样式 ===================== */
-.generate-page :deep(.card) {
+.generate-page .card {
   border: 1px solid hsl(var(--border));
   border-radius: 12px;
 }
 
-.generate-page :deep(.card-header) {
+.generate-page .card-header {
   border-bottom-color: hsl(var(--border));
   padding: 16px 20px 12px;
 }
 
-.generate-page :deep(.card-content) {
+.generate-page .card-content {
   padding: 16px 20px 20px;
 }
 
@@ -194,8 +194,8 @@
   border-left-color: #c2410c;
 }
 
-.scade-collapse-card :deep(.card-title),
-.hil-collapse-card :deep(.card-title) {
+.scade-collapse-card .card-title,
+.hil-collapse-card .card-title {
   font-size: 16px;
   font-weight: 600;
   display: flex;
@@ -235,9 +235,9 @@
 }
 
 /* ===================== 输入卡片 ===================== */
-.input-card :deep(.card-title),
-.result-card :deep(.card-title),
-.terminal-card :deep(.card-title) {
+.input-card .card-title,
+.result-card .card-title,
+.terminal-card .card-title {
   font-size: 16px;
   font-weight: 600;
   display: flex;
@@ -288,6 +288,64 @@
   margin-top: 12px;
 }
 
+.language-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lang-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lang-btn:hover:not(:disabled) {
+  border-color: hsl(220, 70%, 50%);
+  color: hsl(220, 70%, 50%);
+  background: hsla(220, 70%, 50%, 0.06);
+}
+
+.lang-btn.active {
+  border-color: hsl(220, 70%, 50%);
+  background: hsl(220, 70%, 50%);
+  color: white;
+  font-weight: 600;
+}
+
+.dark .lang-btn.active,
+.generate-page.dark .lang-btn.active {
+  background: hsl(210, 80%, 55%);
+  border-color: hsl(210, 80%, 55%);
+}
+
+/* HITL 人工审查（Human-in-the-Loop）开关按钮：默认 outline 样式，开启时高亮琥珀色 */
+.hitl-toggle-btn.active {
+  border-color: hsl(35, 90%, 50%);
+  background: hsl(35, 90%, 50%);
+  color: white;
+  font-weight: 600;
+}
+
+.dark .hitl-toggle-btn.active,
+.generate-page.dark .hitl-toggle-btn.active {
+  background: hsl(35, 85%, 55%);
+  border-color: hsl(35, 85%, 55%);
+}
+
+.lang-hint {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  margin-left: 4px;
+}
+
 .examples-label {
   font-size: 13px;
   color: hsl(var(--muted-foreground));
@@ -330,29 +388,29 @@
 }
 
 /* 深色模式按钮覆盖 */
-.dark .generate-page :deep(.btn-primary),
-.generate-page.dark :deep(.btn-primary) {
+.dark .generate-page .btn-primary,
+.generate-page.dark .btn-primary {
   background: linear-gradient(135deg, hsl(220, 70%, 45%), hsl(215, 80%, 55%));
   border: none;
   color: #fff;
   font-weight: 600;
 }
 
-.dark .generate-page :deep(.btn-primary:hover),
-.generate-page.dark :deep(.btn-primary:hover) {
+.dark .generate-page .btn-primary:hover,
+.generate-page.dark .btn-primary:hover {
   opacity: 0.9;
   box-shadow: 0 0 16px hsla(210, 80%, 55%, 0.3);
 }
 
-.dark .generate-page :deep(.btn-outline),
-.generate-page.dark :deep(.btn-outline) {
+.dark .generate-page .btn-outline,
+.generate-page.dark .btn-outline {
   background: transparent;
   border: 1px solid hsla(210, 80%, 55%, 0.2);
   color: hsl(220, 10%, 60%);
 }
 
-.dark .generate-page :deep(.btn-outline:hover),
-.generate-page.dark :deep(.btn-outline:hover) {
+.dark .generate-page .btn-outline:hover,
+.generate-page.dark .btn-outline:hover {
   background: hsla(210, 80%, 55%, 0.08);
   color: hsl(210, 20%, 98%);
   border-color: hsla(210, 80%, 55%, 0.3);
@@ -574,7 +632,7 @@
   flex-direction: column;
 }
 
-.focus-card :deep(.card-content) {
+.focus-card .card-content {
   flex: 1;
   min-height: 0;
   overflow: hidden;

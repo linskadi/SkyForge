@@ -215,9 +215,9 @@ install_cbmc_from_source() {
         tar -xzf cbmc.tar.gz
         cd "cbmc-cbmc-${cbmc_version}"
         mkdir -p build && cd build
-        cmake -DCMAKE_INSTALL_PREFIX="$HOME/.local" .. 2>&1 | tee -a "$LOG_FILE"
-        make -j"$(nproc 2>/dev/null || echo 4)" 2>&1 | tee -a "$LOG_FILE"
-        sudo make install 2>&1 | tee -a "$LOG_FILE"
+        cmake -DCMAKE_INSTALL_PREFIX="$HOME/.local" -G "Unix Makefiles" .. 2>&1 | tee -a "$LOG_FILE"
+        cmake --build . -j"$(nproc 2>/dev/null || echo 4)" 2>&1 | tee -a "$LOG_FILE"
+        cmake --install . 2>&1 | tee -a "$LOG_FILE"
     else
         error "Failed to download CBMC"
         return 1
@@ -229,6 +229,12 @@ check_z3() {
         local version
         version=$(z3 --version 2>/dev/null | head -n1)
         success "Z3 is already installed: $version"
+        return 0
+    fi
+    if python3 -c "import z3; print(z3.get_version_string())" 2>/dev/null; then
+        local version
+        version=$(python3 -c "import z3; print(z3.get_version_string())" 2>/dev/null)
+        success "Z3 Python module is available: $version"
         return 0
     fi
     return 1
@@ -267,10 +273,42 @@ install_z3() {
                 install_z3_from_source "$os" "$arch"
             fi
             ;;
+        windows)
+            install_z3_win "$arch"
+            ;;
         *)
             install_z3_from_source "$os" "$arch"
             ;;
     esac
+}
+
+install_z3_win() {
+    local arch="$1"
+    info "Installing Z3 via pip (z3-solver)..."
+
+    if pip install "z3-solver>=4.13.0,<5" 2>&1 | tee -a "$LOG_FILE"; then
+        mkdir -p "$HOME/.local/bin"
+        cat > "$HOME/.local/bin/z3" << 'EOF'
+#!/usr/bin/env python3
+import sys
+try:
+    import z3
+    if len(sys.argv) > 1 and sys.argv[1] == '--version':
+        print(f"Z3 {z3.get_version_string()}")
+        sys.exit(0)
+    else:
+        print("Z3 is available as a Python module (import z3)", file=sys.stderr)
+        sys.exit(1)
+except ImportError:
+    print("z3-solver is not installed", file=sys.stderr)
+    sys.exit(1)
+EOF
+        chmod +x "$HOME/.local/bin/z3"
+        success "Z3 installed via pip (z3-solver)"
+    else
+        error "Failed to install z3-solver via pip"
+        return 1
+    fi
 }
 
 install_z3_from_source() {
@@ -289,9 +327,9 @@ install_z3_from_source() {
         tar -xzf z3.tar.gz
         cd "z3-z3-${z3_version}"
         mkdir -p build && cd build
-        cmake -DCMAKE_INSTALL_PREFIX="$HOME/.local" .. 2>&1 | tee -a "$LOG_FILE"
-        make -j"$(nproc 2>/dev/null || echo 4)" 2>&1 | tee -a "$LOG_FILE"
-        sudo make install 2>&1 | tee -a "$LOG_FILE"
+        cmake -DCMAKE_INSTALL_PREFIX="$HOME/.local" -G "Unix Makefiles" .. 2>&1 | tee -a "$LOG_FILE"
+        cmake --build . -j"$(nproc 2>/dev/null || echo 4)" 2>&1 | tee -a "$LOG_FILE"
+        cmake --install . 2>&1 | tee -a "$LOG_FILE"
     else
         error "Failed to download Z3"
         return 1
@@ -446,7 +484,7 @@ install_lcov_from_source() {
     if curl -sSL "$lcov_url" -o lcov.tar.gz 2>&1 | tee -a "$LOG_FILE"; then
         tar -xzf lcov.tar.gz
         cd lcov-*
-        sudo make install PREFIX=/usr/local 2>&1 | tee -a "$LOG_FILE"
+        make install PREFIX="$HOME/.local" 2>&1 | tee -a "$LOG_FILE"
     else
         error "Failed to download lcov"
         return 1
@@ -597,11 +635,16 @@ verify_installation() {
     info ""
     info "Verifying installations..."
     info "=========================="
+    export PATH="$HOME/.local/bin:$PATH"
     local all_ok=true
 
     for tool in cbmc z3 semgrep gcc lcov; do
         if command -v "$tool" &>/dev/null; then
             success "$tool: $(command -v "$tool")"
+        elif [[ "$tool" == "z3" ]] && python3 -c "import z3" 2>/dev/null; then
+            local z3_ver
+            z3_ver=$(python3 -c "import z3; print(z3.get_version_string())" 2>/dev/null)
+            success "z3: Python module (z3-solver $z3_ver)"
         else
             error "$tool: NOT FOUND in PATH"
             all_ok=false

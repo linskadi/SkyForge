@@ -47,6 +47,10 @@ import yaml
 
 from skyforge_engine.utils.log_util import logger
 
+import warnings
+from skyforge_engine.core.verifiers.contract_verifier import ContractVerifier as _ContractVerifier
+from skyforge_engine.core.protocols import VerificationResult as CoreVerificationResult
+
 
 # ==================== 数据类 ====================
 
@@ -379,7 +383,11 @@ class CbmcContractVerifier:
         try:
             result = subprocess.run(
                 ["cbmc", "--version"],
-                capture_output=True, text=True, timeout=5
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=5,
             )
             return result.returncode == 0
         except Exception:
@@ -425,7 +433,10 @@ class CbmcContractVerifier:
             ]
             result = subprocess.run(
                 cmd,
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=120,
             )
 
@@ -523,12 +534,42 @@ class CbmcContractVerifier:
 class ContractFormalVerifier:
     """契约形式化验证统一入口。
 
+    .. deprecated::
+        使用 ``ContractVerifier`` 替代。
+
     自动执行所有可用的验证级别（L1 Z3 → L2 测试用例 → L3 CBMC）。
     """
 
     def __init__(self):
         self._z3_verifier = Z3ContractVerifier()
         self._cbmc_verifier = CbmcContractVerifier()
+        self._verifier = _ContractVerifier()
+
+    def _to_legacy_result(
+        self, result: CoreVerificationResult
+    ) -> VerificationResult:
+        """将新层 VerificationResult 转换为旧数据类。"""
+        meta = result.metadata
+        legacy = VerificationResult(
+            component=meta.get("component", ""),
+            contract_version=meta.get("version", ""),
+            is_consistent=meta.get("is_consistent", True),
+            contradictions=meta.get("contradictions", []),
+            z3_solver_time_ms=meta.get("z3_solver_time_ms", 0.0),
+            test_cases=meta.get("test_cases", []),
+            test_case_count=meta.get("test_case_count", 0),
+            cbmc_verified=meta.get("cbmc_verified", False),
+            cbmc_output=meta.get("cbmc_output", ""),
+            cbmc_time_ms=meta.get("cbmc_time_ms", 0.0),
+            z3_available=meta.get("z3_available", False),
+            cbmc_available=meta.get("cbmc_available", False),
+        )
+        warnings_list = meta.get("warnings", [])
+        if warnings_list:
+            legacy.warnings.extend(warnings_list)
+        if not result.passed and result.violations:
+            legacy.warnings.append("形式化验证发现违规")
+        return legacy
 
     def verify(
         self,
@@ -538,6 +579,9 @@ class ContractFormalVerifier:
     ) -> VerificationResult:
         """对契约执行完整的形式化验证。
 
+        .. deprecated::
+            使用 ``ContractVerifier().verify(contract=contract_yaml, code=code)`` 替代。
+
         Args:
             contract_yaml: 契约 YAML 文本
             code: 可选的 C 代码（用于 CBMC 验证）
@@ -546,6 +590,12 @@ class ContractFormalVerifier:
         Returns:
             VerificationResult 包含完整验证结果
         """
+        warnings.warn(
+            "ContractFormalVerifier is deprecated, use ContractVerifier instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         # 解析契约
         try:
             contract = yaml.safe_load(contract_yaml)
@@ -559,53 +609,29 @@ class ContractFormalVerifier:
             result.errors.append("契约格式无效（非字典）")
             return result
 
-        result = VerificationResult(
-            component=contract.get("component", "unknown"),
-            contract_version=contract.get("version", "0.0.0"),
-            z3_available=self._z3_verifier.is_available(),
-            cbmc_available=self._cbmc_verifier.is_available(),
-        )
-
-        # Level 1: Z3 一致性验证
-        if self._z3_verifier.is_available():
-            logger.info(f"执行 Z3 约束一致性验证: {result.component}")
-            is_consistent, contradictions, z3_time = self._z3_verifier.verify_consistency(contract)
-            result.is_consistent = is_consistent
-            result.contradictions = contradictions
-            result.z3_solver_time_ms = z3_time
-
-            if not is_consistent:
-                result.warnings.append(
-                    f"契约存在 {len(contradictions)} 处逻辑矛盾，"
-                    "代码生成可能出现非预期行为"
-                )
-
-            # Level 2: 边界测试用例生成
-            if is_consistent:
-                test_cases = self._z3_verifier.generate_test_cases(contract, max_test_cases)
-                result.test_cases = test_cases
-                result.test_case_count = len(test_cases)
-        else:
-            result.warnings.append("Z3 不可用，契约约束一致性未验证（建议安装: pip install z3-solver）")
-            result.is_consistent = True  # 无法验证时假设一致
-
-        # Level 3: CBMC 有界模型检查
-        if code and self._cbmc_verifier.is_available():
-            logger.info(f"执行 CBMC 有界模型检查: {result.component}")
-            verified, cbmc_out, cbmc_time = self._cbmc_verifier.verify(code, contract)
-            result.cbmc_verified = verified
-            result.cbmc_output = cbmc_out
-            result.cbmc_time_ms = cbmc_time
-
-            if not verified:
-                result.warnings.append("CBMC 有界模型检查未通过，代码可能不满足契约约束")
-        elif code and not self._cbmc_verifier.is_available():
-            result.warnings.append("CBMC 不可用，有界模型检查已跳过（建议安装: https://github.com/diffblue/cbmc）")
-
-        return result
+        try:
+            new_result = self._verifier.verify(
+                code=code or "",
+                contract=contract_yaml,
+                max_test_cases=max_test_cases,
+            )
+            return self._to_legacy_result(new_result)
+        except Exception as e:
+            logger.error(f"ContractFormalVerifier:委托执行异常: {e}")
+            result = VerificationResult(
+                component=contract.get("component", "unknown"),
+                contract_version=contract.get("version", "0.0.0"),
+                z3_available=self._z3_verifier.is_available(),
+                cbmc_available=self._cbmc_verifier.is_available(),
+            )
+            result.errors.append(str(e))
+            return result
 
     def quick_check(self, contract_yaml: str) -> bool:
         """快速检查：仅执行 Z3 一致性验证。
+
+        .. deprecated::
+            使用 ``ContractVerifier`` 替代。
 
         Args:
             contract_yaml: 契约 YAML 文本
@@ -613,6 +639,11 @@ class ContractFormalVerifier:
         Returns:
             True 如果契约约束一致
         """
+        warnings.warn(
+            "ContractFormalVerifier.quick_check is deprecated, use ContractVerifier instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         result = self.verify(contract_yaml, code=None, max_test_cases=0)
         return result.is_consistent
 
@@ -623,7 +654,16 @@ _verifier_instance: Optional[ContractFormalVerifier] = None
 
 
 def get_verifier() -> ContractFormalVerifier:
-    """获取全局单例验证器。"""
+    """获取全局单例验证器。
+
+    .. deprecated::
+        使用 ``ContractVerifier`` 替代。
+    """
+    warnings.warn(
+        "get_verifier is deprecated, use ContractVerifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     global _verifier_instance
     if _verifier_instance is None:
         _verifier_instance = ContractFormalVerifier()
@@ -631,5 +671,14 @@ def get_verifier() -> ContractFormalVerifier:
 
 
 def verify_contract(contract_yaml: str, code: Optional[str] = None) -> VerificationResult:
-    """便捷函数：验证契约并返回结果。"""
+    """便捷函数：验证契约并返回结果。
+
+    .. deprecated::
+        使用 ``ContractVerifier().verify(contract=contract_yaml, code=code)`` 替代。
+    """
+    warnings.warn(
+        "verify_contract is deprecated, use ContractVerifier instead",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return get_verifier().verify(contract_yaml, code)

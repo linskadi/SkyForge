@@ -92,6 +92,8 @@ def _get_version(cmd: list[str]) -> str:
             cmd,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
         return result.stdout.split("\n")[0].strip()[:80]
@@ -180,10 +182,23 @@ def _check_do178c_docs(project_root: str) -> list[DocCheckResult]:
         "TAS.md",
     ]
     doc_dir = os.path.join(project_root, "docs", "compliance")
+    package_path = os.path.join(project_root, "docs", "DO178C_COMPLIANCE_PACKAGE.md")
+    package_text = ""
+    if os.path.exists(package_path):
+        try:
+            with open(package_path, encoding="utf-8") as f:
+                package_text = f.read()
+        except OSError:
+            package_text = ""
     results: list[DocCheckResult] = []
     for doc in required_docs:
         path = os.path.join(doc_dir, doc)
-        results.append(DocCheckResult(doc=doc, exists=os.path.exists(path), path=path))
+        section = doc.removesuffix(".md")
+        exists = os.path.exists(path)
+        if not exists and package_text:
+            exists = f"## {section}" in package_text
+            path = f"{package_path}#{section}" if exists else path
+        results.append(DocCheckResult(doc=doc, exists=exists, path=path))
     return results
 
 
@@ -238,7 +253,7 @@ def validate(project_root: str | None = None) -> ValidationReport:
     )
     report.all_passed = all_passed
 
-    status = "✅ 通过" if all_passed else "❌ 未通过"
+    status = "通过" if all_passed else "未通过"
     logger.info(f"ToolChainValidator:{status} — {report.summary}")
     return report
 
@@ -263,20 +278,29 @@ def main() -> None:
     if args.json:
         print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
     else:
+        use_unicode = (sys.stdout.encoding or "").lower().replace("-", "") in {
+            "utf8",
+            "utf8sig",
+        }
         print("SkyForge 工具链验证报告")
         print("=" * 50)
         for r in report.tool_results:
-            icon = "✅" if r.available else "❌" if r.required else "⚠️"
+            icon = (
+                "✅" if r.available else "❌" if r.required else "⚠️"
+            ) if use_unicode else ("OK" if r.available else "FAIL" if r.required else "WARN")
             req = "[必须]" if r.required else "[可选]"
             print(f"  {icon} {r.tool} {req}: {r.version or r.message}")
         print("-" * 50)
         print("  文档完整性:")
         for d in report.doc_results:
-            icon = "✅" if d.exists else "❌"
+            icon = ("✅" if d.exists else "❌") if use_unicode else ("OK" if d.exists else "FAIL")
             print(f"  {icon} {d.doc}")
         print("-" * 50)
         print(f"  总结: {report.summary}")
-        print(f"  结论: {'✅ 全部通过' if report.all_passed else '❌ 存在问题'}")
+        conclusion = (
+            "✅ 全部通过" if report.all_passed else "❌ 存在问题"
+        ) if use_unicode else ("全部通过" if report.all_passed else "存在问题")
+        print(f"  结论: {conclusion}")
 
     sys.exit(0 if report.all_passed else 1)
 
