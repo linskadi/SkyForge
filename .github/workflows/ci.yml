@@ -60,8 +60,11 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check src/
 
-      - name: Unit tests
-        run: uv run python -m pytest tests/ studio/app/tests/ -v --tb=short
+      - name: Unit tests (tests/)
+        run: uv run python -m pytest tests/ -v --tb=short
+
+      - name: Unit tests (studio/app/tests/)
+        run: uv run python -m pytest studio/app/tests/ -v --tb=short
 
   do178c-check:
     name: DO-178C Compliance Check
