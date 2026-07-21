@@ -2,7 +2,7 @@
 /**
  * 六层架构 · SkyForge Engine
  * ====================================================================
- * 比赛展示用架构总览：L0 基础设施协议 → L1 LLM 客户端 → L2 HIL 适配器
+ * 比赛展示用架构总览：L0 基础设施协议 → L1 LLM 客户端 → L2 仿真验证层（SIL/PIL/HIL）
  * → L3 验证工具链 → L4 Agent 策略 → L5 编排层（依赖方向自下而上）。
  *
  * - 6 个层级卡片，垂直网格布局
@@ -85,11 +85,11 @@ const layers: LayerCard[] = [
 	},
 	{
 		level: "L2",
-		nameZh: "HIL 适配器层",
-		nameEn: "HIL Adapter",
+		nameZh: "仿真验证层（SIL/PIL/HIL）",
+		nameEn: "Simulation & Verification",
 		responsibility:
-			"Hardware-in-the-Loop 与数字孪生适配，支持 QEMU、串口、ARINC653 注入。",
-		entry: "digital_twin/hil_adapter.py",
+			"覆盖纯软件仿真（SIL）、QEMU 处理器仿真（PIL）与真实硬件在环（HIL），支持故障注入与 ARINC 653 分区调度。",
+		entry: "digital_twin/simulation_engine.py",
 		gradient: "#f8fafc",
 		borderGradient: "linear-gradient(135deg, #1170b3 0%, #1a8bdd 100%)",
 		files: 30,

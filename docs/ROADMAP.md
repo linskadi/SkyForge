@@ -7,13 +7,13 @@
 **发布日期**: 2026-07-21
 
 **核心功能**:
-- [x] 引擎六层架构升级（L0-L5: Protocols/LLM Client/HIL Adapter/Verifier Chain/Agent Strategy/Orchestration）
+- [x] 引擎六层架构升级（L0-L5: Protocols/LLM Client/Simulation & Verification/Verifier Chain/Agent Strategy/Orchestration）
 - [x] PipelineOrchestrator 编排器，调度 12 个 Stage
 - [x] V1 唯一任务协议（idempotency_key + 事件续传 + provenance）
 - [x] 11 个前端页面 + 6 项顶部导航栏
 - [x] 三种执行模式 Profile（demo/cloud/local）
 - [x] 验证工具链可插拔（Z3/CBMC/Cppcheck/GCC）
-- [x] HIL 适配器层（QEMU/串口/ARINC653/虚拟MCU/虚拟传感器/故障注入）
+- [x] 仿真验证层（SIL: 虚拟MCU/虚拟传感器/故障注入 | PIL: QEMU/ARINC653 | HIL: 串口/JTAG-SWD）
 - [x] 组件组合验证系统（compatibility_checker + component_combinator）
 - [x] MISRA 规则搜索引擎（语义搜索 + RAG 增强）
 - [x] DO-178C 报告生成（可追溯性矩阵/PSAC/证据收集器）

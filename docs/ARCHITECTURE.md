@@ -37,8 +37,9 @@ SkyForge 采用**四层可剥离部署架构**（Layer 0-3: Engine/LLM/CLI/Studi
 │  L3 验证工具链层 (Verifier Chain)                                   │
 │  Z3 · CBMC · Cppcheck · GCC · 形式化 · 静态分析 · 可插拔链          │
 ├─────────────────────────────────────────────────────────────────────┤
-│  L2 HIL 适配器层 (HIL Adapter)                                      │
-│  QEMU · 串口 · ARINC653 · 虚拟MCU · 虚拟传感器 · 故障注入           │
+│  L2 仿真验证层 (SIL/PIL/HIL)                                        │
+│  SIL: VirtualSensor · VirtualMCU · FaultInjector                     │
+│  PIL: QEMU · ARINC653 · HIL: 串口 UART · JTAG-SWD                  │
 ├─────────────────────────────────────────────────────────────────────┤
 │  L1 LLM 客户端层 (LLM Client)                                       │
 │  Mock · 云API · 本地OpenAI兼容 · 路由                              │
@@ -54,7 +55,7 @@ SkyForge 采用**四层可剥离部署架构**（Layer 0-3: Engine/LLM/CLI/Studi
 |------|------|----------|----------|
 | L0 | 基础设施协议层 | 定义全系统协议、抽象基类、模式守卫、执行契约 | protocols/ |
 | L1 | LLM 客户端层 | 多模型客户端统一接口、路由、Mock 降级 | strategies/ |
-| L2 | HIL 适配器层 | 硬件在环与数字孪生适配，支持多种仿真后端 | adapters/ · digital_twin/ |
+| L2 | 仿真验证层（SIL/PIL/HIL） | 覆盖纯软件仿真(SIL)、QEMU处理器仿真(PIL)与真实硬件在环(HIL) | adapters/ · digital_twin/ |
 | L3 | 验证工具链层 | 形式化验证与静态分析工具可插拔链 | verifiers/ · tools/ |
 | L4 | Agent 策略层 | 多 Agent 协同完成需求到代码的全流程 | agents/ |
 | L5 | 编排层 | PipelineOrchestrator 串联各层，调度 12 个 Stage | core/orchestrator.py · stages/ |

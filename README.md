@@ -57,9 +57,10 @@ SkyForge 采用**六层引擎架构**(Layer 0-5),自底向上逐层增强,每一
 │  - Z3 / CBMC / Cppcheck / GCC / Contract Checker 可插拔链        │
 │  - VerifierChain: 多验证器编排与结果聚合                          │
 ├──────────────────────────────────────────────────────────────────┤
-│  Layer 2: HIL Adapter (HIL 适配器层)                              │  ← 硬件在环与数字孪生
-│  - QEMU / 串口 / ARINC 653 适配器                                 │
-│  - 数字孪生: 虚拟传感器 / 虚拟 MCU / 故障注入 / 仿真引擎          │
+│  Layer 2: Simulation & Verification (仿真验证层 SIL/PIL/HIL)      │  ← 仿真验证全覆盖
+│  - SIL: VirtualSensor / VirtualMCU / FaultInjector / 仿真引擎     │
+│  - PIL: QEMU 处理器仿真（STM32F103/F407）                        │
+│  - HIL: 串口 UART / JTAG-SWD / ARINC 653 分区调度                 │
 ├──────────────────────────────────────────────────────────────────┤
 │  Layer 1: LLM Client (LLM 客户端层)                               │  ← LLM 适配与路由
 │  - 离线模式 / 云 API / 本地 OpenAI 兼容客户端                      │
@@ -197,7 +198,7 @@ SkyForge/
 │   │   ├── core/                      ←   L5 编排层: orchestrator.py, stages/(12个阶段)
 │   │   ├── agents/                    ←   L4 Agent策略层: 8+ Agent (需求/LLR/架构/契约/代码/修复等)
 │   │   ├── verifiers/                 ←   L3 验证工具链层: VerifierChain + Z3/CBMC/Cppcheck/GCC
-│   │   ├── adapters/                  ←   L2 HIL适配器层: QEMU/串口/ARINC653/数字孪生
+│   │   ├── adapters/                  ←   L2 仿真验证层(SIL/PIL/HIL): QEMU/串口/ARINC653/仿真引擎
 │   │   ├── protocols/                 ←   L0 协议层: 抽象基类/模式守卫/Provider协议
 │   │   ├── strategies/                ←   LLM策略: 离线策略/云API策略/本地策略
 │   │   ├── standards/                 ←   可插拔编码标准(MISRA-C / MISRA C++ / Python)
