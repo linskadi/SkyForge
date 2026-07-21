@@ -43,6 +43,11 @@ jobs:
   backend:
     name: Backend
     runs-on: ubuntu-latest
+    env:
+      USE_REAL_CPPCHECK: "false"
+      SKYFORGE_LLM_MODE: "mock"
+      USE_LLM: "false"
+      HIL_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -60,11 +65,8 @@ jobs:
       - name: Ruff lint
         run: uv run ruff check src/
 
-      - name: Unit tests (tests/)
-        run: uv run python -m pytest tests/ -v --tb=short
-
-      - name: Unit tests (studio/app/tests/)
-        run: uv run python -m pytest studio/app/tests/ -v --tb=short
+      - name: Unit tests
+        run: uv run python -m pytest tests/ studio/app/tests/ -v --tb=short
 
   do178c-check:
     name: DO-178C Compliance Check
