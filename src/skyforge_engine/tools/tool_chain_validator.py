@@ -182,14 +182,22 @@ def _check_do178c_docs(project_root: str) -> list[DocCheckResult]:
         "TAS.md",
     ]
     doc_dir = os.path.join(project_root, "docs", "compliance")
-    package_path = os.path.join(project_root, "docs", "DO178C_COMPLIANCE_PACKAGE.md")
+    # 检查多个可能的合规文档位置
+    package_candidates = [
+        os.path.join(project_root, "docs", "DO178C_COMPLIANCE_PACKAGE.md"),
+        os.path.join(project_root, "..", "developer-docs", "DO178C_COMPLIANCE_PACKAGE.md"),
+    ]
+    package_path = ""
     package_text = ""
-    if os.path.exists(package_path):
-        try:
-            with open(package_path, encoding="utf-8") as f:
-                package_text = f.read()
-        except OSError:
-            package_text = ""
+    for candidate in package_candidates:
+        if os.path.exists(candidate):
+            package_path = candidate
+            try:
+                with open(candidate, encoding="utf-8") as f:
+                    package_text = f.read()
+                break
+            except OSError:
+                pass
     results: list[DocCheckResult] = []
     for doc in required_docs:
         path = os.path.join(doc_dir, doc)
@@ -206,14 +214,14 @@ def validate(project_root: str | None = None) -> ValidationReport:
     """执行完整工具链验证。
 
     Args:
-        project_root: 项目根目录，默认为 backend 的父目录的父目录
+        project_root: 项目根目录，默认为 src/ 的父目录的父目录
                      （即 SkyForge 根目录）。
 
     Returns:
         ValidationReport：验证报告。
     """
     if project_root is None:
-        # 默认推算: backend/app/core/tools/ -> SkyForge/
+        # 默认推算: src/skyforge_engine/tools/ -> SkyForge/
         project_root = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "..", "..")
         )
