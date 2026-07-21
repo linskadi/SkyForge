@@ -23,8 +23,8 @@
 
 | 指标 | 数值 | 校准来源 |
 |------|------|----------|
-| 后端 / 引擎 / LLM 安全测试 | **593 pytest passed** | `uv run pytest studio/app/tests src/skyforge_engine/tests src/skyforge_llm -q`，2026-07-21 |
-| 前端测试与构建 | **171 Vitest passed；生产构建通过** | `pnpm test && pnpm build`，2026-07-21 |
+| 后端 / 引擎 / LLM 安全测试 | **596 pytest passed；11 subtests passed** | `uv run pytest -q`，2026-07-21 |
+| 前端测试与构建 | **172 Vitest passed；生产构建通过；4 E2E passed** | `pnpm test && pnpm build && pnpm test:e2e`，2026-07-21 |
 | DO-178C 目标检查 | 工程辅助检查，不等同于适航符合性结论 | `src/skyforge_engine/report/do178_objectives.py` |
 | MISRA-C 自动修复规则 | **57** 条 | `docs/PROJECT_REVIEW.md`(175 条中可自动修复 33%) |
 | 编码标准插件 | **3** 个 | `src/skyforge_engine/coding_standards/`(MISRA-C / JSF AV C++ / Python) |
@@ -130,7 +130,7 @@ docker compose -f docker-compose.dev.yml up
 
 ### 🛡️ Mock 模式:优雅降级策略
 
-在 `config/.env` 设置 `USE_LLM=false` 即可启用 Mock 模式。Pipeline 启动时会打印 `[Pipeline] 使用 Mock 模式` 或 `[Pipeline] 使用真实 LLM` 便于确认。
+在 `config/.env` 设置 `SKYFORGE_LLM_MODE=mock` 即可启用 Mock 模式；云 API 与本地模型分别使用 `api` / `local`。Pipeline 启动时会打印当前 LLM 模式与来源，便于确认。
 
 | 外部依赖 | 缺失时降级方案 | 实现位置 |
 |----------|----------------|----------|

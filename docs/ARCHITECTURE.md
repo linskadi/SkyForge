@@ -372,8 +372,8 @@ Agent 决策 → 风险评估 → 人工审批 → 结果反馈 → 流程继续
 
 ## 测试覆盖
 
-- 后端/引擎/LLM 安全测试：593 pytest passed
-- 前端测试：171 Vitest passed
+- 后端/引擎/LLM 安全测试：596 pytest passed，11 subtests passed
+- 前端测试：172 Vitest passed，4 E2E passed
 
 ## 性能优化
 

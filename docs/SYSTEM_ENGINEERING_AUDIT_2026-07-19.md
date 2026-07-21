@@ -61,7 +61,7 @@
 ## 6. 验收证据
 
 - 前端生产构建：通过。
-- Vitest：167/167 通过。
+- Vitest：172/172 通过；Playwright E2E：4/4 通过。
 - Playwright：4/4 通过（1707×950、1366×768；演示 API 全拦截；密钥不回填）。
 - Studio 后端：262 项 + 14 subtests 通过。
 - Engine / LLM security：44/44 通过。

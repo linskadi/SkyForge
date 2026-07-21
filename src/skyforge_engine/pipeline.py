@@ -527,15 +527,24 @@ async def run_full_pipeline(
                 repair_result["final_violations"],
                 real_scan=(static_status == "observed"),
             )
-            for i, entry in enumerate(repair_result.get("repair_history", [])):
+            repair_history = repair_result.get("repair_history", [])
+            if repair_history:
+                for i, entry in enumerate(repair_history):
+                    evidence_collector.record_code_repaired(
+                        iteration=entry.get("iteration", i + 1),
+                        before_violations=entry.get("violations_count_before", 0),
+                        after_violations=(
+                            0
+                            if i == len(repair_history) - 1
+                            else entry.get("violations_count_before", 0)
+                        ),
+                        fixed_rules=[],
+                    )
+            elif not repair_result.get("final_violations"):
                 evidence_collector.record_code_repaired(
-                    iteration=entry.get("iteration", i + 1),
-                    before_violations=entry.get("violations_count_before", 0),
-                    after_violations=(
-                        0
-                        if i == len(repair_result["repair_history"]) - 1
-                        else entry.get("violations_count_before", 0)
-                    ),
+                    iteration=0,
+                    before_violations=0,
+                    after_violations=0,
                     fixed_rules=[],
                 )
             if simulation_result_dict:
@@ -573,12 +582,12 @@ async def run_full_pipeline(
                 )
 
             compile_evidence = tool_evidence["compilation"]
-            if compile_evidence["status"] == "observed":
+            if compile_evidence.get("engine"):
                 evidence_collector.record_compile_result(
                     compiler=compile_evidence["engine"],
                     compiler_version=compile_evidence["version"] or "unknown",
                     source_file="generated-task-source.c",
-                    exit_code=compile_evidence["exit_code"],
+                    exit_code=compile_evidence.get("exit_code", -1),
                     warnings=[],
                 )
 
@@ -603,15 +612,15 @@ async def run_full_pipeline(
                     exit_code=compile_evidence["exit_code"],
                 )
 
-            import os
-
             config_files = []
-            for fname in ["output.c", "contract.yaml"]:
-                fpath = os.path.join(os.getcwd(), fname)
-                if os.path.exists(fpath):
-                    with open(fpath, "rb") as f:
-                        fhash = hashlib.sha256(f.read()).hexdigest()[:16]
-                    config_files.append({"path": fname, "hash": fhash})
+            for label, content in (
+                ("final_code", repair_result.get("final_code", "")),
+                ("contract", pipeline_result.get("contract", "")),
+                ("requirement", json.dumps(pipeline_result.get("requirement", {}), ensure_ascii=False)),
+            ):
+                if content:
+                    fhash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+                    config_files.append({"path": label, "hash": fhash})
             if config_files:
                 evidence_collector.record_configuration_snapshot(config_files)
 
@@ -730,6 +739,42 @@ async def run_full_pipeline(
                     )
             full_result["independent_reviews"] = independent_reviews
 
+            # A-7.5/A-7.7/A-7.8: 覆盖率证据（在 evidence block 内收集）
+            if repair_result.get("final_code"):
+                try:
+                    from skyforge_engine.report.coverage_analyzer import (
+                        analyze_code_coverage,
+                    )
+
+                    dal_level = pipeline_result.get("dal", "C")
+                    cov_result = analyze_code_coverage(
+                        code=repair_result.get("final_code", ""),
+                        fault_injected=bool(simulation_result_dict),
+                        dal=dal_level,
+                        use_real_coverage=True,
+                    )
+                    full_result["coverage_result"] = cov_result
+                    evidence_collector.record_coverage_collected(
+                        {
+                            "statement_coverage": cov_result.get("statement_coverage", 0.0),
+                            "decision_coverage": cov_result.get("decision_coverage", 0.0),
+                            "mcdc_coverage": cov_result.get("mcdc_coverage", 0.0),
+                            "method": cov_result.get("method", "static_analysis"),
+                            "dal_target": dal_level,
+                        }
+                    )
+                    logger.info(
+                        f"Pipeline:覆盖率闭环 method={cov_result.get('method', 'static_analysis')} "
+                        f"stmt={cov_result.get('statement_coverage', 0)}% "
+                        f"dec={cov_result.get('decision_coverage', 0)}% "
+                        f"mcdc={cov_result.get('mcdc_coverage', 0)}%"
+                    )
+                except Exception as cov_err:
+                    logger.warning(f"Pipeline:覆盖率收集失败: {cov_err}")
+                    full_result["coverage_result"] = {}
+            else:
+                full_result["coverage_result"] = {}
+
             evidence_collector.end_session("completed")
             evidence_path = evidence_collector.generate_package()
             full_result["evidence_package"] = evidence_path
@@ -740,35 +785,5 @@ async def run_full_pipeline(
             )
         except Exception as e:
             logger.warning(f"Pipeline:证据收集完成失败: {e}")
-
-    # ===== 补丁1: 覆盖率分析闭环（独立于 evidence_collector，确保始终执行）=====
-    # 调用 coverage_analyzer.analyze_code_coverage() 收集真实 GCC 14.2+ lcov 覆盖率，
-    # 工具不可用时自动回退 mcdc_calculator 静态分析，结果写入 full_result["coverage_result"]
-    if repair_result.get("final_code"):
-        try:
-            from skyforge_engine.report.coverage_analyzer import (
-                analyze_code_coverage,
-            )
-
-            dal_level = pipeline_result.get("dal", "C")
-            cov_result = analyze_code_coverage(
-                code=repair_result.get("final_code", ""),
-                fault_injected=bool(simulation_result_dict),
-                dal=dal_level,
-                use_real_coverage=True,
-            )
-            full_result["coverage_result"] = cov_result
-            method = cov_result.get("method", "static_analysis")
-            logger.info(
-                f"Pipeline:覆盖率闭环 method={method} "
-                f"stmt={cov_result.get('statement_coverage', 0)}% "
-                f"dec={cov_result.get('decision_coverage', 0)}% "
-                f"mcdc={cov_result.get('mcdc_coverage', 0)}%"
-            )
-        except Exception as cov_err:
-            logger.warning(f"Pipeline:覆盖率收集失败: {cov_err}")
-            full_result["coverage_result"] = {}
-    else:
-        full_result["coverage_result"] = {}
 
     return full_result

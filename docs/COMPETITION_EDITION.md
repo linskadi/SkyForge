@@ -58,10 +58,12 @@ $env:PYTHONPATH="studio;src"
 
 浏览器验收已覆盖 1440×810、1366×768、1920×1080。1440×810 完成态中，终端自动收至 38px，五项摘要指标位于首屏；1366×768 中五项摘要仍位于首屏，详细标签内容可继续向下浏览。
 
-## 2026-07-19 验收结果
+## 2026-07-21 验收结果
 
-- 前端 Vitest：14 个测试文件、167 项全部通过。
-- `vue-tsc -b && vite build`：生产构建通过；仍有 Monaco 大分块和旧 Browserslist 数据的非阻断警告。
-- 后端 `studio/app/tests`：259 项全部通过，另有 14 个 subtests；仅保留 Redis `close()` 弃用警告。
+- 前端 Vitest：14 个测试文件、172 项全部通过。
+- `vue-tsc -b && vite build`：生产构建通过；仍有 Monaco / ECharts 大分块非阻断警告。
+- Playwright E2E：4 项全部通过。
+- 后端 / 引擎 / LLM：`uv run pytest -q` 596 项全部通过，另有 11 个 subtests；仅保留非阻断 warning。
+- Ruff：`uv run ruff check .` 通过。
 - 浏览器关闭后端实测：首页、HITL 与完整演示均无 `Failed to fetch`；完成态包含 `4 → 0`、100% 追溯和五个证据标签。
 - 自动统计写入 `docs/generated/project_metrics.json`，文档不再手工维护 API 与测试定义数量。

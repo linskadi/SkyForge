@@ -1,4 +1,4 @@
-﻿# SkyForge DO-178C 合规矩阵 (Compliance Matrix)
+# SkyForge DO-178C 合规矩阵 (Compliance Matrix)
 # 文档标识: CM-SKYFORGE-V1.0
 # DO-178C 章节: §6.4 (Verification of Verification Results) + 附录 A
 # DO-330 章节: §11 (Tool Accomplishment Summary)
@@ -27,10 +27,10 @@ OBJ-3,源代码合规性,A-5.1,R+,R+,R+,R,N/A,满足,cppcheck_scanner.py + misra
 OBJ-4,静态分析,A-5.2,R+,R+,R+,R,N/A,满足,cppcheck_scanner.py (Cppcheck --addon=misra),SVP.md §3.2,2026-07-12,0 残留违规标准
 OBJ-5,仿真测试覆盖,A-6.2,R+,R+,R+,R,N/A,满足,simulation_engine.py + arinc653_adapter.py,SVP.md §3.3,2026-07-14,数字孪生 5 类故障注入 + ARINC 653 适配器
 OBJ-6,故障注入测试,A-6.6,R+,R+,R+,R,N/A,满足,fault_injector.py + virtual_sensor.py,SVP.md §3.3,2026-07-14,5 类故障:传感器/执行器/通信/时序/电源
-OBJ-7,代码审查,A-7.1,R+,R+,R+,R+,N/A,满足,HILManager (HIL 人工审查) + GitHub PR,SQAP.md §3.1,2026-07-15,HIL 三检查点 (需求/契约/代码)
+OBJ-7,代码审查,A-7.1,R+,R+,R+,R+,N/A,满足,HILManager（HITL 人工审查） + GitHub PR,SQAP.md §3.1,2026-07-15,HITL 三检查点 (需求/契约/代码)
 OBJ-8,配置管理,A-8.1,R,R,R,R,N/A,满足,Git + SCMP.md + 基线管理,SCMP.md §3,2026-07-16,4 类基线 (功能/分配/开发/产品)
 OBJ-9,问题报告,A-8.3,R,R,R,R,N/A,满足,pr_manager.py + GitHub Issues,SCMP.md §5,2026-07-16,PR-YYYY-NNNN 年度唯一编号
-OBJ-10,独立性,A-9.1,R+,R+,R+,R,N/A,满足,HIL 人工审查 (独立于开发工具) + CI (独立于开发者),SQAP.md §2.2,2026-07-15,工具自动化 + 人工审查双重机制
+OBJ-10,独立性,A-9.1,R+,R+,R+,R,N/A,满足,HITL 人工审查 (独立于开发工具) + CI (独立于开发者),SQAP.md §2.2,2026-07-15,工具自动化 + 人工审查双重机制
 OBJ-11,编译验证,A-5.3,R+,R+,R+,R,N/A,满足,GCC -std=c11 -O2 + virtual_mcu.py,SDP.md §3.2,2026-07-12,真实编译 + 沙盒执行
 OBJ-12,契约违约处理,(自定义),R,R,R,R,N/A,满足,contract_checker.py + simulation_engine.py 断言,—,2026-07-14,前置/后置/不变式/故障处理 4 类
 OBJ-13,语句覆盖率,A-7.5,R+,R+,R+,O,N/A,满足,coverage_analyzer.py (V3.3-Enhanced),SVP.md §3.4,2026-07-17,括号感知条件拆分 + switch case 覆盖统计

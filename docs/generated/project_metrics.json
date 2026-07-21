@@ -1,6 +1,6 @@
 {
-  "backend_test_definitions": 259,
-  "frontend_test_definitions": 167,
-  "http_route_decorators": 51,
+  "backend_test_definitions": 287,
+  "frontend_test_definitions": 172,
+  "http_route_decorators": 48,
   "websocket_route_decorators": 3
 }
