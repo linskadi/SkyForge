@@ -1,9 +1,9 @@
 import { mount } from "@vue/test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
-import AgentTerminal from "../AgentTerminal.vue";
 import { useExecutionStore } from "@/stores/executionStore";
+import AgentTerminal from "../AgentTerminal.vue";
 
 vi.mock("@tanstack/vue-virtual", () => ({
 	useVirtualizer: vi.fn(() =>

@@ -61,7 +61,7 @@ jobs:
         run: uv run ruff check src/
 
       - name: Unit tests
-        run: uv run pytest tests/ studio/app/tests/ -q --tb=short
+        run: uv run python -m pytest tests/ studio/app/tests/ -q --tb=short
 
   do178c-check:
     name: DO-178C Compliance Check
