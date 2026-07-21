@@ -2,7 +2,7 @@
 
 > **项目**: SkyForge（天锻）— AI 智能体驱动的机载软件轻量化开发工具
 > **许可证**: MIT
-> **更新日期**: 2026-07-18
+> **更新日期**: 2026-07-21
 
 ---
 
@@ -106,9 +106,10 @@
 
 | 数据 | 格式 | 大小 | 来源 | 说明 |
 |------|------|------|------|------|
-| MISRA-C:2012 规则 | TXT | 136KB | MISRA Consortium | 143/175 条规则覆盖 |
+| MISRA-C:2012 规则 | TXT | 5028 行 | MISRA Consortium / cnblogs.com | C 语言编码标准完整中文详解 |
+| MISRA-C++:2023 规则 | TXT | 54 行 | MISRA C++:2023 / JSF AV C++ / CERT C++ | C++ 编码标准核心规则 |
+| Python 安全规则 | TXT | 195 行 | T/ZASDI 0002-2023 | 军工软件 Python 语言编程指南 |
 | DO-178C 目标清单 | Python | — | RTCA DO-178C/ED-12C | 19 项目标 DAL 自适应 |
-| 组件模板 | C/YAML | 5 种 | 自主研发 | filter/control/comms/nav/power |
 
 ---
 

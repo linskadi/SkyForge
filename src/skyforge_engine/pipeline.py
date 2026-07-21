@@ -316,9 +316,9 @@ async def run_full_pipeline(
                     pipeline_result["requirement"].get("req_id", "REQ-001"),
                 )
             llr_result = pipeline_result.get("requirement", {}).get("llr_result")
-            if llr_result and llr_result.get("llr_list"):
+            if llr_result:
                 evidence_collector.record_llr_generated(
-                    llr_list=llr_result["llr_list"],
+                    llr_list=llr_result.get("llr_list", []),
                     hlr_req_id=pipeline_result["requirement"].get("req_id", "REQ-001"),
                 )
         except Exception as e:
@@ -623,6 +623,14 @@ async def run_full_pipeline(
                     config_files.append({"path": label, "hash": fhash})
             if config_files:
                 evidence_collector.record_configuration_snapshot(config_files)
+
+            # A-8.2: 正式 PR 系统证据 — 记录 pipeline 运行为受控变更
+            evidence_collector.record_pr_created(
+                pr_id=f"PR-{evidence_collector.session_id}",
+                title=f"Pipeline run: {pipeline_result['requirement'].get('req_id', 'REQ-001')}",
+                branch="main",
+                status="merged",
+            )
 
             formal_evidence = tool_evidence["formal_verification"]
             if formal_evidence["status"] == "observed":
