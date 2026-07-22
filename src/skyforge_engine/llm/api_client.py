@@ -124,7 +124,7 @@ class APIClient:
                         content = reasoning
                 logger.info(f"APIClient.chat: generated {len(content)} chars, finish_reason={finish_reason}, usage={usage}")
                 if finish_reason == "length":
-                    logger.warning(f"APIClient.chat: response truncated due to max_tokens limit! Consider increasing max_tokens.")
+                    logger.warning("APIClient.chat: response truncated due to max_tokens limit! Consider increasing max_tokens.")
                 return content
             except Exception as e:
                 logger.error(f"APIClient.chat attempt {attempt + 1}/{self.max_retries} failed: {str(e)}")
@@ -172,7 +172,7 @@ class APIClient:
                         content = reasoning
                 logger.info(f"APIClient.chat_async: generated {len(content)} chars, finish_reason={finish_reason}, usage={usage}")
                 if finish_reason == "length":
-                    logger.warning(f"APIClient.chat_async: response truncated due to max_tokens limit! Consider increasing max_tokens.")
+                    logger.warning("APIClient.chat_async: response truncated due to max_tokens limit! Consider increasing max_tokens.")
                 return content
             except Exception as e:
                 logger.error(f"APIClient.chat_async attempt {attempt + 1}/{self.max_retries} failed: {str(e)}")

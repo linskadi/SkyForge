@@ -7,7 +7,7 @@ import sys
 import os
 
 # 添加 src 到路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 def test_patch1_coverage_analyzer_returns_real_or_static():

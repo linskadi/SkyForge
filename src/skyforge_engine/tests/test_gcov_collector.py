@@ -208,7 +208,8 @@ def test_parse_lcov_info_empty():
 
 def test_collect_coverage_success_with_mocked_tools(tmp_path):
     """模拟完整流程：编译、执行、gcov JSON 收集均成功。"""
-    import json, gzip
+    import json
+    import gzip
 
     code = "int main(void) { return 0; }"
 

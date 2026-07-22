@@ -99,7 +99,7 @@ def _fix_jsf_6_6_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
         return _ooB(v, "JSF 6-6-1")
     m = re.match(r"^\s*return\s+(.+?);?\s*$", old)
     expr = m.group(1).rstrip(";") if m else "0"
-    new_line = f"goto __cleanup_6_6_1; /* [JSF-6-6-1] fix: 单一出口 */\n"
+    new_line = "goto __cleanup_6_6_1; /* [JSF-6-6-1] fix: 单一出口 */\n"
     ls[v.line - 1] = new_line
     for i in range(v.line, len(ls)):
         if ls[i].strip() == "}":
@@ -145,7 +145,7 @@ def _fix_rule_0_1_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
     if not old:
         return _ooB(v, "Rule 0-1-1")
     indent = len(old) - len(old.lstrip())
-    new_line = " " * indent + f"/* [Rule-0-1-1] TODO: 移除不可达代码 */\n" + old
+    new_line = " " * indent + "/* [Rule-0-1-1] TODO: 移除不可达代码 */\n" + old
     ls[v.line - 1] = new_line
     action = RepairAction(
         rule_id=v.rule_id, line=v.line,
@@ -221,7 +221,7 @@ def _fix_rule_0_1_6(code: str, v: "Violation") -> tuple[str, RepairAction]:
     if not old:
         return _ooB(v, "Rule 0-1-6")
     indent = len(old) - len(old.lstrip())
-    new_line = " " * indent + f"/* [Rule-0-1-6] TODO: 移除函数内不可达代码 */\n" + old
+    new_line = " " * indent + "/* [Rule-0-1-6] TODO: 移除函数内不可达代码 */\n" + old
     ls[v.line - 1] = new_line
     action = RepairAction(
         rule_id=v.rule_id, line=v.line,
@@ -775,7 +775,7 @@ def _fix_rule_14_3_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
     if not old:
         return _ooB(v, "Rule 14-3-1")
     indent = len(old) - len(old.lstrip())
-    new_line = " " * indent + f"/* [Rule-14-3-1] TODO: 移除不可达代码 */\n" + old
+    new_line = " " * indent + "/* [Rule-14-3-1] TODO: 移除不可达代码 */\n" + old
     ls[v.line - 1] = new_line
     action = RepairAction(
         rule_id=v.rule_id, line=v.line,
@@ -1192,7 +1192,7 @@ def _fix_rule_17_3_5(code: str, v: "Violation") -> tuple[str, RepairAction]:
     if m:
         local_var = m.group(1)
         new_line = old.replace(f"&{local_var}", local_var)
-        new_line = new_line.rstrip("\n") + f"  /* [Rule-17-3-5] fix: 返回值而非引用 */\n"
+        new_line = new_line.rstrip("\n") + "  /* [Rule-17-3-5] fix: 返回值而非引用 */\n"
     else:
         new_line = old.rstrip("\n") + "  /* [Rule-17-3-5] TODO: 不要返回局部对象的引用 */\n"
     ls[v.line - 1] = new_line

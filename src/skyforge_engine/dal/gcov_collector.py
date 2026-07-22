@@ -491,8 +491,6 @@ def _generate_coverage_harness(code: str, test_inputs: list[float], is_cpp: bool
     - void func(void)            — 初始化类
     - RetType func(Type1, Type2) — 通用类（如 ARINC 429 解析器）
     """
-    import math
-
     # 清除本地 #include "xxx.h"（头文件内容已内联，避免编译时找不到文件）
     code = re.sub(r'#include\s+"[^"]+\.h"\s*\n?', '', code)
     code = re.sub(r'#include\s+"[^"]+\.h"', '', code)
@@ -584,7 +582,6 @@ def _generate_coverage_harness(code: str, test_inputs: list[float], is_cpp: bool
 
         # 生成多个测试调用以覆盖不同分支
         # 构造不同输入值来驱动分支覆盖
-        test_calls = []
         # 从代码中提取可能的阈值用于边界测试
         hex_values = re.findall(r'0x[0-9A-Fa-f]+', code)
         decimal_values = re.findall(r'\b(\d{3,})\b', code)
@@ -728,13 +725,11 @@ def _collect_from_gcov(code: str, test_inputs: list[float], lcov_path: str | Non
         src = Path(tmpdir) / ("test_harness.cpp" if is_cpp else "test_harness.c")
         ext = ".exe" if os.name == "nt" else ""
         binary = Path(tmpdir) / f"test_harness{ext}"
-        info_file = Path(tmpdir) / "coverage.info"
-
         # 检测用户代码中的函数签名（通用匹配）
         harness = _generate_coverage_harness(code, test_inputs, is_cpp=is_cpp)
         src.write_text(harness, encoding="utf-8")
 
-        compiler, std_flag = ("g++", "-std=c++17") if is_cpp else (gcc, "-std=c11")
+        compiler, std_flag = ("g++", "-std=c++17") if is_cpp else ("gcc", "-std=c11")
         compile_result = subprocess.run(
             [
                 compiler, std_flag, "-O0", "-g",

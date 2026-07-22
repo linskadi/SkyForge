@@ -36,7 +36,6 @@ Level 3 — 有界模型检查 (CBMC，可选):
         logger.warning(f"契约形式化验证失败，建议手动审查: {result}")
 """
 
-import os
 import re
 import shutil
 import subprocess

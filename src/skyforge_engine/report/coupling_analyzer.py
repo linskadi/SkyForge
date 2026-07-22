@@ -152,7 +152,6 @@ def _extract_functions(code: str) -> dict[str, dict[str, Any]]:
         {func_name: {line, params, body, body_start, body_end}, ...}
     """
     functions: dict[str, dict[str, Any]] = {}
-    lines = code.splitlines()
 
     for match in _FUNC_DEF_RE.finditer(code):
         func_name = match.group(1)
@@ -278,8 +277,6 @@ def _analyze_data_coupling(
       - 函数间参数传递的数据流是否正确
       - 是否存在共享数据冲突
     """
-    func_names = set(functions.keys())
-
     # 提取全局变量
     global_vars = _extract_global_variables(code, functions)
 

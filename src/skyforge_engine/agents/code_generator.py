@@ -552,7 +552,6 @@ static double {guard_name}(const double {input_name},
         # 使用公共契约工具提取约束
         c = self._extract_contract_constraints(contract)
         input_name = c["input_name"]
-        output_name = c["output_name"]
 
         return f"""/* [{req_id}] [MISRA-Rule-8.13] 通用模块实现
  * Traceability: {req_id}

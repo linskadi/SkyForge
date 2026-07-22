@@ -1692,7 +1692,7 @@ def _fix_rule_2_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
     old_line = lines[v.line - 1]
     # 在不可达代码前插入注释标记
     indent = len(old_line) - len(old_line.lstrip())
-    new_line = " " * indent + f"/* [Rule-2.1] TODO: 移除不可达代码 */\n" + old_line
+    new_line = " " * indent + "/* [Rule-2.1] TODO: 移除不可达代码 */\n" + old_line
     lines[v.line - 1] = new_line
     new_code = "".join(lines)
     action = RepairAction(
@@ -1969,7 +1969,7 @@ def _fix_rule_5_3(code: str, v: "Violation") -> tuple[str, RepairAction]:
     if m:
         old_name = m.group(1)
         new_name = f"sf_{old_name}"
-        new_line = old_line.replace(old_name, new_name, 1) + f"  /* [Rule-5.3] fix */\n"
+        new_line = old_line.replace(old_name, new_name, 1) + "  /* [Rule-5.3] fix */\n"
     else:
         new_line = old_line.rstrip("\n") + "  /* [Rule-5.3] TODO: 重命名冲突的 typedef */\n"
     lines[v.line - 1] = new_line
@@ -1997,7 +1997,7 @@ def _fix_rule_5_4(code: str, v: "Violation") -> tuple[str, RepairAction]:
     if m:
         old_name = m.group(1)
         new_name = f"SF_{old_name}"
-        new_line = old_line.replace(old_name, new_name, 1) + f"  /* [Rule-5.4] fix */\n"
+        new_line = old_line.replace(old_name, new_name, 1) + "  /* [Rule-5.4] fix */\n"
     else:
         new_line = old_line.rstrip("\n") + "  /* [Rule-5.4] TODO: 重命名冲突的宏 */\n"
     lines[v.line - 1] = new_line
@@ -2484,7 +2484,7 @@ def _fix_rule_14_1(code: str, v: "Violation") -> tuple[str, RepairAction]:
         )
     old_line = lines[v.line - 1]
     indent = len(old_line) - len(old_line.lstrip())
-    new_line = " " * indent + f"/* [Rule-14.1] TODO: 移除循环内不可达语句 */\n" + old_line
+    new_line = " " * indent + "/* [Rule-14.1] TODO: 移除循环内不可达语句 */\n" + old_line
     lines[v.line - 1] = new_line
     new_code = "".join(lines)
     action = RepairAction(
@@ -3227,11 +3227,9 @@ def _fix_rule_22_9(code: str, v: "Violation") -> tuple[str, RepairAction]:
         )
     old_line = lines[v.line - 1]
     # 添加 errno 测试
-    m = re.search(r"(\w+)\s*\(", old_line)
-    func_name = m.group(1) if m else "func"
     new_line = (
         old_line.rstrip("\n") + "\n"
-        f"    if (errno != 0) {{ /* [Rule-22.9] fix */ }}\n"
+        "    if (errno != 0) { /* [Rule-22.9] fix */ }\n"
     )
     lines[v.line - 1] = new_line
     new_code = "".join(lines)
