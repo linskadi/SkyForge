@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
+from pathlib import Path
 from typing import Any
 
 from skyforge_engine.core.protocols import ToolNotFoundError, VerificationResult
@@ -226,7 +228,7 @@ class ContractVerifier:
                                 test_cases.append({
                                     "case": f"{name}_{desc}",
                                     "input": {
-                                        name: float(model[var].as_decimal())
+                                        name: float(model[var].as_decimal(10))
                                         if hasattr(model[var], "as_decimal")
                                         else str(model[var])
                                     },
@@ -241,32 +243,36 @@ class ContractVerifier:
     def _verify_cbmc(self, code: str, contract: dict[str, Any], unwind: int = 10) -> tuple[bool, str, float]:
         start = time.time()
         try:
+            from skyforge_engine.core.verifiers.cbmc_verifier import preprocess_with_gcc
+
             instrumented_code = self._instrument_code(code, contract)
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".c", prefix="cbmc_verify_", delete=False
-            ) as f:
-                f.write(instrumented_code)
-                tmp_path = f.name
+            with tempfile.TemporaryDirectory() as tmpdir:
+                pp_file = preprocess_with_gcc(instrumented_code, tmpdir)
+                if pp_file:
+                    src = Path(pp_file)
+                else:
+                    src = Path(tmpdir) / "verify.c"
+                    src.write_text(instrumented_code, encoding="utf-8")
 
-            cmd = [
-                "cbmc", tmp_path,
-                "--unwind", str(unwind),
-                "--xml-ui",
-                "--trace",
-            ]
-            result = subprocess.run(
-                cmd,
-                capture_output=True, text=True, encoding="utf-8", errors="replace",
-                timeout=120,
-            )
+                cbmc_path = shutil.which("cbmc")
+                if not cbmc_path:
+                    return False, "CBMC not found", 0.0
 
-            elapsed = (time.time() - start) * 1000
-            verified = "VERIFICATION SUCCESSFUL" in result.stdout
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            return verified, result.stdout[:2000], elapsed
+                cmd = [
+                    cbmc_path, str(src),
+                    "--unwind", str(unwind),
+                    "--xml-ui",
+                    "--trace",
+                ]
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True, text=True, encoding="utf-8", errors="replace",
+                    timeout=120,
+                )
+
+                elapsed = (time.time() - start) * 1000
+                verified = "VERIFICATION SUCCESSFUL" in result.stdout
+                return verified, result.stdout[:2000], elapsed
 
         except subprocess.TimeoutExpired:
             elapsed = (time.time() - start) * 1000

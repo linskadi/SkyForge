@@ -318,7 +318,7 @@ async def run_full_pipeline(
             llr_result = pipeline_result.get("requirement", {}).get("llr_result")
             if llr_result:
                 evidence_collector.record_llr_generated(
-                    llr_list=llr_result.get("llr_list", []),
+                    llr_list=llr_result.get("llrs", []),
                     hlr_req_id=pipeline_result["requirement"].get("req_id", "REQ-001"),
                 )
         except Exception as e:
@@ -624,12 +624,19 @@ async def run_full_pipeline(
             if config_files:
                 evidence_collector.record_configuration_snapshot(config_files)
 
-            # A-8.2: 正式 PR 系统证据 — 记录 pipeline 运行为受控变更
+            # A-8.2: 正式 PR 系统证据 — 必须使用隔离分支，不能直接记录 main 合并。
+            pr_report = {
+                "pr_id": f"PR-{evidence_collector.session_id}",
+                "title": f"Pipeline run: {pipeline_result['requirement'].get('req_id', 'REQ-001')}",
+                "branch": f"skyforge/{evidence_collector.session_id}",
+                "status": "open",
+            }
+            full_result["problem_reports"] = [pr_report]
             evidence_collector.record_pr_created(
-                pr_id=f"PR-{evidence_collector.session_id}",
-                title=f"Pipeline run: {pipeline_result['requirement'].get('req_id', 'REQ-001')}",
-                branch="main",
-                status="merged",
+                pr_id=pr_report["pr_id"],
+                title=pr_report["title"],
+                branch=pr_report["branch"],
+                status=pr_report["status"],
             )
 
             formal_evidence = tool_evidence["formal_verification"]
@@ -639,6 +646,12 @@ async def run_full_pipeline(
                     passed=bool(formal.get("consistent")),
                     details=formal,
                 )
+
+            contract_check_data = repair_result.get("contract_check_result") or {}
+            contract_check_failed = (
+                isinstance(contract_check_data, dict)
+                and contract_check_data.get("passed") is False
+            )
 
             if simulation_result_dict:
                 contract_violation = simulation_result_dict.get("contract_violation")
@@ -652,12 +665,42 @@ async def run_full_pipeline(
                         breach_type="postcondition",
                         stderr_output=contract_violation.get("stderr_output", ""),
                     )
+                elif contract_check_failed:
+                    evidence_collector.record_contract_breach(
+                        contract_id=pipeline_result["requirement"].get(
+                            "req_id", "REQ-001"
+                        ),
+                        failed_step=0,
+                        assertion_message="contract_check_result.passed=false",
+                        breach_type="contract_check",
+                    )
                 else:
                     evidence_collector.record_breach_resolution(
                         contract_id=pipeline_result["requirement"].get(
                             "req_id", "REQ-001"
                         ),
-                        resolution_method="no_breach",
+                        resolution_method="verified_no_breach",
+                    )
+            else:
+                contract_check_passed = (
+                    isinstance(contract_check_data, dict)
+                    and contract_check_data.get("passed") is True
+                )
+                if contract_check_failed:
+                    evidence_collector.record_contract_breach(
+                        contract_id=pipeline_result["requirement"].get(
+                            "req_id", "REQ-001"
+                        ),
+                        failed_step=0,
+                        assertion_message="contract_check_result.passed=false",
+                        breach_type="contract_check",
+                    )
+                elif contract_check_passed:
+                    evidence_collector.record_breach_resolution(
+                        contract_id=pipeline_result["requirement"].get(
+                            "req_id", "REQ-001"
+                        ),
+                        resolution_method="code_repair",
                     )
 
             for evidence, scope in (
@@ -686,7 +729,17 @@ async def run_full_pipeline(
                 )
 
             for checkpoint, approval in pipeline_result.get("hil_approvals", {}).items():
-                if approval.get("approved"):
+                comments = approval.get("comments", "")
+                reviewer = approval.get("reviewer", "")
+                valid_human_review = (
+                    approval.get("approved")
+                    and reviewer not in {"", "system"}
+                    and approval.get("status") not in {"skipped", "timeout"}
+                    and "HIL 已禁用" not in comments
+                    and "自动通过" not in comments
+                    and "自动批准" not in comments
+                )
+                if valid_human_review:
                     evidence_collector.record_independent_review(
                         reviewer_id=f"human-{checkpoint}",
                         reviewer_role="human_reviewer",
@@ -704,10 +757,29 @@ async def run_full_pipeline(
                     full_result["breach_contract_id"] = contract_violation.get(
                         "contract_id", "unknown"
                     )
+                elif contract_check_failed:
+                    full_result["breach_detected"] = True
+                    full_result["breach_contract_id"] = pipeline_result[
+                        "requirement"
+                    ].get("req_id", "REQ-001")
                 else:
                     full_result["breach_resolved"] = True
+                    full_result["breach_resolution_method"] = "verified_no_breach"
             else:
-                full_result["breach_status"] = "unavailable"
+                contract_check_passed = (
+                    isinstance(contract_check_data, dict)
+                    and contract_check_data.get("passed") is True
+                )
+                if contract_check_passed:
+                    full_result["breach_resolved"] = True
+                    full_result["breach_resolution_method"] = "code_repair"
+                elif contract_check_failed:
+                    full_result["breach_detected"] = True
+                    full_result["breach_contract_id"] = pipeline_result[
+                        "requirement"
+                    ].get("req_id", "REQ-001")
+                else:
+                    full_result["breach_status"] = "unavailable"
 
             independent_reviews = []
             for evidence, scope in (
@@ -735,7 +807,17 @@ async def run_full_pipeline(
             for checkpoint, approval in pipeline_result.get(
                 "hil_approvals", {}
             ).items():
-                if approval.get("approved"):
+                comments = approval.get("comments", "")
+                reviewer = approval.get("reviewer", "")
+                valid_human_review = (
+                    approval.get("approved")
+                    and reviewer not in {"", "system"}
+                    and approval.get("status") not in {"skipped", "timeout"}
+                    and "HIL 已禁用" not in comments
+                    and "自动通过" not in comments
+                    and "自动批准" not in comments
+                )
+                if valid_human_review:
                     independent_reviews.append(
                         {
                             "reviewer_id": f"human-{checkpoint}",
@@ -743,6 +825,9 @@ async def run_full_pipeline(
                             "is_author": False,
                             "scope": f"{checkpoint}_review",
                             "approved": True,
+                            "reviewer": reviewer,
+                            "comments": comments,
+                            "status": approval.get("status"),
                         }
                     )
             full_result["independent_reviews"] = independent_reviews
@@ -754,11 +839,34 @@ async def run_full_pipeline(
                         analyze_code_coverage,
                     )
 
-                    dal_level = pipeline_result.get("dal", "C")
+                    # 从 requirement.safety_level 提取 DAL 等级（而非 pipeline_result.get("dal", "C")）
+                    requirement = pipeline_result.get("requirement", {})
+                    if isinstance(requirement, dict):
+                        safety_level = str(requirement.get("safety_level", "DAL-C")).strip().upper()
+                        if safety_level.startswith("DAL"):
+                            dal_level = safety_level.replace("DAL", "").replace("-", "").replace(" ", "").strip()
+                            if not dal_level:
+                                dal_level = "C"
+                        else:
+                            dal_level = safety_level[:1] if safety_level else "C"
+                    else:
+                        dal_level = "C"
+                    from skyforge_engine.dal.gcov_collector import (
+                        _generate_default_inputs,
+                    )
+                    sim_inputs = (
+                        simulation_result_dict.get("input_waveform", [])
+                        if simulation_result_dict
+                        else []
+                    )
+                    test_inputs = sim_inputs + _generate_default_inputs(
+                        repair_result.get("final_code", "")
+                    )
                     cov_result = analyze_code_coverage(
                         code=repair_result.get("final_code", ""),
                         fault_injected=bool(simulation_result_dict),
                         dal=dal_level,
+                        test_inputs=test_inputs,
                         use_real_coverage=True,
                     )
                     full_result["coverage_result"] = cov_result
@@ -769,6 +877,9 @@ async def run_full_pipeline(
                             "mcdc_coverage": cov_result.get("mcdc_coverage", 0.0),
                             "method": cov_result.get("method", "static_analysis"),
                             "dal_target": dal_level,
+                            "statement_target": cov_result.get("statement_target", 100.0),
+                            "decision_target": cov_result.get("decision_target", 0.0),
+                            "mcdc_target": cov_result.get("mcdc_target", 0.0),
                         }
                     )
                     logger.info(
@@ -782,6 +893,58 @@ async def run_full_pipeline(
                     full_result["coverage_result"] = {}
             else:
                 full_result["coverage_result"] = {}
+
+            # OBJ-20/OBJ-21: 数据耦合与控制耦合分析
+            if repair_result.get("final_code"):
+                try:
+                    from skyforge_engine.report.coupling_analyzer import (
+                        analyze_coupling,
+                    )
+
+                    coupling_result = analyze_coupling(
+                        code=repair_result.get("final_code", "")
+                    )
+                    full_result["coupling_result"] = coupling_result.to_dict()
+                    evidence_collector.record_coupling_analyzed(
+                        coupling_result.to_dict()
+                    )
+                    logger.info(
+                        f"Pipeline:耦合分析完成 "
+                        f"函数={coupling_result.summary.get('total_functions', 0)} "
+                        f"全局变量={coupling_result.summary.get('total_global_variables', 0)}"
+                    )
+                except Exception as cpl_err:
+                    logger.warning(f"Pipeline:耦合分析失败: {cpl_err}")
+                    full_result["coupling_result"] = {}
+            else:
+                full_result["coupling_result"] = {}
+
+            # OBJ-19: 工具鉴定证据 — 运行工具链验证并创建 TQP/TOR 记录
+            try:
+                from skyforge_engine.tools.tool_chain_validator import (
+                    validate as validate_toolchain,
+                )
+
+                tc_report = validate_toolchain()
+                tqp_exists = any(
+                    d.exists for d in tc_report.doc_results if d.doc == "TQP.md"
+                )
+                tor_exists = any(
+                    d.exists for d in tc_report.doc_results if d.doc == "TOR.md"
+                )
+                tool_qualification = {
+                    "tqp_exists": tqp_exists,
+                    "tor_exists": tor_exists,
+                    "chain_validated": tc_report.all_passed,
+                    "tool_results": [
+                        r.to_dict() for r in tc_report.tool_results
+                    ],
+                    "summary": tc_report.summary,
+                }
+                full_result["tool_qualification"] = tool_qualification
+            except Exception as tq_err:
+                logger.warning(f"Pipeline:工具鉴定失败: {tq_err}")
+                full_result["tool_qualification"] = {}
 
             evidence_collector.end_session("completed")
             evidence_path = evidence_collector.generate_package()

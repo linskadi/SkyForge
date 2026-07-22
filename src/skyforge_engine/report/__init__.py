@@ -13,6 +13,10 @@ from skyforge_engine.report.coverage_analyzer import (
     analyze_code_coverage,
     get_coverage_summary,
 )
+from skyforge_engine.report.coupling_analyzer import (
+    analyze_coupling,
+    get_coupling_summary as get_coupling_summary_text,
+)
 from skyforge_engine.report.do178_objectives import (
     ObjectiveResult,
     check_objectives,
@@ -38,6 +42,8 @@ __all__ = [
     "export_to_pdf",
     "analyze_code_coverage",
     "get_coverage_summary",
+    "analyze_coupling",
+    "get_coupling_summary_text",
     "ObjectiveResult",
     "check_objectives",
     "PSACDocument",

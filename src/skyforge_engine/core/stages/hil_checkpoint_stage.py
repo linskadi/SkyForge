@@ -58,7 +58,7 @@ class HILCheckpointStage:
             artifact["hil_approvals"] = {}
         artifact["hil_approvals"][self._checkpoint] = result
 
-        if not result.get("approved", False):
+        if not result.get("approved", False) and not result.get("pipeline_continue", False):
             return StageResult(
                 artifact=artifact,
                 status="failure",

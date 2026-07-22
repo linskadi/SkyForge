@@ -44,7 +44,7 @@ class ArchitectureDesignStage:
             safety_level = req_json.get("safety_level", "DAL-C")
             arch_result = design_architecture(
                 hlr_list,
-                llr_list=llr_result.get("llr_list", []),
+                llr_list=llr_result.get("llrs", []),
                 module_name=module_name,
                 safety_level=safety_level,
             )

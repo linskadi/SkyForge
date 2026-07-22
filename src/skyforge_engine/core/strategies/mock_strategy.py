@@ -53,7 +53,8 @@ class MockStrategy:
                 from skyforge_engine.agents.code_generator import CodeGeneratorAgent
 
                 agent = CodeGeneratorAgent()
-                output = agent._mock_run(input_data)
+                contract = kwargs.get("contract", "")
+                output = agent._mock_run(input_data, contract=contract)
                 return AgentResult(output=output)
 
             elif input_type == "repair":

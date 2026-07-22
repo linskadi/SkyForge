@@ -18,6 +18,32 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from skyforge_engine.agents.code_generator import CodeGeneratorAgent
+from skyforge_engine.tools.contract_checker import check as contract_check
+
+
+SAMPLE_CONTRACT = """component: generated_module
+version: 1.0.0
+interface:
+  inputs:
+    - name: raw_input
+      type: double
+      range: [0, 100]
+  outputs:
+    - name: filtered_output
+      type: double
+      range: [0, 100]
+contracts:
+  preconditions:
+    - "raw_input >= 0"
+    - "raw_input <= 100"
+  postconditions:
+    - "filtered_output >= 0"
+    - "filtered_output <= 100"
+  invariants:
+    - "filtered_output >= 0"
+  fault_handling:
+    - "if raw_input out of range set fault_detected"
+"""
 
 
 def test_gen_generic_code_contains_requirement():
@@ -147,6 +173,59 @@ def test_mock_run_redundancy_type():
     assert "channel_a" in code
     assert "channel_b" in code
     assert "[REQ-006]" in code
+
+
+def test_mock_run_c_templates_emit_contract_guard_and_pass_checker():
+    """C 模板有契约输入时必须生成可校验的 pre/post/invariant/fault 保护。"""
+    generator = CodeGeneratorAgent()
+    c_types = [
+        "generic",
+        "filter",
+        "control",
+        "power",
+        "navigation",
+        "hmi",
+        "sensor_fusion",
+        "mission_planning",
+        "arinc653",
+        "freertos",
+        "redundancy",
+    ]
+
+    for req_type in c_types:
+        req = {
+            "req_id": "REQ-031",
+            "desc": "契约保护测试",
+            "type": req_type,
+            "module_name": f"{req_type}_module",
+        }
+        code = generator._mock_run(req, contract=SAMPLE_CONTRACT)
+        assert "skyforge_contract_guard_" in code or req_type in {"generic", "filter"}
+        result = contract_check(code, SAMPLE_CONTRACT, cid="CON-001")
+        assert result.passed, (req_type, result.violations)
+
+
+def test_cpp_templates_include_misra_cpp_labels():
+    """C++ 生成模板必须带 MISRA-C++/JSF AV C++ 标签，避免只标 REQ。"""
+    generator = CodeGeneratorAgent()
+    cpp_types = [
+        "cpp_template",
+        "cpp_stl_container",
+        "cpp_exception",
+        "cpp_inheritance",
+    ]
+
+    for req_type in cpp_types:
+        code = generator._mock_run(
+            {
+                "req_id": "REQ-CPP-001",
+                "desc": "C++ 合规模板测试",
+                "type": req_type,
+                "module_name": req_type,
+            }
+        )
+        assert "MISRA-C++/JSF AV C++/CERT C++" in code
+        assert "@misra Rule" in code
 
 
 def test_run_mock_mode_calls_mock_run():

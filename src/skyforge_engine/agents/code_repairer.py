@@ -116,12 +116,14 @@ class CodeRepairerAgent:
             input_type="repair",
         )
         if not result.success:
-            if len(result.warnings) == 1:
-                raise RuntimeError(result.warnings[0])
-            raise RuntimeError(
-                f"CodeRepairerAgent 执行失败: {result.warnings}"
+            # V0.5: LLM 修复失败时优雅降级为 Mock 修复，不再抛出异常
+            logger.warning(
+                f"CodeRepairerAgent: LLM 修复失败 ({result.warnings[0] if result.warnings else 'unknown'})，"
+                f"降级为基于规则模板的 Mock 修复"
             )
-        repair_result = result.output
+            repair_result = self._mock_repair(code, violations, req_id)
+        else:
+            repair_result = result.output
         logger.info(
             f"CodeRepairerAgent:完成:共修复 {len(repair_result.actions)} 处"
         )
@@ -160,7 +162,7 @@ class CodeRepairerAgent:
             prompt=prompt,
             system_prompt=_SYSTEM_PROMPT,
             temperature=0.2,
-            max_tokens=8192,
+            max_tokens=32768,  # 推理模型需要更大 token 上限（C++ 800+行需要 32768）
         )
         if not response:
             raise RuntimeError("CodeRepairerAgent:LLM 调用返回空响应")

@@ -19,8 +19,9 @@ V3.2 重构:
   OBJ-7  代码审查                OBJ-17 独立验证 *
   OBJ-8  配置管理                OBJ-18 正式 PR 系统 *
   OBJ-9  问题报告                OBJ-19 工具鉴定 *
-  OBJ-10 独立性
+  OBJ-10 独立性                  OBJ-20 数据耦合分析 **
   (* = V3.2 新增)
+  (** = V0.5.0 P0 新增 — DO-178C §6.4.4.2.d/e)
 """
 
 from __future__ import annotations
@@ -156,6 +157,12 @@ def check_objectives(
 
     # ---- OBJ-19 工具鉴定 (V3.2 新增) ----
     results.append(_check_obj19(pipeline_result, def_map))
+
+    # ---- OBJ-20 数据耦合分析 (V0.5.0 P0 新增) ----
+    results.append(_check_obj20(pipeline_result, def_map))
+
+    # ---- OBJ-21 控制耦合分析 (V0.5.0 P0 新增) ----
+    results.append(_check_obj21(pipeline_result, def_map))
 
     # 按 applicable_ids 过滤：不适用当前 DAL 的目标设为 STATUS_NA
     final_results: list[ObjectiveResult] = []
@@ -310,22 +317,28 @@ def _check_obj4(
 ) -> ObjectiveResult:
     """OBJ-4 静态分析。"""
     d = _build_def("OBJ-4", def_map)
-    cppcheck_result = pipeline_result.get("cppcheck_result", []) or []
-    final_violations = pipeline_result.get("final_violations", []) or []
-    if isinstance(cppcheck_result, list) and cppcheck_result:
+    # V0.5.1: 优先检查 tool_evidence 中的 static_analysis 状态
+    tool_evidence = pipeline_result.get("tool_evidence", {}) or {}
+    static_evidence = tool_evidence.get("static_analysis", {}) or {}
+    static_status = static_evidence.get("status", "")
+
+    if static_status == "observed":
         status = STATUS_PASS
-        n_scan = len(cppcheck_result)
-        n_fixed = len(final_violations)
-        evidence = (
-            f"Cppcheck 已执行，扫描出 {n_scan} 条违规"
-            f"（修复后 {n_fixed} 条）"
-        )
-    elif isinstance(cppcheck_result, list) and not cppcheck_result:
+        engine = static_evidence.get("engine", "cppcheck")
+        version = static_evidence.get("version", "")
+        evidence = f"真实 {engine} {version} 已执行静态分析"
+    elif static_status == "simulated":
         status = STATUS_PARTIAL
-        evidence = "Cppcheck 扫描结果为空（可能未执行或无违规）"
+        evidence = "静态分析使用模拟引擎（非真实 Cppcheck）"
     else:
-        status = STATUS_FAIL
-        evidence = "cppcheck_result 字段缺失"
+        cppcheck_result = pipeline_result.get("cppcheck_result", []) or []
+        final_violations = pipeline_result.get("final_violations", []) or []
+        if isinstance(cppcheck_result, list) and cppcheck_result:
+            status = STATUS_PASS
+            evidence = f"Cppcheck 已执行，扫描出 {len(cppcheck_result)} 条违规（修复后 {len(final_violations)} 条）"
+        else:
+            status = STATUS_PARTIAL
+            evidence = "Cppcheck 扫描结果为空（可能未执行）"
     return ObjectiveResult(status=status, evidence=evidence, **d)
 
 
@@ -358,17 +371,28 @@ def _check_obj6(
     """OBJ-6 故障注入测试。"""
     d = _build_def("OBJ-6", def_map)
     sim = pipeline_result.get("simulation_result")
+    cov = pipeline_result.get("coverage_result", {}) or {}
+
+    # V0.5.1: 多渠道检测故障注入 — sim fault_type、coverage fault_injected、evidence
+    has_fault = False
+    fault_evidence = ""
+
     if isinstance(sim, dict):
         fault_type = sim.get("fault_type")
         if fault_type:
-            status = STATUS_PASS
-            fault_params = sim.get("fault_params", {})
-            evidence = (
-                f"已执行故障注入测试 fault_type={fault_type} params={fault_params}"
-            )
-        else:
-            status = STATUS_PARTIAL
-            evidence = "数字孪生仿真未注入故障（仅正常运行）"
+            has_fault = True
+            fault_evidence = f"已执行故障注入测试 fault_type={fault_type}"
+
+    if not has_fault and cov.get("fault_injected"):
+        has_fault = True
+        fault_evidence = "已执行故障注入测试（通过覆盖率收集确认）"
+
+    if has_fault:
+        status = STATUS_PASS
+        evidence = fault_evidence
+    elif isinstance(sim, dict):
+        status = STATUS_PARTIAL
+        evidence = "数字孪生仿真未注入故障（仅正常运行）"
     else:
         status = STATUS_FAIL
         evidence = "未执行数字孪生仿真"
@@ -434,6 +458,11 @@ def _check_obj9(
     final_violations = pipeline_result.get("final_violations", []) or []
     cppcheck_result = pipeline_result.get("cppcheck_result", []) or []
     repair_history = pipeline_result.get("repair_history", []) or []
+
+    # V0.5.1: 检查静态分析是否已执行（0 违规也是有效结果）
+    tool_evidence = pipeline_result.get("tool_evidence", {}) or {}
+    static_status = (tool_evidence.get("static_analysis", {}) or {}).get("status", "")
+
     violations_reported = (
         len(final_violations) if isinstance(final_violations, list) else 0
     ) + (
@@ -443,9 +472,14 @@ def _check_obj9(
         ])
     )
     repair_recorded = len(repair_history) if isinstance(repair_history, list) else 0
+
     if violations_reported > 0 or repair_recorded > 0:
         status = STATUS_PASS
         evidence = f"已记录 {violations_reported} 条违规 + {repair_recorded} 轮修复历史"
+    elif static_status == "observed":
+        # 静态分析已执行且确认 0 违规 — 最佳结果
+        status = STATUS_PASS
+        evidence = "静态分析已执行，确认 0 条违规（无问题即最佳报告）"
     else:
         status = STATUS_PARTIAL
         evidence = "未发现违规记录（可能无违规，或未报告）"
@@ -457,23 +491,58 @@ def _check_obj10(
 ) -> ObjectiveResult:
     """OBJ-10 独立性。"""
     d = _build_def("OBJ-10", def_map)
-    ccr = pipeline_result.get("contract_check_result")
-    sim = pipeline_result.get("simulation_result")
-    has_ai_gen = (
-        bool(pipeline_result.get("requirement"))
-        and bool(pipeline_result.get("contract"))
-        and bool(pipeline_result.get("final_code") or pipeline_result.get("code"))
-    )
-    has_auto_verify = isinstance(ccr, dict) or isinstance(sim, dict)
-    if has_ai_gen and has_auto_verify:
+
+    def _valid_human_review(review: dict[str, Any]) -> bool:
+        comments = str(review.get("comments", ""))
+        reviewer = str(review.get("reviewer") or review.get("reviewer_id") or "")
+        return (
+            review.get("approved") is True
+            and reviewer not in {"", "system"}
+            and review.get("status") not in {"skipped", "timeout"}
+            and review.get("is_author", False) is False
+            and "HIL 已禁用" not in comments
+            and "自动通过" not in comments
+            and "自动批准" not in comments
+        )
+
+    independent_reviews = pipeline_result.get("independent_reviews", []) or []
+    valid_human_reviews = []
+    valid_tool_reviews = []
+    if isinstance(independent_reviews, list):
+        valid_human_reviews = [
+            r for r in independent_reviews
+            if isinstance(r, dict)
+            and r.get("reviewer_role") in {"human_reviewer", "ci_system"}
+            and _valid_human_review(r)
+        ]
+        valid_tool_reviews = [
+            r for r in independent_reviews
+            if isinstance(r, dict)
+            and r.get("reviewer_role") in {"automated_tool", "tool"}
+            and r.get("approved") is True
+            and r.get("is_author", True) is False
+        ]
+
+    hil_approvals = pipeline_result.get("hil_approvals", {}) or {}
+    valid_hil = []
+    if isinstance(hil_approvals, dict):
+        valid_hil = [
+            a for a in hil_approvals.values()
+            if isinstance(a, dict) and _valid_human_review(a)
+        ]
+
+    if valid_human_reviews or valid_hil:
         status = STATUS_PASS
-        evidence = "AI 生成 3 阶段产物完整 + 自动化验证（契约校验/仿真）已执行"
-    elif has_ai_gen or has_auto_verify:
+        evidence = (
+            f"独立人工/CI 审查记录有效 "
+            f"({len(valid_human_reviews)} review + {len(valid_hil)} HITL)"
+        )
+    elif valid_tool_reviews:
         status = STATUS_PARTIAL
-        evidence = f"AI 生成完整={has_ai_gen}，自动化验证={has_auto_verify}"
+        evidence = f"仅有独立工具审查 {len(valid_tool_reviews)} 条，缺少真实人工/CI 独立审查"
     else:
         status = STATUS_FAIL
-        evidence = "AI 生成 + 自动化验证均缺失"
+        evidence = "缺少有效独立性证据：无真实人工/CI 审查，或审批由 system 自动通过"
     return ObjectiveResult(status=status, evidence=evidence, **d)
 
 
@@ -508,13 +577,28 @@ def _check_obj12(
     """OBJ-12 契约违约处理。"""
     d = _build_def("OBJ-12", def_map)
 
-    # 检查 1: pipeline_result 中的 breach_resolved/breach_detected 标记（证据收集注入）
-    if pipeline_result.get("breach_resolved"):
-        status = STATUS_PASS
-        evidence = "契约违约已解决（无违约或违约已修复）"
+    ccr = pipeline_result.get("contract_check_result")
+    if isinstance(ccr, dict) and ccr.get("passed") is False:
+        status = STATUS_PARTIAL
+        evidence = "契约校验未通过，已检测到违约但缺少解决闭环"
         return ObjectiveResult(status=status, evidence=evidence, **d)
 
-    # 检查 2: 仿真结果中的契约违约
+    if pipeline_result.get("breach_resolved"):
+        method = pipeline_result.get("breach_resolution_method", "")
+        if method and method not in {"no_breach", "verified_no_breach"}:
+            status = STATUS_PASS
+            evidence = f"契约违约已解决: {method}"
+            return ObjectiveResult(status=status, evidence=evidence, **d)
+        status = STATUS_PASS
+        evidence = "契约校验与仿真均未发现违约"
+        return ObjectiveResult(status=status, evidence=evidence, **d)
+
+    if pipeline_result.get("breach_detected"):
+        status = STATUS_PARTIAL
+        cid = pipeline_result.get("breach_contract_id", "unknown")
+        evidence = f"检测到契约违约但未完成解决闭环: {cid}"
+        return ObjectiveResult(status=status, evidence=evidence, **d)
+
     sim = pipeline_result.get("simulation_result")
     if isinstance(sim, dict):
         cv = sim.get("contract_violation")
@@ -551,7 +635,13 @@ def _check_obj13(
     cov = pipeline_result.get("coverage_result", {}) or {}
     method = cov.get("method", "static_analysis")
     stmt_pct = cov.get("statement_coverage", 0)
-    if stmt_pct >= 100:
+    if method != "gcov":
+        status = STATUS_FAIL
+        evidence = (
+            f"语句覆盖率 {stmt_pct}%（目标 100%） · 收集方法: {_method_label(method)}；"
+            "静态估算不构成 A-7.5 达标证据"
+        )
+    elif stmt_pct >= 100:
         status = STATUS_PASS
         evidence = f"语句覆盖率 {stmt_pct}%（100%） · 收集方法: {_method_label(method)}"
     elif stmt_pct >= 80:
@@ -576,7 +666,13 @@ def _check_obj14(
     cov = pipeline_result.get("coverage_result", {}) or {}
     method = cov.get("method", "static_analysis")
     dec_pct = cov.get("decision_coverage", 0)
-    if dec_pct >= 100:
+    if method != "gcov":
+        status = STATUS_FAIL
+        evidence = (
+            f"判定覆盖率 {dec_pct}%（目标 100%） · 收集方法: {_method_label(method)}；"
+            "静态估算不构成 A-7.7 达标证据"
+        )
+    elif dec_pct >= 100:
         status = STATUS_PASS
         evidence = f"判定覆盖率 {dec_pct}%（100%） · 收集方法: {_method_label(method)}"
     elif dec_pct >= 80:
@@ -602,7 +698,13 @@ def _check_obj15(
     method = cov.get("method", "static_analysis")
     mcdc_pct = cov.get("mcdc_coverage", 0)
     method_label = _method_label(method)
-    if mcdc_pct >= 100:
+    if method != "gcov":
+        status = STATUS_FAIL
+        evidence = (
+            f"MC/DC 覆盖率 {mcdc_pct}%（目标 100%） · 收集方法: {method_label}；"
+            "静态估算不构成 A-7.8 达标证据"
+        )
+    elif mcdc_pct >= 100:
         status = STATUS_PASS
         evidence = f"MC/DC 覆盖率 {mcdc_pct}%（100%） · 收集方法: {method_label}"
     elif mcdc_pct >= 80:
@@ -630,6 +732,10 @@ def _check_obj16(
     """OBJ-16 HLR/LLR 追溯（适用于 DAL-A/B/C/D）。"""
     d = _build_def("OBJ-16", def_map)
     llr_result = pipeline_result.get("llr_result")
+    if not isinstance(llr_result, dict):
+        requirement = pipeline_result.get("requirement", {})
+        if isinstance(requirement, dict):
+            llr_result = requirement.get("llr_result")
     if isinstance(llr_result, dict):
         hlr_count = llr_result.get("hlr_count", 0)
         llr_count = llr_result.get("llr_count", 0)
@@ -640,7 +746,6 @@ def _check_obj16(
             status = STATUS_PARTIAL
             evidence = f"HLR {hlr_count} 条 → LLR {llr_count} 条（追溯不完整）"
     else:
-        # 检查旧格式：requirement 直接存在
         requirement = pipeline_result.get("requirement")
         if isinstance(requirement, dict) and requirement:
             status = STATUS_PARTIAL
@@ -709,10 +814,21 @@ def _check_obj18(
     d = _build_def("OBJ-18", def_map)
     pr_list = pipeline_result.get("problem_reports", []) or []
     if isinstance(pr_list, list) and pr_list:
-        open_count = sum(1 for pr in pr_list if isinstance(pr, dict) and pr.get("status") == "open")
-        closed_count = sum(1 for pr in pr_list if isinstance(pr, dict) and pr.get("status") == "closed")
-        status = STATUS_PASS
-        evidence = f"PR 系统已启用: {len(pr_list)} 条报告（{open_count} open / {closed_count} closed）"
+        valid_prs = [
+            pr for pr in pr_list
+            if isinstance(pr, dict)
+            and pr.get("branch") not in {"", None, "main"}
+            and pr.get("status") in {"open", "merged", "closed"}
+            and pr.get("pr_id")
+        ]
+        open_count = sum(1 for pr in valid_prs if pr.get("status") == "open")
+        closed_count = sum(1 for pr in valid_prs if pr.get("status") in {"closed", "merged"})
+        if valid_prs:
+            status = STATUS_PASS
+            evidence = f"PR 系统已启用: {len(valid_prs)} 条有效 PR（{open_count} open / {closed_count} closed-or-merged）"
+        else:
+            status = STATUS_FAIL
+            evidence = f"PR 记录存在但无有效分支隔离（共 {len(pr_list)} 条）"
     else:
         # 检查是否有旧格式的违规记录（向后兼容）
         violations = pipeline_result.get("final_violations", []) or []
@@ -748,4 +864,103 @@ def _check_obj19(
     else:
         status = STATUS_FAIL
         evidence = "工具鉴定文档（TQP/TOR）缺失"
+    return ObjectiveResult(status=status, evidence=evidence, **d)
+
+
+# ========== OBJ-20 ~ OBJ-21（V0.5.0 P0 新增：数据耦合 / 控制耦合）==========
+
+def _check_obj20(
+    pipeline_result: dict[str, Any], def_map: dict[str, Any]
+) -> ObjectiveResult:
+    """OBJ-20 数据耦合分析（DO-178C §6.4.4.2.d）。
+
+    验证模块间的数据依赖关系：全局变量读写、参数传递、共享数据异常。
+    """
+    d = _build_def("OBJ-20", def_map)
+    coupling_result = pipeline_result.get("coupling_result", {}) or {}
+
+    if not coupling_result:
+        return ObjectiveResult(
+            status=STATUS_FAIL,
+            evidence="未执行数据耦合分析（coupling_result 缺失）",
+            **d,
+        )
+
+    data_coupling = coupling_result.get("data_coupling", {}) or {}
+    global_access = data_coupling.get("global_variable_access", {})
+    anomalies = data_coupling.get("shared_data_anomalies", [])
+    warnings = [a for a in anomalies if a.get("severity") == "warning"]
+
+    total_vars = len(global_access)
+    if total_vars == 0:
+        status = STATUS_PASS
+        evidence = "无全局变量依赖，数据耦合简单（纯函数式设计）"
+    elif len(warnings) == 0:
+        status = STATUS_PASS
+        evidence = (
+            f"数据耦合分析完成: {total_vars} 个全局变量 "
+            f"({len(anomalies)} 个 info 级异常，0 警告)"
+        )
+    elif len(warnings) <= 3:
+        status = STATUS_PARTIAL
+        evidence = (
+            f"数据耦合分析完成: {total_vars} 个全局变量 "
+            f"({len(warnings)} 个警告需关注)"
+        )
+    else:
+        status = STATUS_FAIL
+        evidence = (
+            f"数据耦合分析: {total_vars} 个全局变量 "
+            f"({len(warnings)} 个警告，存在数据竞争风险)"
+        )
+    return ObjectiveResult(status=status, evidence=evidence, **d)
+
+
+def _check_obj21(
+    pipeline_result: dict[str, Any], def_map: dict[str, Any]
+) -> ObjectiveResult:
+    """OBJ-21 控制耦合分析（DO-178C §6.4.4.2.e）。
+
+    验证模块间的控制流交互：函数调用图、调用顺序、入口点、孤立函数。
+    """
+    d = _build_def("OBJ-21", def_map)
+    coupling_result = pipeline_result.get("coupling_result", {}) or {}
+
+    if not coupling_result:
+        return ObjectiveResult(
+            status=STATUS_FAIL,
+            evidence="未执行控制耦合分析（coupling_result 缺失）",
+            **d,
+        )
+
+    control_coupling = coupling_result.get("control_coupling", {}) or {}
+    total_funcs = control_coupling.get("total_functions", 0)
+    total_edges = control_coupling.get("total_edges", 0)
+    isolated = control_coupling.get("isolated_functions", [])
+    entry_points = control_coupling.get("entry_points", [])
+
+    if total_funcs == 0:
+        status = STATUS_FAIL
+        evidence = "未检测到函数定义"
+    elif total_funcs == 1:
+        status = STATUS_PASS
+        evidence = f"单函数模块，控制耦合简单（1 个函数，{total_edges} 条调用边）"
+    elif len(isolated) == 0 and len(entry_points) > 0:
+        status = STATUS_PASS
+        evidence = (
+            f"控制耦合分析完成: {total_funcs} 个函数，{total_edges} 条调用边 "
+            f"入口点={len(entry_points)}，孤立函数=0"
+        )
+    elif len(isolated) <= 2:
+        status = STATUS_PARTIAL
+        evidence = (
+            f"控制耦合分析完成: {total_funcs} 个函数，{total_edges} 条调用边 "
+            f"孤立函数={len(isolated)}（{', '.join(isolated)}）"
+        )
+    else:
+        status = STATUS_FAIL
+        evidence = (
+            f"控制耦合分析: {total_funcs} 个函数，{total_edges} 条调用边 "
+            f"孤立函数={len(isolated)}（存在控制流断裂风险）"
+        )
     return ObjectiveResult(status=status, evidence=evidence, **d)

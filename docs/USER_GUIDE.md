@@ -1328,7 +1328,7 @@ docker compose up -d --build
 
 #### 10.1 工具鉴定概述
 
-根据 DO-178C §12.2 和 DO-330 标准，SkyForge 作为机载软件开发工具，需要进行工具鉴定（Tool Qualification）。鉴定计划与合规草案统一收录在 [`docs/DO178C_COMPLIANCE_PACKAGE.md`](./DO178C_COMPLIANCE_PACKAGE.md)。
+根据 DO-178C §12.2 和 DO-330 标准，SkyForge 作为机载软件开发工具，需要进行工具鉴定（Tool Qualification）。鉴定计划与合规草案统一收录在 [`../developer-docs/DO178C_COMPLIANCE_PACKAGE.md`](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md)。
 
 #### 10.2 工具链合规检查
 
@@ -1344,8 +1344,8 @@ make do178c-check
 
 | 文档 | 路径 | 用途 |
 |------|------|------|
-| PSAC / SDP / SVP / SCMP / SQAP | `docs/DO178C_COMPLIANCE_PACKAGE.md` | 软件计划、开发、验证、配置管理与质量保证草案 |
-| TQP / TOR / TAS | `docs/DO178C_COMPLIANCE_PACKAGE.md` | DO-330 工具鉴定计划、操作需求与总结草案 |
+| PSAC / SDP / SVP / SCMP / SQAP | `../developer-docs/DO178C_COMPLIANCE_PACKAGE.md` | 软件计划、开发、验证、配置管理与质量保证草案 |
+| TQP / TOR / TAS | `../developer-docs/DO178C_COMPLIANCE_PACKAGE.md` | DO-330 工具鉴定计划、操作需求与总结草案 |
 | 合规矩阵 | `docs/COMPLIANCE_MATRIX.csv` | DO-178C 目标覆盖矩阵 |
 
 #### 10.4 安全部署检查清单

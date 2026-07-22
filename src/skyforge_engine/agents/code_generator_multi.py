@@ -136,11 +136,14 @@ class MultiLanguageCodeGenerator:
             f"需求：\n{json.dumps(requirement_json, ensure_ascii=False, indent=2)}\n\n"
             f"契约：\n{contract}"
         )
+        # deepseek-v4-flash 是推理模型，reasoning + content 共享 max_tokens
+        # C ~100行 + Python ~200行: 16384 足够；C++ ~800行: 32768
+        max_tokens = {"c": 16384, "python": 16384, "cpp": 32768}.get(language, 16384)
         response = await client.chat_async(
             prompt=prompt,
             system_prompt=self._prompts[language],
             temperature=0.2,
-            max_tokens=8192,
+            max_tokens=max_tokens,
         )
         if not response:
             raise RuntimeError("CodeGeneratorAgent:LLM 调用返回空响应")
@@ -166,15 +169,22 @@ class MultiLanguageCodeGenerator:
         return self._mock_c(requirement_json)
 
     def _mock_c(self, req: dict) -> str:
-        """生成C语言示例代码。"""
+        """生成 MISRA-C:2012 合规的 C 语言示例代码。
+
+        V0.5.1: 消除 MISRA 12.1/15.5/8.9 违规。
+        - Rule 12.1: 括号明确运算符优先级
+        - Rule 15.5: 单一 return 语句
+        - Rule 8.9: 单一定义点
+        """
         module_name = req.get("module_name", "module")
         return (
             "/* [REQ-001] [MISRA-Rule-8.13] " + module_name + " 模块实现 */\n"
-            "#include <stdbool.h>\n"
+            "#include <stdint.h>\n"
+            "#include <stddef.h>\n"
             "\n"
-            "/* [REQ-001] [MISRA-Rule-8.9] 静态变量 */\n"
+            "/* [REQ-001] [MISRA-Rule-8.9] 静态变量 — 单一定义 */\n"
             "static double s_prev = 0.0;\n"
-            "static bool s_fault = false;\n"
+            "static int s_fault = 0;\n"
             "\n"
             "/* [REQ-001] [MISRA-Rule-8.4] 函数声明 */\n"
             "void " + module_name + "_init(void);\n"
@@ -183,20 +193,26 @@ class MultiLanguageCodeGenerator:
             "/* [REQ-001] [MISRA-Rule-15.7] 初始化函数 */\n"
             "void " + module_name + "_init(void) {\n"
             "    s_prev = 0.0;\n"
-            "    s_fault = false;\n"
+            "    s_fault = 0;\n"
             "}\n"
             "\n"
             "/* [REQ-001] [MISRA-Rule-15.7] 处理函数 */\n"
             "double " + module_name + "_apply(double input) {\n"
-            "    if (input < 0.0 || input > 20000.0) {\n"
-            "        s_fault = true;\n"
-            "        return 0.0;\n"
+            "    const double alpha = 0.1;\n"
+            "    double output = 0.0;\n"
+            "\n"
+            "    /* MISRA Rule 12.1: 括号明确运算符优先级 */\n"
+            "    if ((input < 0.0) || (input > 20000.0)) {\n"
+            "        s_fault = 1;\n"
+            "        output = 0.0;\n"
+            "    } else {\n"
+            "        output = (alpha * input) + ((1.0 - alpha) * s_prev);\n"
+            "        s_prev = output;\n"
             "    }\n"
-            "    double alpha = 0.1;\n"
-            "    double output = alpha * input + (1.0 - alpha) * s_prev;\n"
-            "    s_prev = output;\n"
+            "\n"
+            "    /* MISRA Rule 15.5: 单一 return 语句 */\n"
             "    return output;\n"
-            "}"
+            "}\n"
         )
 
     def _mock_cpp(self, req: dict) -> str:

@@ -114,7 +114,17 @@ class APIClient:
                 response.raise_for_status()
                 result = response.json()
                 content = result["choices"][0]["message"].get("content", "")
-                logger.info(f"APIClient.chat: generated {len(content)} chars")
+                finish_reason = result["choices"][0].get("finish_reason", "")
+                usage = result.get("usage", {})
+                # 推理模型（如 deepseek-v4-flash）可能 content 为空但 reasoning_content 有值
+                if not content:
+                    reasoning = result["choices"][0]["message"].get("reasoning_content", "")
+                    if reasoning:
+                        logger.warning(f"APIClient.chat: content 为空，使用 reasoning_content ({len(reasoning)} chars) 作为 fallback")
+                        content = reasoning
+                logger.info(f"APIClient.chat: generated {len(content)} chars, finish_reason={finish_reason}, usage={usage}")
+                if finish_reason == "length":
+                    logger.warning(f"APIClient.chat: response truncated due to max_tokens limit! Consider increasing max_tokens.")
                 return content
             except Exception as e:
                 logger.error(f"APIClient.chat attempt {attempt + 1}/{self.max_retries} failed: {str(e)}")
@@ -152,7 +162,17 @@ class APIClient:
                 response.raise_for_status()
                 result = response.json()
                 content = result["choices"][0]["message"].get("content", "")
-                logger.info(f"APIClient.chat_async: generated {len(content)} chars")
+                finish_reason = result["choices"][0].get("finish_reason", "")
+                usage = result.get("usage", {})
+                # 推理模型（如 deepseek-v4-flash）可能 content 为空但 reasoning_content 有值
+                if not content:
+                    reasoning = result["choices"][0]["message"].get("reasoning_content", "")
+                    if reasoning:
+                        logger.warning(f"APIClient.chat_async: content 为空，使用 reasoning_content ({len(reasoning)} chars) 作为 fallback")
+                        content = reasoning
+                logger.info(f"APIClient.chat_async: generated {len(content)} chars, finish_reason={finish_reason}, usage={usage}")
+                if finish_reason == "length":
+                    logger.warning(f"APIClient.chat_async: response truncated due to max_tokens limit! Consider increasing max_tokens.")
                 return content
             except Exception as e:
                 logger.error(f"APIClient.chat_async attempt {attempt + 1}/{self.max_retries} failed: {str(e)}")
@@ -176,33 +196,39 @@ class APIClient:
         if not self.base_url:
             raise ValueError("API Base URL 未配置，请设置 LOCAL_LLM_BASE_URL 或 SKYFORGE_API_BASE_URL 环境变量")
 
-        request = self._build_request(prompt, system_prompt, temperature=temperature, max_tokens=max_tokens)
-        request["stream"] = True
+        request_body = self._build_request(prompt, system_prompt, temperature=temperature, max_tokens=max_tokens)
+        request_body["stream"] = True
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
-        response = self._client.post(
+        # httpx.Client.post() 不接受 stream 参数，需用 Client.send() + stream=True
+        req = httpx.Request(
+            "POST",
             self._endpoint("chat/completions"),
             headers=headers,
-            json=request,
-            stream=True,
+            json=request_body,
         )
+        response = self._client.send(req, stream=True)
         response.raise_for_status()
 
         def stream():
-            for line in response.iter_lines():
-                if line:
-                    line = line.decode("utf-8")
-                    if line.startswith("data: "):
-                        data = line[6:]
-                        if data == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(data)
-                            content = chunk["choices"][0]["delta"].get("content", "")
-                            if content:
-                                yield content
-                        except json.JSONDecodeError:
-                            continue
+            try:
+                for line in response.iter_lines():
+                    if line:
+                        if isinstance(line, bytes):
+                            line = line.decode("utf-8")
+                        if line.startswith("data: "):
+                            data = line[6:]
+                            if data == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data)
+                                content = chunk["choices"][0]["delta"].get("content", "")
+                                if content:
+                                    yield content
+                            except json.JSONDecodeError:
+                                continue
+            finally:
+                response.close()
 
         return stream()
 

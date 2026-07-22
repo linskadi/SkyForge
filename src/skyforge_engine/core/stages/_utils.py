@@ -116,14 +116,21 @@ async def _push_agent_thought(
     if client.is_available():
         try:
             thought = ""
-            async for token in client.chat_stream(
+            # chat_stream 返回同步 generator，使用 for 而非 async for
+            stream = client.chat_stream(
                 prompt=(
                     "你是航空软件工程 Agent。用一句话（不超过 50 字）"
                     f"简述你即将执行的任务：{context_desc}"
                 ),
                 max_tokens=80,
-            ):
-                thought += token
+            )
+            # 检查是否为 async generator
+            if hasattr(stream, '__aiter__'):
+                async for token in stream:
+                    thought += token
+            else:
+                for token in stream:
+                    thought += token
             thought = thought.strip() or context_desc
             await hook(agent_name, "info", thought)
             return

@@ -389,6 +389,12 @@ class EvidenceCollector:
         statement = coverage_data.get("statement_coverage", 0)
         decision = coverage_data.get("decision_coverage", 0)
         mcdc = coverage_data.get("mcdc_coverage", 0)
+        method = coverage_data.get("method", "static_analysis")
+        dal_target = coverage_data.get("dal_target", "C")
+        statement_target = coverage_data.get("statement_target", 100)
+        decision_target = coverage_data.get("decision_target", 0)
+        mcdc_target = coverage_data.get("mcdc_target", 0)
+        is_real = method == "gcov"
 
         return self._add_item(
             category="verification",
@@ -398,11 +404,13 @@ class EvidenceCollector:
                 "statement_coverage": statement,
                 "decision_coverage": decision,
                 "mcdc_coverage": mcdc,
-                "dal_target": coverage_data.get("dal_target", "C"),
-                "meets_requirement": (
-                    (not coverage_data.get("dal_target") or coverage_data.get("dal_target") in ("D", "E"))
-                    or statement >= 100
-                ),
+                "method": method,
+                "dal_target": dal_target,
+                "statement_target": statement_target,
+                "decision_target": decision_target,
+                "mcdc_target": mcdc_target,
+                "is_real_coverage": is_real,
+                "meets_requirement": is_real and statement >= statement_target,
                 "raw_data": coverage_data,
             },
         )
@@ -767,10 +775,151 @@ class EvidenceCollector:
             },
         }
 
+    @staticmethod
+    def _is_evidence_valid_for_objective(
+        do178c_ref: str, evidence_data: dict[str, Any]
+    ) -> bool:
+        """判断单条证据是否真正支持其声称的 DO-178C 目标。
+
+        核心修复：原先仅检查 evidence item 的 do178c_ref 是否存在（存在即覆盖），
+        现在检查 evidence data 中的实际字段值，确保证据内容真正达标。
+        """
+        d = evidence_data
+
+        if do178c_ref == "A-2.1":
+            # LLR 必须实际生成（llr_count > 0）
+            return d.get("llr_count", 0) > 0
+
+        if do178c_ref == "A-3.1":
+            # 契约验证必须通过
+            return d.get("passed", False) is True
+
+        if do178c_ref == "A-5.1":
+            # 代码必须实际生成且有追溯标签
+            return d.get("lines", 0) > 0 and d.get("req_tags", 0) > 0
+
+        if do178c_ref == "A-5.2":
+            # 必须使用真实扫描工具
+            return d.get("real_scan", False) is True
+
+        if do178c_ref == "A-5.3":
+            # 编译必须成功
+            return d.get("passed", False) is True
+
+        if do178c_ref == "A-6.2":
+            # 仿真必须通过
+            result = d.get("result", {})
+            return result.get("passed", False) is True
+
+        if do178c_ref == "A-6.6":
+            # 故障注入测试必须通过且确实注入了故障
+            result = d.get("result", {})
+            return (
+                d.get("fault_injected", False) is True
+                and result.get("passed", False) is True
+            )
+
+        if do178c_ref == "A-7.1":
+            # 代码审查必须有实际改进或真实审查记录
+            return d.get("improvement", 0) > 0 or d.get("after", -1) == 0
+
+        if do178c_ref == "A-7.5":
+            # 语句覆盖率必须由真实 gcov/lcov 收集并达到当前 DAL 目标。
+            target = d.get("statement_target", 100)
+            return (
+                d.get("method") == "gcov"
+                and d.get("is_real_coverage", False) is True
+                and d.get("statement_coverage", 0) >= target
+            )
+
+        if do178c_ref == "A-7.6":
+            # 需求已解析（基础检查）
+            return bool(d.get("req_id"))
+
+        if do178c_ref == "A-7.7":
+            # 判定覆盖率必须由真实 gcov/lcov 收集并达到当前 DAL 目标。
+            target = d.get("decision_target", 100)
+            return (
+                d.get("method") == "gcov"
+                and d.get("is_real_coverage", False) is True
+                and d.get("decision_coverage", 0) >= target
+            )
+
+        if do178c_ref == "A-7.8":
+            # MC/DC 覆盖率必须由真实 gcov/lcov 收集并达到当前 DAL 目标。
+            target = d.get("mcdc_target", 100)
+            return (
+                d.get("method") == "gcov"
+                and d.get("is_real_coverage", False) is True
+                and d.get("mcdc_coverage", 0) >= target
+            )
+
+        if do178c_ref == "A-8.1":
+            # 必须有实际配置文件
+            return d.get("file_count", 0) > 0
+
+        if do178c_ref == "A-8.2":
+            # PR 不能直接合并到 main（需要分支隔离），且必须有可追踪状态。
+            return (
+                d.get("branch", "main") != "main"
+                and d.get("status") in {"open", "merged", "closed"}
+                and bool(d.get("pr_id"))
+            )
+
+        if do178c_ref == "A-8.3":
+            # 报告必须实际生成
+            return bool(d.get("report_type"))
+
+        if do178c_ref == "A-9.1":
+            # HITL 不能被禁用/超时/系统自动通过，必须有真实审查者。
+            comments = d.get("comments", "")
+            reviewer = d.get("reviewer", "")
+            return (
+                d.get("approved") is True
+                and reviewer not in {"", "system"}
+                and d.get("status") not in {"skipped", "timeout"}
+                and "HIL 已禁用" not in comments
+                and "自动通过" not in comments
+                and "自动批准" not in comments
+            )
+
+        if do178c_ref == "DO-330 §12.2":
+            # 工具必须成功执行（exit_code 必须显式存在且为 0）
+            return "exit_code" in d and d["exit_code"] == 0
+
+        if do178c_ref == "OBJ-12":
+            # 违约必须被实际解决；检测记录或 no_breach 声明本身不构成处理闭环。
+            return d.get("resolution_method") in {
+                "code_repair",
+                "contract_relaxation",
+                "false_positive",
+                "verified_no_breach",
+            }
+
+        if do178c_ref == "OBJ-17":
+            # 独立验证：审查者不能是作者，且不能由 system 自动批准
+            is_author = d.get("is_author", True)
+            comments = d.get("comments", "")
+            reviewer_role = d.get("reviewer_role", "")
+            if is_author:
+                return False
+            if "HIL 已禁用" in comments:
+                return False
+            if reviewer_role == "human_reviewer" and "自动通过" in comments:
+                return False
+            return True
+
+        if do178c_ref in ("A-7.9", "A-7.10"):
+            # 耦合分析必须有实际结果
+            return bool(d)
+
+        # 未知目标：存在即视为覆盖（保守策略）
+        return True
+
     def _calculate_do178c_coverage(
         self, categories: dict[str, list[EvidenceItem]]
     ) -> dict[str, Any]:
-        """计算 DO-178C 目标覆盖情况。"""
+        """计算 DO-178C 目标覆盖情况（基于证据内容验证）。"""
         # DO-178C Annex A 目标清单
         all_objectives = {
             "A-2.1": "HLR/LLR 追溯",
@@ -792,23 +941,36 @@ class EvidenceCollector:
             "DO-330 §12.2": "工具鉴定",
             "OBJ-12": "契约违约处理",
             "OBJ-17": "独立验证",
+            "A-7.9": "数据耦合分析",
+            "A-7.10": "控制耦合分析",
         }
 
-        covered = {}
+        # 按目标聚合证据，并逐条验证内容有效性
+        objective_evidence: dict[str, list[dict[str, Any]]] = {
+            ref: [] for ref in all_objectives
+        }
         for item in self._session.items:
             ref = item.do178c_ref
-            if "/" in ref:  # 处理复合引用如 "A-7.5/A-7.7/A-7.8"
-                for part in ref.split("/"):
-                    covered[part] = covered.get(part, 0) + 1
-            else:
-                covered[ref] = covered.get(ref, 0) + 1
+            refs = ref.split("/") if "/" in ref else [ref]
+            for r in refs:
+                if r in objective_evidence:
+                    objective_evidence[r].append(
+                        {"data": item.data, "id": item.id}
+                    )
 
         objectives = {}
         for ref, desc in all_objectives.items():
+            items = objective_evidence[ref]
+            evidence_count = len(items)
+            # 关键修复：至少有一条证据通过内容验证才算覆盖
+            genuinely_valid = any(
+                self._is_evidence_valid_for_objective(ref, it["data"])
+                for it in items
+            )
             objectives[ref] = {
                 "description": desc,
-                "covered": ref in covered,
-                "evidence_count": covered.get(ref, 0),
+                "covered": genuinely_valid,
+                "evidence_count": evidence_count,
             }
 
         total = len(all_objectives)
@@ -882,6 +1044,28 @@ class EvidenceCollector:
         ])
 
         return "\n".join(lines)
+
+    def record_coupling_analyzed(
+        self,
+        coupling_result: dict[str, Any],
+    ) -> EvidenceItem:
+        """记录数据耦合与控制耦合分析证据 (OBJ-20/OBJ-21)。
+
+        Args:
+            coupling_result: coupling_analyzer.analyze_coupling() 的返回字典
+        """
+        summary = coupling_result.get("summary", {})
+        return self._add_item(
+            category="verification",
+            do178c_ref="OBJ-20/OBJ-21",
+            description=(
+                f"耦合分析: {summary.get('total_functions', 0)} 函数 "
+                f"{summary.get('total_call_edges', 0)} 调用边 "
+                f"{summary.get('total_global_variables', 0)} 全局变量 "
+                f"({summary.get('warnings', 0)} 警告)"
+            ),
+            data=coupling_result,
+        )
 
     # ==================== 内部方法 ====================
 

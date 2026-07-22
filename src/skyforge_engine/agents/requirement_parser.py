@@ -162,6 +162,7 @@ class RequirementParserAgent:
             prompt=f"请解析以下机载软件需求：\n{requirement}",
             system_prompt=_SYSTEM_PROMPT,
             temperature=0.3,
+            max_tokens=8192,  # 推理模型需要更大 token 上限
         )
         if not response:
             raise RuntimeError("RequirementParserAgent:LLM 调用返回空响应")

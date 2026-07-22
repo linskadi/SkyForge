@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -14,6 +16,43 @@ from skyforge_engine.core.protocols import ToolNotFoundError, VerificationResult
 from skyforge_engine.utils.log_util import logger
 
 
+def preprocess_with_gcc(code: str, tmpdir: str) -> str | None:
+    """使用 GCC 预处理 C 代码，使 CBMC 能在无 cl.exe 的 Windows 上运行。
+
+    替换 bool/true/false/NULL 为 C99 兼容形式，去除 #include。
+    """
+    replacements = [
+        (r'#include\s+<[^>]+>', ''),
+        (r'\bbool\b', 'int'),
+        (r'\btrue\b', '1'),
+        (r'\bfalse\b', '0'),
+        (r'\bNULL\b', '0'),
+    ]
+    clean = code
+    for pattern, replacement in replacements:
+        clean = re.sub(pattern, replacement, clean)
+    src = os.path.join(tmpdir, "clean.c")
+    pp = os.path.join(tmpdir, "preprocessed.i")
+    with open(src, "w", encoding="utf-8") as f:
+        f.write(clean)
+    gcc_path = shutil.which("gcc")
+    if not gcc_path:
+        return None
+    try:
+        r = subprocess.run(
+            [gcc_path, "-E", "-P", "-std=c99", "-nostdinc", src],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=15,
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            with open(pp, "w", encoding="utf-8") as f:
+                f.write(r.stdout)
+            return pp
+    except Exception:
+        pass
+    return None
+
+
 class CBMCVerifier:
     """CBMC 有界模型检查器验证器."""
 
@@ -23,6 +62,10 @@ class CBMCVerifier:
 
     def is_available(self) -> bool:
         return shutil.which("cbmc") is not None
+
+    def _preprocess_with_gcc(self, code: str, tmpdir: str) -> str | None:
+        """使用 GCC 预处理 C 代码（Windows 上 CBMC 需要 cl.exe，改用 GCC 代替）。"""
+        return preprocess_with_gcc(code, tmpdir)
 
     def verify(self, code: str, contract: str | None = None, *, language: str = "c", **kwargs: Any) -> VerificationResult:
         """执行 CBMC 有界模型检查.
@@ -60,13 +103,25 @@ class CBMCVerifier:
         property_flags = kwargs.get("property_flags", None)
 
         code = self._inject_assertions(code)
+
+        if not function and not self._has_main(code):
+            funcs = self._find_entry_functions(code)
+            if funcs:
+                function = funcs[0]
+                logger.info(f"CBMC:自动检测入口函数: {function}")
+
         cbmc_path = shutil.which("cbmc")
         start = time.time()
 
         try:
             with tempfile.TemporaryDirectory() as tmpdir:
-                src = Path(tmpdir) / "verify.c"
-                src.write_text(code, encoding="utf-8")
+                # Windows 上 cl.exe 通常不可用，使用 GCC 预处理
+                pp_file = self._preprocess_with_gcc(code, tmpdir)
+                if pp_file:
+                    src = Path(pp_file)
+                else:
+                    src = Path(tmpdir) / "verify.c"
+                    src.write_text(code, encoding="utf-8")
 
                 cmd = [
                     cbmc_path,
@@ -131,6 +186,24 @@ class CBMCVerifier:
         except Exception as e:
             logger.error(f"CBMC:异常: {e}")
             raise
+
+    def _find_entry_functions(self, code: str) -> list[str]:
+        """找出 C 代码中已定义的函数（有 body），排除 main 和 void 函数。"""
+        funcs: list[str] = []
+        for m in re.finditer(
+            r'(?:(?:static|inline)\s+)*(\w+(?:\s*\*)?)\s+(\w+)\s*\([^)]*\)\s*\{',
+            code,
+        ):
+            name = m.group(2)
+            if name in ('if', 'while', 'for', 'switch', 'return', 'sizeof', 'main'):
+                continue
+            ret_type = m.group(1).strip()
+            if ret_type != 'void' and name not in funcs:
+                funcs.append(name)
+        return funcs if funcs else []
+
+    def _has_main(self, code: str) -> bool:
+        return bool(re.search(r'\b(?:int|void)\s+main\s*\(', code))
 
     def _inject_assertions(self, code: str) -> str:
         """在 C 代码中注入 CBMC 断言注解."""

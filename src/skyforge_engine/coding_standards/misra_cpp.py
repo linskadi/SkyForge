@@ -8,6 +8,8 @@ from skyforge_engine.utils.log_util import logger
 
 
 def _register() -> None:
+    from skyforge_engine.agents.misra_cpp_fixes import CPP_FIXERS
+
     standard = CodingStandard(
         standard_id="jsf_av_cpp",
         name="MISRA-C++/JSF AV C++/CERT C++",
@@ -43,7 +45,7 @@ def _register() -> None:
             (["命名空间", "namespace", "using", "ADL"], "namespaces"),
             (["RAII", "资源", "文件", "锁", "mutex"], "resource_management"),
         ],
-        fixers={},
+        fixers=CPP_FIXERS,
         mock_scan_patterns=[
             {
                 "pattern": r"\bnew\s+\w+[\[\(]",

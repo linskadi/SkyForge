@@ -109,7 +109,7 @@ class Settings(BaseSettings):
 
     # 数字孪生 / 虚拟 MCU 配置
     # USE_REAL_GCC=true 时启用真实 GCC 编译（需系统已安装 gcc）
-    USE_REAL_GCC: bool = False
+    USE_REAL_GCC: bool = True
 
     # HIL（Hardware-in-the-Loop）真实硬件测试配置
     # HIL_ENABLED=true 时启用真实硬件在环测试（需连接真实 MCU）

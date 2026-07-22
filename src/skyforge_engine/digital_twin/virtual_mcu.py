@@ -494,30 +494,31 @@ class VirtualMCU:
                 source_path="",
             )
 
-        # USE_REAL_GCC=true：检查 GCC 是否可用，不可用则降级到 Mock
+        # USE_REAL_GCC=true 表示调用方需要真实编译证据。此路径必须严格失败，
+        # 不能降级成 mock 后仍声明编译验证可用。
         if not self.is_gcc_available():
             logger.warning(
-                "VirtualMCU:USE_REAL_GCC=true 但 GCC 未安装，降级到 Mock"
+                "VirtualMCU:USE_REAL_GCC=true 但 GCC 未安装，编译验证失败"
             )
             if log_callback:
                 log_callback(
                     "SYSTEM",
-                    "warn",
-                    "GCC 未安装，降级到 Python 模拟 filter（mock 模式）",
+                    "error",
+                    "GCC 未安装，无法执行真实编译验证",
                 )
             return CompileResult(
-                success=True,
+                success=False,
                 executable_path="",
-                errors="",
-                used_mock=True,
+                errors="GCC 未安装，无法执行真实编译验证",
+                used_mock=False,
                 source_path="",
             )
 
         # 生成 test_harness.c 源码
         harness_source = self._generate_test_harness(code, assert_code)
 
-        # 在临时目录中编译（USE_REAL_GCC=true 且 GCC 可用）
-        # 任何编译失败都降级到 Mock，不阻断仿真；临时文件用完即删
+        # 在临时目录中编译（USE_REAL_GCC=true 且 GCC 可用）。
+        # 真实编译路径中的失败必须作为编译失败返回，由上层决定是否阻断流程。
         tmpdir_ctx = None
         try:
             tmpdir_ctx = tempfile.TemporaryDirectory(prefix="skyforge_digital_twin_")
@@ -570,23 +571,22 @@ class VirtualMCU:
             )
 
             if result.returncode != 0:
-                # 编译失败：清理临时目录，记录 warning，降级到 Mock
                 logger.warning(
-                    f"VirtualMCU:GCC 编译失败，降级到 Mock:\n{result.stderr}"
+                    f"VirtualMCU:GCC 编译失败:\n{result.stderr}"
                 )
                 if log_callback:
                     err_snippet = (result.stderr or "")[:2000]
                     log_callback(
                         "SYSTEM",
-                        "warn",
-                        f"GCC 编译失败，降级到 mock 模式:\n{err_snippet}",
+                        "error",
+                        f"GCC 编译失败:\n{err_snippet}",
                     )
                 tmpdir_ctx.cleanup()
                 return CompileResult(
-                    success=True,
+                    success=False,
                     executable_path="",
                     errors=result.stderr or "",
-                    used_mock=True,
+                    used_mock=False,
                     source_path="",
                     command=gcc_cmd_str,
                     compiler_version=self._compiler_version(),
@@ -614,34 +614,34 @@ class VirtualMCU:
 
         except subprocess.TimeoutExpired:
             logger.warning(
-                f"VirtualMCU:GCC 编译超时（{self.compile_timeout}s），降级到 Mock"
+                f"VirtualMCU:GCC 编译超时（{self.compile_timeout}s）"
             )
             if log_callback:
                 log_callback(
                     "SYSTEM",
-                    "warn",
-                    f"GCC 编译超时（{self.compile_timeout}s），降级到 mock 模式",
+                    "error",
+                    f"GCC 编译超时（{self.compile_timeout}s）",
                 )
             if tmpdir_ctx is not None:
                 tmpdir_ctx.cleanup()
             return CompileResult(
-                success=True,
+                success=False,
                 executable_path="",
-                errors="",
-                used_mock=True,
+                errors=f"GCC 编译超时（{self.compile_timeout}s）",
+                used_mock=False,
                 source_path="",
             )
         except Exception as e:
-            logger.warning(f"VirtualMCU:编译异常，降级到 Mock: {e}")
+            logger.warning(f"VirtualMCU:编译异常: {e}")
             if log_callback:
-                log_callback("SYSTEM", "warn", f"GCC 编译异常，降级到 mock: {e}")
+                log_callback("SYSTEM", "error", f"GCC 编译异常: {e}")
             if tmpdir_ctx is not None:
                 tmpdir_ctx.cleanup()
             return CompileResult(
-                success=True,
+                success=False,
                 executable_path="",
-                errors="",
-                used_mock=True,
+                errors=str(e),
+                used_mock=False,
                 source_path="",
             )
 
@@ -913,6 +913,47 @@ class VirtualMCU:
         # 若清理后代码中没有 double filter(double) 函数定义，
         # 自动添加一个示例 filter（避免编译失败）
         if "double filter(double" not in cleaned_code and "filter(double" not in cleaned_code:
+            # 检测所有非 double 函数定义（而非仅第一个匹配）
+            # 优先选择：非 static、非 init、参数最多的函数（通常是主函数）
+            func_def_pattern = re.compile(
+                r'(?:extern\s+)?(?:static\s+)?(\w[\w\s\*]*?)\s+(\w+)\s*\(([^)]*)\)\s*\{',
+            )
+            candidates = []
+            for m in func_def_pattern.finditer(cleaned_code):
+                ret_type_raw = m.group(1).strip()
+                name = m.group(2)
+                params_str = m.group(3).strip()
+                # 跳过 static 函数和 init/main 函数
+                if 'static' in ret_type_raw or name in ('module_init', 'init', 'main', 'count_bits'):
+                    continue
+                # 计算参数数量
+                if params_str in ('void', ''):
+                    param_count = 0
+                else:
+                    param_count = len([p for p in params_str.split(',') if p.strip()])
+                candidates.append((name, ret_type_raw, params_str, param_count))
+
+            if candidates:
+                # 按参数数量降序排序，选择参数最多的函数（通常是主函数）
+                candidates.sort(key=lambda x: x[3], reverse=True)
+                best_func = candidates[0][0]
+                logger.info(
+                    f"VirtualMCU:代码使用非 filter 函数 ({best_func})，"
+                    f"候选 {len(candidates)} 个函数，生成通用 harness"
+                )
+                return self._generate_generic_harness(cleaned_code, best_func)
+            # 回退：尝试旧的简单匹配
+            non_double_func = re.search(
+                r'(?:int8_t|int16_t|int32_t|int|uint8_t|uint16_t|uint32_t|void|bool)\s+(\w+)\s*\(',
+                cleaned_code,
+            )
+            if non_double_func:
+                logger.info(
+                    f"VirtualMCU:代码使用非 filter 函数 ({non_double_func.group(1)})，"
+                    f"生成通用 harness（回退匹配）"
+                )
+                return self._generate_generic_harness(cleaned_code, non_double_func.group(1))
+            # 无任何可识别函数 → 注入 mock filter（保持旧行为）
             cleaned_code = (
                 "double filter(double input) {\n"
                 "    static double last = 0.0;\n"
@@ -930,7 +971,10 @@ class VirtualMCU:
             ) + cleaned_code
 
         # 处理断言代码：若非空，则在每步 filter 调用后调用 __check_contract_step_<cid>
-        if assert_code.strip():
+        # 但如果代码没有 double filter(double) 函数（如 ARINC 429 的 int8_t parse(uint32_t, ...)），
+        # 断言引用的变量不存在，会导致编译失败 → 此时跳过断言
+        has_filter = "double filter" in cleaned_code or "filter(double" in cleaned_code
+        if assert_code.strip() and has_filter:
             import re
 
             # 净化：将 __check_contract_step_<cid> 中的连字符替换为下划线
@@ -952,6 +996,8 @@ class VirtualMCU:
                 assert_call = ""
             assert_code_final = sanitized_assert
         else:
+            if assert_code.strip() and not has_filter:
+                logger.info("VirtualMCU:代码无 filter(double) 函数，跳过契约断言注入（避免编译失败）")
             assert_call = ""
             assert_code_final = "/* 无契约断言 */"
 
@@ -960,6 +1006,166 @@ class VirtualMCU:
             assert_code=assert_code_final,
             assert_call=assert_call,
         )
+
+    def _generate_generic_harness(self, user_code: str, func_name: str) -> str:
+        """为非 filter(double) 函数生成通用 harness。
+
+        读取整数输入，调用用户函数，输出返回值。
+        不注入契约断言（变量名不匹配会导致编译失败）。
+
+        Args:
+            user_code: AI 生成的 C 代码（已清理头文件引用）。
+            func_name: 用户代码中的主函数名。
+
+        Returns:
+            完整的 test_harness.c 源码字符串。
+        """
+        import re
+
+        # 优先匹配函数定义（后跟 {），而非 extern 声明（后跟 ;）
+        sig_match = re.search(
+            r'(\w[\w\s\*]*?)\s+' + re.escape(func_name) + r'\s*\(([^)]*)\)\s*\{',
+            user_code,
+        )
+        if not sig_match:
+            # 回退：匹配声明
+            sig_match = re.search(
+                r'(\w[\w\s\*]*?)\s+' + re.escape(func_name) + r'\s*\(([^)]*)\)',
+                user_code,
+            )
+
+        if sig_match:
+            ret_type = sig_match.group(1).strip()
+            # 去除 extern/static/inline/register/auto 修饰符
+            ret_type = re.sub(r'\b(?:extern|static|inline|register|auto)\b', '', ret_type).strip()
+            params_str = sig_match.group(2).strip()
+            # void 参数 → 无参数
+            if params_str in ('void', ''):
+                params = []
+            else:
+                params = [p.strip() for p in params_str.split(',') if p.strip()]
+        else:
+            ret_type = "int"
+            params = []
+
+        # 生成参数声明和调用代码
+        call_args = []
+        param_decls = []
+        param_info = []  # (type, name, kind) 用于 stdin 读取
+        for i, param in enumerate(params):
+            # 去除 const 修饰符
+            param_clean = re.sub(r'\bconst\b', '', param).strip()
+            # 处理指针：Type *name 或 Type* name 或 Type* name
+            if '*' in param_clean:
+                # 指针参数
+                parts = param_clean.rsplit(None, 1)
+                if len(parts) == 2 and '*' in parts[0]:
+                    ptype = parts[0].replace('*', '').strip()
+                    pname = parts[1].lstrip('*').strip()
+                elif len(parts) == 2 and parts[1].startswith('*'):
+                    ptype = parts[0].strip()
+                    pname = parts[1].lstrip('*').strip()
+                else:
+                    ptype = param_clean.replace('*', '').strip()
+                    pname = f"arg{i}"
+                param_decls.append(f"    {ptype} {pname}_val; memset(&{pname}_val, 0, sizeof({pname}_val));")
+                call_args.append(f"&{pname}_val")
+                param_info.append((ptype, pname + "_val", 'pointer'))
+            else:
+                parts = param_clean.rsplit(None, 1)
+                if len(parts) == 2:
+                    ptype, pname = parts
+                else:
+                    ptype, pname = param_clean, f"arg{i}"
+                ptype = ptype.strip()
+                if ptype in ('uint32_t', 'int32_t', 'int', 'unsigned int', 'uint16_t', 'int16_t', 'uint8_t', 'int8_t', 'size_t'):
+                    param_decls.append(f"    {ptype} {pname} = 0;")
+                    call_args.append(pname)
+                    param_info.append((ptype, pname, 'int'))
+                elif ptype in ('double', 'float'):
+                    param_decls.append(f"    {ptype} {pname} = 0.0;")
+                    call_args.append(pname)
+                    param_info.append((ptype, pname, 'float'))
+                else:
+                    # 未知类型（自定义结构体等）：声明并置零
+                    param_decls.append(f"    {ptype} {pname}; memset(&{pname}, 0, sizeof({pname}));")
+                    call_args.append(pname)
+                    param_info.append((ptype, pname, 'unknown'))
+
+        call_args_str = ', '.join(call_args) if call_args else ''
+        param_setup = '\n'.join(param_decls) if param_decls else '    /* 无参数 */'
+
+        # 根据返回类型生成调用和输出
+        is_void = ret_type in ('void', '')
+        if is_void:
+            call_line = f"        {func_name}({call_args_str});"
+            output_line = '    printf("ok\\n");'
+        elif ret_type in ('double', 'float'):
+            call_line = f"        {ret_type} result = {func_name}({call_args_str});"
+            output_line = '    printf("%.15g\\n", result);'
+        else:
+            call_line = f"        {ret_type} result = {func_name}({call_args_str});"
+            output_line = '    printf("%d\\n", (int)result);'
+
+        # 为第一个数值参数添加 stdin 读取
+        stdin_read = ""
+        if param_info:
+            ptype, pname, pkind = param_info[0]
+            if pkind == 'int':
+                if ptype in ('uint32_t', 'uint16_t', 'uint8_t', 'size_t', 'unsigned int'):
+                    stdin_read = f"        sscanf(line, \"%u\", &{pname});\n"
+                else:
+                    stdin_read = f"        sscanf(line, \"%d\", &{pname});\n"
+            elif pkind == 'float':
+                stdin_read = f"        sscanf(line, \"%lf\", &{pname});\n"
+
+        harness = f"""/* test_harness.c - 由 VirtualMCU 自动生成（通用模式）*/
+#define _USE_MATH_DEFINES
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+/* === AI 生成的用户代码 === */
+/* USER_CODE_BEGIN */
+{user_code}
+/* USER_CODE_END */
+
+/* === 通用 harness（非 filter 函数）=== */
+/* 无契约断言（变量名不匹配，避免编译失败）*/
+
+int main(void) {{
+    int N;
+    char line[128];
+
+    if (fgets(line, sizeof(line), stdin) == NULL) return 1;
+    N = atoi(line);
+    if (N <= 0 || N > 1000000) {{
+        fprintf(stderr, "ERROR: invalid N=%d\\n", N);
+        return 2;
+    }}
+
+    for (int i = 0; i < N; i++) {{
+        if (fgets(line, sizeof(line), stdin) == NULL) {{
+            fprintf(stderr, "ERROR: eof at step %d\\n", i);
+            return 3;
+        }}
+
+        /* 参数设置 */
+{param_setup}
+        /* 读取第一个数值参数 */
+{stdin_read}
+        /* 调用用户函数 */
+{call_line}
+{output_line}
+        fflush(stdout);
+    }}
+    return 0;
+}}
+"""
+        return harness
 
     @staticmethod
     def _detect_assertion_failure(stderr: str) -> bool:

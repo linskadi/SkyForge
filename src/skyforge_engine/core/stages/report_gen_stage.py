@@ -74,7 +74,7 @@ class ReportGenStage:
         llr_result = requirement.get("llr_result")
         if llr_result:
             evidence_collector.record_llr_generated(
-                llr_list=llr_result.get("llr_list", []),
+                llr_list=llr_result.get("llrs", []),
                 hlr_req_id=requirement.get("req_id", "REQ-001"),
             )
 
@@ -149,7 +149,19 @@ class ReportGenStage:
         try:
             from skyforge_engine.report.coverage_analyzer import analyze_code_coverage
 
-            dal_level = artifact.get("dal", "C")
+            # 从 requirement.safety_level 提取 DAL 等级（如 "DAL-A" → "A"）
+            requirement = artifact.get("requirement", {})
+            if isinstance(requirement, dict):
+                safety_level = str(requirement.get("safety_level", "DAL-C")).strip().upper()
+                # 支持 "DAL-A" / "A" / "DAL A" 等格式
+                if safety_level.startswith("DAL"):
+                    dal_level = safety_level.replace("DAL", "").replace("-", "").replace(" ", "").strip()
+                    if not dal_level:
+                        dal_level = "C"
+                else:
+                    dal_level = safety_level[:1] if safety_level else "C"
+            else:
+                dal_level = "C"
             coverage_result = analyze_code_coverage(
                 code=final_code,
                 fault_injected=bool(simulation_result_dict),
@@ -162,14 +174,17 @@ class ReportGenStage:
             # 推送证据到 evidence_collector
             method = coverage_result.get("method", "static_analysis")
             evidence_collector.record_coverage_collected(
-                {
-                    "statement_coverage": coverage_result.get("statement_coverage", 0.0),
-                    "decision_coverage": coverage_result.get("decision_coverage", 0.0),
-                    "mcdc_coverage": coverage_result.get("mcdc_coverage", 0.0),
-                    "method": method,
-                    "dal_target": dal_level,
-                }
-            )
+                    {
+                        "statement_coverage": coverage_result.get("statement_coverage", 0.0),
+                        "decision_coverage": coverage_result.get("decision_coverage", 0.0),
+                        "mcdc_coverage": coverage_result.get("mcdc_coverage", 0.0),
+                        "method": method,
+                        "dal_target": dal_level,
+                        "statement_target": coverage_result.get("statement_target", 100.0),
+                        "decision_target": coverage_result.get("decision_target", 0.0),
+                        "mcdc_target": coverage_result.get("mcdc_target", 0.0),
+                    }
+                )
             logger.info(
                 f"ReportGenStage:覆盖率收集完成 method={method} "
                 f"stmt={coverage_result.get('statement_coverage', 0)}% "
@@ -179,6 +194,30 @@ class ReportGenStage:
         except Exception as cov_err:
             logger.warning(f"ReportGenStage:覆盖率收集失败: {cov_err}")
             artifact["coverage_result"] = {}
+
+        # ===== V0.5.0 P0: 数据耦合与控制耦合分析 =====
+        # 调用 coupling_analyzer.analyze_coupling() 提取函数调用图和全局变量读写关系，
+        # 结果写入 pipeline_result["coupling_result"]，供 DO-178C OBJ-20/OBJ-21 检查
+        try:
+            from skyforge_engine.report.coupling_analyzer import analyze_coupling
+
+            coupling_result = analyze_coupling(code=final_code)
+            artifact["coupling_result"] = coupling_result.to_dict()
+
+            evidence_collector.record_coupling_analyzed(
+                coupling_result.to_dict()
+            )
+
+            logger.info(
+                f"ReportGenStage:耦合分析完成 "
+                f"函数={coupling_result.summary.get('total_functions', 0)} "
+                f"调用边={coupling_result.summary.get('total_call_edges', 0)} "
+                f"全局变量={coupling_result.summary.get('total_global_variables', 0)} "
+                f"异常={coupling_result.summary.get('total_anomalies', 0)}"
+            )
+        except Exception as cpl_err:
+            logger.warning(f"ReportGenStage:耦合分析失败: {cpl_err}")
+            artifact["coupling_result"] = {}
 
         # 记录契约验证
         if contract_check_result:
@@ -239,12 +278,19 @@ class ReportGenStage:
         if config_files:
             evidence_collector.record_configuration_snapshot(config_files)
 
-        # A-8.2: 正式 PR 系统证据
+        # A-8.2: 正式 PR 系统证据。记录隔离分支，不能直接把 main 当作 PR。
+        pr_report = {
+            "pr_id": f"PR-{evidence_collector.session_id}",
+            "title": f"Pipeline run: {requirement.get('req_id', 'REQ-001')}",
+            "branch": f"skyforge/{evidence_collector.session_id}",
+            "status": "open",
+        }
+        artifact["problem_reports"] = [pr_report]
         evidence_collector.record_pr_created(
-            pr_id=f"PR-{evidence_collector.session_id}",
-            title=f"Pipeline run: {requirement.get('req_id', 'REQ-001')}",
-            branch="main",
-            status="merged",
+            pr_id=pr_report["pr_id"],
+            title=pr_report["title"],
+            branch=pr_report["branch"],
+            status=pr_report["status"],
         )
 
         formal_evidence = tool_evidence.get("formal_verification", {})
@@ -254,6 +300,11 @@ class ReportGenStage:
                 passed=bool(formal_verification.get("consistent")),
                 details=formal_verification,
             )
+
+        contract_check_failed = (
+            isinstance(contract_check_result, dict)
+            and contract_check_result.get("passed") is False
+        )
 
         if simulation_result_dict:
             contract_violation = simulation_result_dict.get("contract_violation")
@@ -265,11 +316,26 @@ class ReportGenStage:
                     breach_type="postcondition",
                     stderr_output=contract_violation.get("stderr_output", ""),
                 )
+                artifact["breach_detected"] = True
+                artifact["breach_contract_id"] = contract_violation.get(
+                    "contract_id", "unknown"
+                )
+            elif contract_check_failed:
+                evidence_collector.record_contract_breach(
+                    contract_id=requirement.get("req_id", "REQ-001"),
+                    failed_step=0,
+                    assertion_message="contract_check_result.passed=false",
+                    breach_type="contract_check",
+                )
+                artifact["breach_detected"] = True
+                artifact["breach_contract_id"] = requirement.get("req_id", "REQ-001")
             else:
                 evidence_collector.record_breach_resolution(
                     contract_id=requirement.get("req_id", "REQ-001"),
-                    resolution_method="no_breach",
+                    resolution_method="verified_no_breach",
                 )
+                artifact["breach_resolved"] = True
+                artifact["breach_resolution_method"] = "verified_no_breach"
 
         for evidence, scope in (
             (static_evidence, "static_analysis"),
@@ -297,7 +363,17 @@ class ReportGenStage:
             )
 
         for checkpoint, approval in hil_approvals.items():
-            if approval.get("approved"):
+            comments = approval.get("comments", "")
+            reviewer = approval.get("reviewer", "")
+            valid_human_review = (
+                approval.get("approved")
+                and reviewer not in {"", "system"}
+                and approval.get("status") not in {"skipped", "timeout"}
+                and "HIL 已禁用" not in comments
+                and "自动通过" not in comments
+                and "自动批准" not in comments
+            )
+            if valid_human_review:
                 evidence_collector.record_independent_review(
                     reviewer_id=f"human-{checkpoint}",
                     reviewer_role="human_reviewer",

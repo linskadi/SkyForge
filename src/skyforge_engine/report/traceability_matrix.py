@@ -228,6 +228,10 @@ def _extract_llr_mapping(
 
     llr_result = pipeline_result.get("llr_result")
     if not isinstance(llr_result, dict):
+        requirement = pipeline_result.get("requirement", {})
+        if isinstance(requirement, dict):
+            llr_result = requirement.get("llr_result")
+    if not isinstance(llr_result, dict):
         return result
 
     llrs = llr_result.get("llrs", []) or []

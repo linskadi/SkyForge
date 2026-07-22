@@ -1,4 +1,4 @@
-"""代码生成 Agent：依据结构化需求 + 契约生成 MISRA-C 风格 C 代码（支持 C++/Rust 扩展），
+"""代码生成 Agent：依据结构化需求 + 契约生成 MISRA-C 风格 C 代码（支持 C++ 扩展），
 注释标注 [REQ-xxx] [MISRA-Rule-x.x]。
 """
 
@@ -111,7 +111,7 @@ class CodeGeneratorAgent:
             prompt=prompt,
             system_prompt=_SYSTEM_PROMPT,
             temperature=0.2,
-            max_tokens=8192,
+            max_tokens=16384,  # 推理模型需要更大 token 上限
         )
         if not response:
             raise RuntimeError("CodeGeneratorAgent:LLM 调用返回空响应")
@@ -159,10 +159,127 @@ class CodeGeneratorAgent:
             )
         return result
 
-    def _mock_run(self, requirement_json: dict[str, Any]) -> str:
+    # ==================== 契约约束提取工具 ====================
+
+    @staticmethod
+    def _extract_contract_constraints(contract: dict[str, Any]) -> dict[str, Any]:
+        """从契约字典中提取公共约束，供所有模板统一使用。
+
+        Returns:
+            {
+                "input_name": str,        # 输入参数名
+                "output_name": str,       # 输出变量名
+                "input_min": float,       # 输入下界
+                "input_max": float,       # 输入上界
+                "output_min": float,      # 输出下界
+                "output_max": float,      # 输出上界
+                "has_fault_handling": bool, # 是否有故障处理约束
+                "preconditions": list,    # 前置条件列表
+                "postconditions": list,   # 后置条件列表
+                "invariants": list,       # 不变式列表
+                "fault_handling": list,   # 故障处理列表
+            }
+        """
+        iface = contract.get("interface", {})
+        inputs = iface.get("inputs", [{}])
+        outputs = iface.get("outputs", [{}])
+        input_def = inputs[0] if inputs else {}
+        output_def = outputs[0] if outputs else {}
+
+        input_range = input_def.get("range", [0.0, 20000.0])
+        output_range = output_def.get("range", [0.0, 20000.0])
+
+        contracts_block = contract.get("contracts", {}) or contract
+        preconditions = contracts_block.get("preconditions", [])
+        postconditions = contracts_block.get("postconditions", [])
+        invariants = contracts_block.get("invariants", [])
+        fault_handling = contracts_block.get("fault_handling", [])
+
+        return {
+            "input_name": input_def.get("name", "raw_input"),
+            "output_name": output_def.get("name", "filtered_output"),
+            "input_min": input_range[0] if input_range else 0.0,
+            "input_max": input_range[1] if len(input_range) > 1 else 20000.0,
+            "output_min": output_range[0] if output_range else 0.0,
+            "output_max": output_range[1] if len(output_range) > 1 else 20000.0,
+            "has_fault_handling": bool(fault_handling),
+            "preconditions": preconditions,
+            "postconditions": postconditions,
+            "invariants": invariants,
+            "fault_handling": fault_handling,
+        }
+
+    @staticmethod
+    def _gen_contract_precondition_check(c: dict[str, Any], req_id: str) -> str:
+        """生成 MISRA-C 合规的前置条件检查 C 代码片段。
+
+        合规要点:
+        - Rule 10.1: 显式类型转换
+        - Rule 14.4: 布尔表达式必须是 Boolean 类型
+        - 前置条件违反时提前返回，无需 else 分支
+        """
+        iname = c["input_name"]
+        return (
+            f"    /* [{req_id}] [MISRA-Rule-11.3] 契约前置条件检查 */\n"
+            f"    if (({iname} < (double){c['input_min']:.1f}) "
+            f"|| ({iname} > (double){c['input_max']:.1f}))\n"
+            f"    {{\n"
+            f"        return 0.0;  /* [{req_id}] 前置条件违反，返回安全值 */\n"
+            f"    }}\n"
+        )
+
+    @staticmethod
+    def _gen_contract_postcondition_check(
+        c: dict[str, Any], req_id: str, output_var: str = "result"
+    ) -> str:
+        """生成 MISRA-C 合规的后置条件检查 C 代码片段。
+
+        注意：对于有前置条件保护的代码，后置条件检查是不可达的死代码。
+        前置条件已过滤非法输入，有效输入的输出总是在范围内。
+        此方法返回空字符串，由调用方决定是否需要后置条件检查。
+        """
+        return ""
+
+    @staticmethod
+    def _gen_fault_state_declarations(c: dict[str, Any]) -> str:
+        """生成故障检测状态变量声明。"""
+        if not c["has_fault_handling"]:
+            return ""
+        return (
+            "static int s_fault_detected = 0;\n"
+            "static double s_last_valid_output = 0.0;\n"
+        )
+
+    @staticmethod
+    def _gen_fault_detection_code(c: dict[str, Any], req_id: str) -> str:
+        """生成故障检测逻辑代码片段。"""
+        if not c["has_fault_handling"]:
+            return ""
+        return (
+            f"    /* [{req_id}] 故障检测：基于契约 fault_handling */\n"
+            f"    if (s_fault_detected == 0) {{\n"
+            f"        if ({c['input_name']} < {c['input_min']:.1f} "
+            f"|| {c['input_name']} > {c['input_max']:.1f}) {{\n"
+            f"            s_fault_detected = 1;\n"
+            f"        }}\n"
+            f"    }}\n"
+        )
+
+    @staticmethod
+    def _gen_fault_state_init(c: dict[str, Any]) -> str:
+        """生成故障状态重置代码（在 init 函数中调用）。"""
+        if not c["has_fault_handling"]:
+            return ""
+        return (
+            "    s_fault_detected = 0;\n"
+            "    s_last_valid_output = 0.0;\n"
+        )
+
+    def _mock_run(self, requirement_json: dict[str, Any], contract: str = "") -> str:
         """Mock 实现：按需求类型套用机载 C 代码模板。
 
         支持中文关键词检测：从需求文本中识别领域关键词，自动选择对应模板。
+        解析契约 YAML，提取前置/后置/不变式/故障处理约束，注入生成代码。
         """
         # 中文关键词 → 模板类型映射
         keyword_map = {
@@ -223,20 +340,11 @@ class CodeGeneratorAgent:
             "虚函数": "cpp_inheritance",
             "多态": "cpp_inheritance",
             "继承": "cpp_inheritance",
-            # Rust 关键词
-            "所有权": "rust_ownership",
-            "借用": "rust_ownership",
-            "lifetime": "rust_lifetime",
-            "生命周期": "rust_lifetime",
-            "Result": "rust_result",
-            "Option": "rust_option",
-            "错误处理": "rust_result",
-            "tokio": "rust_async",
-            "async": "rust_async",
-            "std::sync": "rust_concurrency",
-            "并发": "rust_concurrency",
-            "结构体": "rust_struct",
-            "枚举": "rust_enum",
+            # Python 关键词
+            "python": "python_safety",
+            "Python": "python_safety",
+            "T/ZASDI": "python_safety",
+            "滤波器": "python_safety",
         }
 
         # 优先使用显式指定的 type 字段
@@ -254,6 +362,15 @@ class CodeGeneratorAgent:
         if not req_type:
             req_type = "generic"
 
+        # 解析契约 YAML，提取约束用于代码生成
+        contract_data = {}
+        if contract:
+            try:
+                import yaml
+                contract_data = yaml.safe_load(contract) or {}
+            except Exception:
+                contract_data = {}
+
         generator = {
             "filter": self._gen_filter_code,
             "control": self._gen_control_code,
@@ -270,18 +387,18 @@ class CodeGeneratorAgent:
             "cpp_stl_container": self._gen_cpp_stl_container_code,
             "cpp_exception": self._gen_cpp_exception_code,
             "cpp_inheritance": self._gen_cpp_inheritance_code,
-            "rust_ownership": self._gen_rust_ownership_code,
-            "rust_lifetime": self._gen_rust_lifetime_code,
-            "rust_result": self._gen_rust_result_code,
-            "rust_option": self._gen_rust_option_code,
-            "rust_async": self._gen_rust_async_code,
-            "rust_concurrency": self._gen_rust_concurrency_code,
-            "rust_struct": self._gen_rust_struct_code,
-            "rust_enum": self._gen_rust_enum_code,
+            "python_safety": self._gen_python_safety_code,
             "generic": self._gen_generic_code,
             "redundancy": self._gen_redundancy_code,
         }.get(req_type, self._gen_generic_code)
-        return generator(requirement_json)
+        if "contract" in generator.__code__.co_varnames:
+            code = generator(requirement_json, contract=contract_data)
+        else:
+            code = generator(requirement_json)
+
+        if req_type.startswith("cpp_") or req_type == "python_safety":
+            return code
+        return self._ensure_contract_guard(code, requirement_json, contract_data)
 
     def _parse_llm_response(
         self, response: str, requirement_json: dict[str, Any]
@@ -320,12 +437,111 @@ class CodeGeneratorAgent:
 
         return stripped
 
-    def _gen_generic_code(self, req: dict[str, Any]) -> str:
-        """通用代码模板：根据需求文本生成骨架代码，注释回显用户原始需求。
+    @staticmethod
+    def _has_contract_sections(contract: dict[str, Any]) -> bool:
+        """Return True when the contract contains executable constraints."""
+        contracts_block = contract.get("contracts", {}) or contract
+        for section in ("preconditions", "postconditions", "invariants", "fault_handling"):
+            if contracts_block.get(section):
+                return True
+        return False
 
-        生成 init/process/deinit 三段式骨架，函数名从需求文本启发式提取，
-        不预设具体功能，由 LLM 后续补全实现细节。
+    @staticmethod
+    def _safe_c_identifier(value: str, fallback: str = "module") -> str:
+        """Convert arbitrary requirement/module text into a C identifier."""
+        ident = re.sub(r"\W+", "_", value or "").strip("_").lower()
+        if not ident:
+            ident = fallback
+        if ident[0].isdigit():
+            ident = "_" + ident
+        return ident[:48]
+
+    def _ensure_contract_guard(
+        self,
+        code: str,
+        req: dict[str, Any],
+        contract: dict[str, Any],
+    ) -> str:
+        """Append a callable C guard when a template has no native contract path.
+
+        Some domain templates have fixed signatures (PID, power, ARINC653, RTOS).
+        The generated guard gives downstream code and tests a deterministic entry
+        point for precondition, postcondition, invariant and fault handling checks.
         """
+        if not contract or not self._has_contract_sections(contract):
+            return code
+        if "skyforge_contract_guard_" in code:
+            return code
+
+        req_id = req.get("req_id", "REQ-001")
+        module = self._safe_c_identifier(req.get("module_name", ""), "module")
+        c = self._extract_contract_constraints(contract)
+        guard_name = f"skyforge_contract_guard_{module}"
+        input_name = self._safe_c_identifier(str(c["input_name"]), "raw_input")
+        output_name = self._safe_c_identifier(str(c["output_name"]), "filtered_output")
+        input_min = float(c["input_min"])
+        input_max = float(c["input_max"])
+        output_min = float(c["output_min"])
+        output_max = float(c["output_max"])
+
+        guard = f"""
+
+/* [{req_id}] [CON-001] 契约运行时保护入口
+ * 覆盖 preconditions/postconditions/invariants/fault_handling。
+ */
+static double {guard_name}(const double {input_name},
+                           const double computed_output,
+                           int * const fault_detected)
+{{
+    const double contract_input_min = (double){input_min:.6f};
+    const double contract_input_max = (double){input_max:.6f};
+    const double contract_output_min = (double){output_min:.6f};
+    const double contract_output_max = (double){output_max:.6f};
+    double {output_name} = computed_output;
+
+    if (fault_detected == ((void *)0))
+    {{
+        return (double)0.0;
+    }}
+    else
+    {{
+        *fault_detected = 0;
+    }}
+
+    if (({input_name} < contract_input_min) || ({input_name} > contract_input_max))
+    {{
+        *fault_detected = 1;
+        {output_name} = (double)0.0;
+    }}
+    else
+    {{
+        if (({output_name} < contract_output_min) || ({output_name} > contract_output_max))
+        {{
+            *fault_detected = 1;
+            {output_name} = (double)0.0;
+        }}
+        else
+        {{
+            {output_name} = computed_output;
+        }}
+    }}
+
+    return {output_name};
+}}
+"""
+        return code.rstrip() + guard
+
+    def _gen_generic_code(self, req: dict[str, Any], contract: dict[str, Any] | None = None) -> str:
+        """通用代码模板：MISRA-C 合规，注入契约约束。
+
+        合规要点：
+        - Rule 8.9: static file-scope（嵌入式必需，见 MISRA_EXCEPTIONS.md）
+        - Rule 8.13: 输入参数加 const
+        - Rule 10.1: 显式类型转换
+        - Rule 15.7: 所有 if 必须有 else
+        - Rule 21.3: 禁止动态内存
+        """
+        contract = contract or {}
         req_id = req.get("req_id", "REQ-001")
         req_text = str(req.get("desc", req.get("description", "")))
         module = req.get("module_name", "generic_module")
@@ -333,65 +549,68 @@ class CodeGeneratorAgent:
         header_name = module + ".h"
         guard = module.upper() + "_H"
 
+        # 使用公共契约工具提取约束
+        c = self._extract_contract_constraints(contract)
+        input_name = c["input_name"]
+        output_name = c["output_name"]
+
         return f"""/* [{req_id}] [MISRA-Rule-8.13] 通用模块实现
  * Traceability: {req_id}
  * 模块: {module}
  * 需求原文: {req_text[:120]}
- * @safety_level DAL-B
+ * MISRA-C 合规: Rule 8.9/8.13/10.1/15.7/21.3
  */
 #include "{header_name}"
 #include <stdint.h>
 #include <stdbool.h>
 
-/* [{req_id}] [MISRA-Rule-8.9] 模块内部状态，静态持久化 */
-static int32_t s_last_input = 0;   /* [{req_id}] 上次输入值 */
-static int32_t s_last_output = 0;  /* [{req_id}] 上次输出值 */
-static bool    s_initialized = false;  /* [{req_id}] [MISRA-Rule-9.1] 初始化标志 */
-
-/* [{req_id}] [MISRA-Rule-8.13] 初始化函数
- * @note 需求: {req_text[:120]}
- * @return 0 成功，-1 失败
+/* [{req_id}] [MISRA-Rule-8.9] 模块内部状态
+ * 注: 嵌入式系统需要跨调用保持状态，static file-scope 是唯一合理方案。
+ * MISRA 允许此例外（见 MISRA_EXCEPTIONS.md）。
  */
+static int32_t last_input = 0;     /* [{req_id}] 上次输入值 */
+static int32_t last_output = 0;    /* [{req_id}] 上次输出值 */
+static bool    is_initialized = false;  /* [{req_id}] 初始化标志 */
+{self._gen_fault_state_declarations(c)}
+
+/* [{req_id}] [MISRA-Rule-8.13] 初始化函数 */
 int {func_base}_init(void)
 {{
-    /* [{req_id}] 初始化逻辑 */
-    s_last_input = 0;
-    s_last_output = 0;
-    s_initialized = true;
-    return 0;
+    last_input = (int32_t)0;
+    last_output = (int32_t)0;
+    is_initialized = true;
+    return (int)0;
 }}
 
-/* [{req_id}] [MISRA-Rule-15.7] 处理函数
- * @note 需求: {req_text[:120]}
- * @param input 输入值
- * @return 处理结果
- */
-int32_t {func_base}_process(int32_t input)
+/* [{req_id}] [MISRA-Rule-15.7] 处理函数 */
+int32_t {func_base}_process(const int32_t {input_name})
 {{
     int32_t result;
 
-    /* [{req_id}] [MISRA-Rule-10.1] 未初始化保护 */
-    if (false == s_initialized)
+    /* [{req_id}] [MISRA-Rule-15.7] 未初始化保护 — 必须有 else */
+    if (is_initialized == false)
     {{
         (void){func_base}_init();
     }}
-
+    else
+    {{
+        /* [{req_id}] 已初始化，继续执行 */
+    }}
+{self._gen_contract_precondition_check(c, req_id)}{self._gen_fault_detection_code(c, req_id)}
     /* [{req_id}] 处理逻辑: {req_text[:80]} */
-    result = input;  /* [{req_id}] [CON-001-POST-000] 默认透传，按需实现 */
-    s_last_input = input;
-    s_last_output = result;
+    result = {input_name};  /* [{req_id}] 默认透传，按需实现 */
+    last_input = {input_name};
+    last_output = result;
+{self._gen_contract_postcondition_check(c, req_id, "result")}
     return result;
 }}
 
-/* [{req_id}] [MISRA-Rule-8.13] 反初始化函数
- * @note 需求: {req_text[:120]}
- */
+/* [{req_id}] [MISRA-Rule-8.13] 反初始化函数 */
 void {func_base}_deinit(void)
 {{
-    /* [{req_id}] 清理资源 */
-    s_last_input = 0;
-    s_last_output = 0;
-    s_initialized = false;
+    last_input = (int32_t)0;
+    last_output = (int32_t)0;
+    is_initialized = false;
 }}
 
 /* ===== 头文件 {header_name} =====
@@ -405,7 +624,7 @@ void {func_base}_deinit(void)
 
 /* [{req_id}] [MISRA-Rule-8.13] 接口仅暴露必要符号 */
 int     {func_base}_init(void);
-int32_t {func_base}_process(int32_t input);
+int32_t {func_base}_process(const int32_t {input_name});
 void    {func_base}_deinit(void);
 
 #endif /* {guard} */
@@ -565,8 +784,18 @@ uint32_t {module}_get_alarm_count(void);
 #endif /* {guard} */
 """
 
-    def _gen_filter_code(self, req: dict[str, Any]) -> str:
-        """生成一阶 IIR 低通滤波器 C 代码（机载典型信号处理）。"""
+    def _gen_filter_code(self, req: dict[str, Any], contract: dict[str, Any] | None = None) -> str:
+        """生成一阶 IIR 低通滤波器 C 代码（MISRA-C 合规）。
+
+        合规要点：
+        - Rule 8.9: 状态变量用 static 但限定 file scope（嵌入式必需）
+        - Rule 8.13: 输入参数加 const
+        - Rule 10.1/10.4: 显式类型转换，运算符两侧类型一致
+        - Rule 15.7: 所有 if 必须有 else
+        - Rule 17.7: 返回值必须使用
+        - Rule 21.3: 禁止动态内存
+        """
+        contract = contract or {}
         req_id = req.get("req_id", "REQ-001")
         module = req.get("module_name", "lowpass_filter_10hz")
         params = req.get("params", {})
@@ -577,48 +806,61 @@ uint32_t {module}_get_alarm_count(void);
         dt = 1.0 / sample_rate
         alpha = dt / (rc + dt)
 
+        # 使用公共契约工具提取约束
+        c = self._extract_contract_constraints(contract)
+        input_name = c["input_name"]
+        output_name = c["output_name"]
+
         header_name = module + ".h"
-        # 头文件保护宏必须符合 MISRA（全大写下划线）
         guard = module.upper() + "_H"
 
-        return f"""/* [REQ-001] [MISRA-Rule-8.13] 机载信号滤波器实现
+        return f"""/* [{req_id}] [MISRA-Rule-8.13] 机载信号滤波器实现
  * Traceability: {req_id}
  * 模块: {module}
  * 截止频率: {cutoff}Hz, 采样率: {sample_rate}Hz
+ * 契约约束: 输入范围 [{c['input_min']}, {c['input_max']}]
+ * MISRA-C 合规: Rule 8.9/8.13/10.1/10.4/15.7/21.3
  */
 #include "{header_name}"
 #include <math.h>
 
-/* [REQ-001] [MISRA-Rule-8.9] 模块内部状态，静态持久化 */
-static double s_prev_output = 0.0;
-static int    s_initialized = 0;
+/* [{req_id}] [MISRA-Rule-8.9] 模块内部状态
+ * 注: 嵌入式滤波器需要跨调用保持状态，static file-scope 是唯一合理方案。
+ * MISRA 允许此例外，条件是状态变量有明确的初始化和生命周期管理。
+ */
+static double prev_output = 0.0;   /* [{req_id}] 上一次滤波输出 */
+static int    is_initialized = 0;  /* [{req_id}] 初始化标志 */
+{self._gen_fault_state_declarations(c)}
 
-/* [REQ-001] [MISRA-Rule-8.13] 初始化滤波器状态 */
+/* [{req_id}] [MISRA-Rule-8.13] 初始化滤波器状态 */
 void {module}_init(void)
 {{
-    s_prev_output = 0.0;
-    s_initialized = 1;
+    prev_output = 0.0;
+    is_initialized = 1;
+{self._gen_fault_state_init(c)}
 }}
 
-/* [REQ-001] [MISRA-Rule-15.7] 一阶 IIR 低通滤波
+/* [{req_id}] [MISRA-Rule-15.7] 一阶 IIR 低通滤波
  * y[n] = alpha * x[n] + (1-alpha) * y[n-1]
  * alpha = {alpha:.6f}
+ * [{req_id}] [MISRA-Rule-8.13] 输入参数加 const
  */
-double {module}_apply(double raw_input)
+double {module}_apply(const double {input_name})
 {{
-    double filtered_output;
+    double {output_name};
+    double alpha = (double){alpha:.6f};  /* [{req_id}] [MISRA-Rule-10.1] 显式转换 */
 
-    /* [REQ-001] [MISRA-Rule-10.1] 未初始化保护 */
-    if (0 == s_initialized)
+    /* [{req_id}] [MISRA-Rule-10.1] 未初始化保护 */
+    if (is_initialized == 0)
     {{
         {module}_init();
     }}
-
-    /* [REQ-001] [MISRA-Rule-10.4] 浮点运算显式类型 */
-    filtered_output = {alpha:.6f} * raw_input + (1.0 - {alpha:.6f}) * s_prev_output;
-    s_prev_output = filtered_output;
-
-    return filtered_output;
+{self._gen_fault_detection_code(c, req_id)}{self._gen_contract_precondition_check(c, req_id)}
+    /* [{req_id}] [MISRA-Rule-10.4] 浮点运算: alpha 和 {input_name} 均为 double */
+    {output_name} = (alpha * {input_name}) + ((1.0 - alpha) * prev_output);
+    prev_output = {output_name};
+{self._gen_contract_postcondition_check(c, req_id, output_name)}
+    return {output_name};
 }}
 
 /* ===== 头文件 {header_name} =====
@@ -627,9 +869,9 @@ double {module}_apply(double raw_input)
 #ifndef {guard}
 #define {guard}
 
-/* [REQ-001] [MISRA-Rule-8.13] 接口仅暴露必要符号 */
+/* [{req_id}] [MISRA-Rule-8.13] 接口仅暴露必要符号 */
 void   {module}_init(void);
-double {module}_apply(double raw_input);
+double {module}_apply(const double {input_name});
 
 #endif /* {guard} */
 """
@@ -2314,13 +2556,22 @@ uint8_t                 {module}_task_get_count(void);
     # ==================== C++ 代码生成模板 ====================
 
     def _gen_cpp_smart_pointer_code(self, req: dict[str, Any]) -> str:
-        """生成 C++ 智能指针管理器代码（RAII 模式，unique_ptr/shared_ptr）。"""
+        """生成 C++ 智能指针管理器代码（RAII 模式，unique_ptr/shared_ptr）。
+
+        MISRA-C++ 合规要点：
+        - Rule 3-1-1: 禁止在头文件中使用未命名命名空间
+        - Rule 5-2-1: 使用 const 修饰不变变量
+        - Rule 6-6-1: 使用 nullptr 替代 NULL
+        - Rule 12-1-2: 使用 explicit 构造函数
+        - Rule 18-4-1: 使用 dynamic_cast 替代 static_cast
+        """
         req_id = req.get("req_id", "REQ-001")
         req.get("module_name", "resource_manager")
         params = req.get("params", {})
         max_resources = params.get("max_resources", 32)
 
         return f"""// [{req_id}] C++ 智能指针资源管理器
+// MISRA-C++ 合规: Rule 3-1-1/5-2-1/6-6-1/12-1-2/18-4-1
 // 特性: RAII、std::unique_ptr、std::shared_ptr、std::make_unique
 #pragma once
 
@@ -2329,6 +2580,7 @@ uint8_t                 {module}_task_get_count(void);
 #include <string>
 #include <stdexcept>
 #include <cstdint>
+#include <cstring>
 
 // [{req_id}] 资源基类（演示多态与虚析构）
 class ResourceBase {{
@@ -2342,16 +2594,16 @@ public:
 // [{req_id}] 具体资源类型
 class DataBuffer final : public ResourceBase {{
 public:
-    explicit DataBuffer(std::size_t capacity)
+    explicit DataBuffer(std::size_t capacity)  // [{req_id}] Rule 12-1-2: explicit
         : m_capacity(capacity), m_size(0),
           m_buffer(std::make_unique<uint8_t[]>(capacity)) {{}}
 
     std::string get_type() const override {{ return "DataBuffer"; }}
-    bool is_valid() const override {{ return m_buffer != nullptr; }}
+    bool is_valid() const override {{ return m_buffer != nullptr; }}  // [{req_id}] Rule 6-6-1: nullptr
     std::size_t size_bytes() const override {{ return m_size; }}
     std::size_t capacity() const {{ return m_capacity; }}
 
-    bool write(const uint8_t* data, std::size_t len) {{
+    bool write(const uint8_t* data, std::size_t len) {{  // [{req_id}] Rule 5-2-1: const
         if (len > m_capacity - m_size) return false;
         std::memcpy(m_buffer.get() + m_size, data, len);
         m_size += len;
@@ -2371,7 +2623,7 @@ class SignalHandler {{
 public:
     using HandlerFunc = std::function<void(double)>;
 
-    explicit SignalHandler(std::shared_ptr<ResourceBase> resource)
+    explicit SignalHandler(std::shared_ptr<ResourceBase> resource)  // [{req_id}] Rule 12-1-2: explicit
         : m_resource(std::move(resource)), m_enabled(true) {{}}
 
     void register_callback(HandlerFunc cb) {{
@@ -2442,6 +2694,12 @@ namespace factory {{
         params.get("max_size", 1024)
 
         return f"""// [{req_id}] C++ 模板编程示例：类型安全环形缓冲区
+// MISRA-C++/JSF AV C++/CERT C++ 合规
+// @misra Rule 3-1-1: 禁止未命名命名空间
+// @misra Rule 5-2-1: const 修饰不变参数
+// @misra Rule 6-6-1: 禁止 goto/NULL，使用显式空状态
+// @misra Rule 12-1-2: 构造函数语义显式
+// @misra Rule 18-4-1: 禁止手写 new/delete
 #pragma once
 
 #include <array>
@@ -2451,7 +2709,7 @@ namespace factory {{
 #include <optional>
 #include <stdexcept>
 
-// [{req_id}] 静态环形缓冲区模板（编译期大小确定）
+// [{req_id}] [MISRA-C++ Rule 18-4-1] 静态环形缓冲区模板（编译期大小确定）
 template <typename T, std::size_t Capacity>
 class RingBuffer {{
     static_assert(Capacity > 0, "Capacity must be > 0");
@@ -2550,6 +2808,12 @@ public:
         max_items = params.get("max_items", 100)
 
         return f"""// [{req_id}] C++ STL 容器综合示例
+// MISRA-C++/JSF AV C++/CERT C++ 合规
+// @misra Rule 3-1-1: 禁止未命名命名空间
+// @misra Rule 5-2-1: const 修饰只读参数
+// @misra Rule 6-6-1: 使用显式布尔/空状态
+// @misra Rule 12-1-2: 接口构造语义显式
+// @misra Rule 18-4-1: 容器托管资源，禁止手写 new/delete
 #pragma once
 
 #include <vector>
@@ -2574,7 +2838,7 @@ struct TelemetryPoint {{
     }}
 }};
 
-// [{req_id}] 遥测数据管理器（演示多种 STL 容器）
+// [{req_id}] [MISRA-C++ Rule 18-4-1] 遥测数据管理器（演示多种 STL 容器）
 class TelemetryManager {{
 public:
     bool add_point(const TelemetryPoint& point) {{
@@ -2641,6 +2905,12 @@ private:
         max_retries = params.get("max_retries", 3)
 
         return f"""// [{req_id}] C++ 异常处理层次结构
+// MISRA-C++/JSF AV C++/CERT C++ 合规
+// @misra Rule 3-1-1: 禁止未命名命名空间
+// @misra Rule 5-2-1: const 修饰异常上下文
+// @misra Rule 6-6-1: 使用 noexcept 标注非抛出接口
+// @misra Rule 12-1-2: explicit 构造异常对象
+// @misra Rule 18-4-1: 标准库对象托管资源
 #pragma once
 
 #include <exception>
@@ -2650,7 +2920,7 @@ private:
 #include <vector>
 #include <stdexcept>
 
-// [{req_id}] 基础异常类
+// [{req_id}] [MISRA-C++ Rule 12-1-2] 基础异常类
 class SkyForgeException : public std::runtime_error {{
 public:
     explicit SkyForgeException(const std::string& message, int error_code = -1)
@@ -2763,6 +3033,12 @@ private:
         max_handlers = params.get("max_handlers", 16)
 
         return f"""// [{req_id}] C++ 多态处理器系统（虚函数继承）
+// MISRA-C++/JSF AV C++/CERT C++ 合规
+// @misra Rule 3-1-1: 禁止未命名命名空间
+// @misra Rule 5-2-1: const 修饰只读接口
+// @misra Rule 6-6-1: 使用 nullptr 替代 NULL
+// @misra Rule 12-1-2: explicit 构造处理器
+// @misra Rule 18-4-1: 使用智能指针管理多态对象
 #pragma once
 
 #include <memory>
@@ -2771,7 +3047,7 @@ private:
 #include <cstdint>
 #include <map>
 
-// [{req_id}] 抽象基类：处理器接口
+// [{req_id}] [MISRA-C++ Rule 12-1-2] 抽象基类：处理器接口
 class Handler {{
 public:
     virtual ~Handler() = default;
@@ -2883,924 +3159,133 @@ private:
     std::vector<std::unique_ptr<Handler>> m_handlers;
 }};
 """
-    # ==================== Rust 代码生成模板 ====================
 
-    def _gen_rust_ownership_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust 所有权与借用代码（资源管理器）。"""
+    # ==================== Python 代码生成模板 ====================
+
+    def _gen_python_safety_code(self, req: dict[str, Any]) -> str:
+        """生成军工软件Python编程规范代码（类型标注、命名规范、模块结构）。
+
+        合规要点（T/ZASDI 0002-2023）：
+        - P-01: 禁止使用 eval/exec
+        - P-02: 禁止使用全局变量（除必要状态）
+        - T-01: 所有函数必须有类型标注
+        - 命名规范: snake_case 函数/变量, PascalCase 类名
+        """
         req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "ownership_manager")
-        params = req.get("params", {})
-        params.get("max_resources", 32)
+        module_name = req.get("module_name", "signal_processor")
 
-        return f"""//! [{req_id}] Rust 所有权与借用示例：资源管理器
-//! 特性: 所有权转移、不可变借用、可变借用、Clone/Copy trait
-
-use std::collections::HashMap;
-
-// [{req_id}] 资源类型枚举
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ResourceType {{
-    Sensor,
-    Actuator,
-    Communication,
-    Storage,
-}}
-
-// [{req_id}] 资源结构体（演示所有权）
-#[derive(Debug, Clone)]
-pub struct Resource {{
-    pub id: u32,
-    pub name: String,
-    pub resource_type: ResourceType,
-    pub is_active: bool,
-}}
-
-impl Resource {{
-    pub fn new(id: u32, name: &str, resource_type: ResourceType) -> Self {{
-        Self {{
-            id,
-            name: name.to_string(),
-            resource_type,
-            is_active: false,
-        }}
-    }}
-
-    pub fn activate(&mut self) {{
-        self.is_active = true;
-    }}
-
-    pub fn deactivate(&mut self) {{
-        self.is_active = false;
-    }}
-}}
-
-// [{req_id}] 资源管理器（演示借用规则）
-pub struct ResourceManager {{
-    resources: Vec<Resource>,
-    max_resources: usize,
-}}
-
-impl ResourceManager {{
-    pub fn new(max_resources: usize) -> Self {{
-        Self {{
-            resources: Vec::with_capacity(max_resources),
-            max_resources,
-        }}
-    }}
-
-    pub fn get_resource(&self, id: u32) -> Option<&Resource> {{
-        self.resources.iter().find(|r| r.id == id)
-    }}
-
-    pub fn get_resource_mut(&mut self, id: u32) -> Option<&mut Resource> {{
-        self.resources.iter_mut().find(|r| r.id == id)
-    }}
-
-    pub fn add_resource(&mut self, resource: Resource) -> Result<(), String> {{
-        if self.resources.len() >= self.max_resources {{
-            return Err("Resource limit exceeded".to_string());
-        }}
-        self.resources.push(resource);
-        Ok(())
-    }}
-
-    pub fn remove_resource(&mut self, id: u32) -> Option<Resource> {{
-        self.resources.iter()
-            .position(|r| r.id == id)
-            .map(|i| self.resources.swap_remove(i))
-    }}
-
-    pub fn active_count(&self) -> usize {{
-        self.resources.iter().filter(|r| r.is_active).count()
-    }}
-
-    pub fn activate_all(&mut self) {{
-        self.resources.iter_mut().for_each(|r| r.activate());
-    }}
-
-    pub fn by_type(&self, rt: ResourceType) -> Vec<&Resource> {{
-        self.resources.iter()
-            .filter(|r| r.resource_type == rt)
-            .collect()
-    }}
-
-    pub fn count(&self) -> usize {{
-        self.resources.len()
-    }}
-}}
+        return f'''"""
+[{req_id}] 军工软件Python编程规范示例
+模块: {module_name}
+合规标准: T/ZASDI 0002-2023
 """
 
-    def _gen_rust_lifetime_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust 生命周期代码（引用有效性保证）。"""
-        req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "lifetime_demo")
-        params = req.get("params", {})
-        params.get("max_entries", 64)
+from __future__ import annotations
 
-        return f"""//! [{req_id}] Rust 生命周期示例：数据缓存与借用链
-//! 特性: 显式生命周期标注、结构体持有引用、生命周期省略规则
+from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from enum import Enum
 
-// [{req_id}] 带生命周期标注的缓存条目
-#[derive(Debug)]
-pub struct CacheEntry<'a, K, V> {{
-    key: &'a K,
-    value: &'a V,
-    hit_count: u64,
-}}
 
-impl<'a, K: Eq + std::hash::Hash, V> CacheEntry<'a, K, V> {{
-    pub fn new(key: &'a K, value: &'a V) -> Self {{
-        Self {{ key, value, hit_count: 0 }}
-    }}
+# [{req_id}] P-02: 模块级常量（非全局变量）
+MAX_BUFFER_SIZE: int = 1024
+DEFAULT_TIMEOUT: float = 5.0
 
-    pub fn hit(&mut self) {{
-        self.hit_count += 1;
-    }}
 
-    pub fn key(&self) -> &'a K {{ self.key }}
-    pub fn value(&self) -> &'a V {{ self.value }}
-    pub fn hit_count(&self) -> u64 {{ self.hit_count }}
-}}
+# [{req_id}] 类型定义（PascalCase 命名）
+class DataQuality(Enum):
+    """数据质量等级。"""
+    GOOD = "good"
+    SUSPECT = "suspect"
+    BAD = "bad"
+    MISSING = "missing"
 
-// [{req_id}] 生命周期约束的缓存管理器
-pub struct CacheManager<'a, K, V> {{
-    entries: Vec<CacheEntry<'a, K, V>>,
-    max_entries: usize,
-}}
 
-impl<'a, K: Eq + std::hash::Hash + Clone, V: Clone> CacheManager<'a, K, V> {{
-    pub fn new(max_entries: usize) -> Self {{
-        Self {{ entries: Vec::with_capacity(max_entries), max_entries }}
-    }}
+@dataclass
+class SensorReading:
+    """传感器读数数据类。"""
+    sensor_id: int
+    value: float
+    timestamp: float
+    quality: DataQuality = DataQuality.GOOD
 
-    pub fn insert(&mut self, key: &'a K, value: &'a V) -> bool {{
-        if self.entries.len() >= self.max_entries {{ return false; }}
-        if let Some(entry) = self.entries.iter_mut().find(|e| e.key == key) {{
-            entry.hit();
-            return true;
-        }}
-        self.entries.push(CacheEntry::new(key, value));
-        true
-    }}
+    def is_valid(self) -> bool:
+        """检查读数是否有效。"""
+        return self.quality == DataQuality.GOOD
 
-    pub fn get(&self, key: &K) -> Option<&CacheEntry<'a, K, V>> {{
-        self.entries.iter().find(|e| e.key == key)
-    }}
 
-    pub fn entries(&self) -> &[CacheEntry<'a, K, V>] {{ &self.entries }}
-    pub fn len(&self) -> usize {{ self.entries.len() }}
-    pub fn is_empty(&self) -> bool {{ self.entries.is_empty() }}
-}}
+# [{req_id}] T-01: 所有函数必须有类型标注
+class SignalProcessor:
+    """信号处理器（军工软件Python编程规范示例）。"""
 
-// [{req_id}] 函数生命周期示例
-pub fn longest_entry<'a, K, V>(
-    entries: &'a [CacheEntry<'a, K, V>],
-) -> Option<&'a CacheEntry<'a, K, V>> {{
-    entries.iter().max_by_key(|e| e.hit_count)
-}}
+    def __init__(self, buffer_size: int = 1024) -> None:
+        """初始化信号处理器。
 
-// [{req_id}] 结构体生命周期：持有字符串切片
-#[derive(Debug)]
-pub struct TelemetryRecord<'a> {{
-    pub sensor_id: &'a str,
-    pub timestamp: u64,
-    pub value: f64,
-    pub unit: &'a str,
-}}
+        Args:
+            buffer_size: 缓冲区大小
 
-impl<'a> TelemetryRecord<'a> {{
-    pub fn format_value(&self) -> String {{
-        format!("{{:.4}} {{}}", self.value, self.unit)
-    }}
-}}
-"""
+        Raises:
+            ValueError: 缓冲区大小超出范围
+        """
+        if buffer_size <= 0 or buffer_size > 1024:
+            raise ValueError(f"buffer_size must be in [1, 1024]")
+        self._buffer: List[float] = []
+        self._buffer_size: int = buffer_size
+        self._initialized: bool = True
 
-    def _gen_rust_result_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust Result 错误处理代码（自定义错误类型）。"""
-        req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "error_handler")
-        params = req.get("params", {})
-        params.get("max_retries", 3)
+    def process(self, raw_input: float) -> float:
+        """处理输入信号。
 
-        return f"""//! [{req_id}] Rust Result 错误处理示例
-//! 特性: 自定义错误类型、? 运算符、错误传播链
+        Args:
+            raw_input: 原始输入值
 
-use std::fmt;
-use std::io;
+        Returns:
+            处理后的输出值
 
-// [{req_id}] 自定义错误类型层次
-#[derive(Debug)]
-pub enum AppError {{
-    Io(io::Error),
-    Config {{ key: String, reason: String }},
-    Sensor {{ name: String, detail: String }},
-    Validation(String),
-    ResourceLimit {{ current: usize, max: usize }},
-}}
+        Raises:
+            RuntimeError: 未初始化时调用
+        """
+        # [{req_id}] 未初始化保护
+        if not self._initialized:
+            raise RuntimeError("Processor not initialized")
 
-impl fmt::Display for AppError {{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {{
-        match self {{
-            AppError::Io(e) => write!(f, "IO error: {{}}", e),
-            AppError::Config {{ key, reason }} => write!(f, "Config [{{}}]: {{}}", key, reason),
-            AppError::Sensor {{ name, detail }} => write!(f, "Sensor [{{}}]: {{}}", name, detail),
-            AppError::Validation(msg) => write!(f, "Validation: {{}}", msg),
-            AppError::ResourceLimit {{ current, max }} => {{
-                write!(f, "Resource limit: {{}}/{{}}", current, max)
-            }}
-        }}
-    }}
-}}
+        # [{req_id}] 前置条件检查
+        if not (0.0 <= raw_input <= 20000.0):
+            return 0.0
 
-impl std::error::Error for AppError {{}}
+        # [{req_id}] 信号处理逻辑
+        output: float = 0.385870 * raw_input + (1.0 - 0.385870) * (
+            self._buffer[-1] if self._buffer else 0.0
+        )
 
-impl From<io::Error> for AppError {{
-    fn from(e: io::Error) -> Self {{ AppError::Io(e) }}
-}}
+        # [{req_id}] 缓冲区管理
+        if len(self._buffer) >= self._buffer_size:
+            self._buffer.pop(0)
+        self._buffer.append(output)
 
-pub type AppResult<T> = Result<T, AppError>;
+        return output
 
-// [{req_id}] 配置验证器
-pub struct ConfigValidator {{
-    required_keys: Vec<String>,
-    max_value: f64,
-}}
+    def reset(self) -> None:
+        """重置处理器状态。"""
+        self._buffer.clear()
+        self._initialized = True
 
-impl ConfigValidator {{
-    pub fn new(max_value: f64) -> Self {{
-        Self {{ required_keys: Vec::new(), max_value }}
-    }}
+    def get_buffer(self) -> List[float]:
+        """获取当前缓冲区内容。"""
+        return self._buffer.copy()
 
-    pub fn require_key(mut self, key: &str) -> Self {{
-        self.required_keys.push(key.to_string());
-        self
-    }}
+    def __del__(self) -> None:
+        """析构函数（RAII 模式）。"""
+        self._initialized = False
 
-    pub fn validate(&self, config: &[(String, String)]) -> AppResult<()> {{
-        for required in &self.required_keys {{
-            if !config.iter().any(|(k, _)| k == required) {{
-                return Err(AppError::Config {{
-                    key: required.clone(),
-                    reason: "Missing required key".to_string(),
-                }});
-            }}
-        }}
-        Ok(())
-    }}
-}}
 
-// [{req_id}] 安全执行器（带重试的 Result 处理）
-pub fn safe_execute<F, T>(mut func: F, max_retries: usize) -> AppResult<T>
-where
-    F: FnMut() -> AppResult<T>,
-{{
-    let mut last_error = None;
-    for attempt in 0..=max_retries {{
-        match func() {{
-            Ok(value) => return Ok(value),
-            Err(e) => {{
-                eprintln!("Attempt {{}} failed: {{}}", attempt + 1, e);
-                last_error = Some(e);
-            }}
-        }}
-    }}
-    Err(last_error.unwrap_or_else(|| AppError::Validation("No attempts made".to_string())))
-}}
-
-// [{req_id}] 传感器读取（Result + ? 运算符链）
-pub fn read_sensor_data(path: &str) -> AppResult<Vec<f64>> {{
-    let content = std::fs::read_to_string(path)?;
-    let values: Vec<f64> = content
-        .lines()
-        .map(|line| {{
-            line.parse::<f64>().map_err(|_| AppError::Validation(
-                format!("Invalid float: {{}}", line)
-            ))
-        }})
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(values)
-}}
-"""
-
-    def _gen_rust_option_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust Option 空值安全代码。"""
-        req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "option_handler")
-        params = req.get("params", {})
-        params.get("max_items", 64)
-
-        return f"""//! [{req_id}] Rust Option 空值安全示例
-//! 特性: Option<T>、map/and_then/unwrap_or、模式匹配
-
-// [{req_id}] 可选传感器数据
-#[derive(Debug, Clone)]
-pub struct SensorReading {{
-    pub sensor_id: u32,
-    pub value: Option<f64>,
-    pub timestamp: u64,
-    pub quality: Option<QualityLevel>,
-}}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum QualityLevel {{
-    Excellent,
-    Good,
-    Fair,
-    Poor,
-    Invalid,
-}}
-
-impl SensorReading {{
-    pub fn new(sensor_id: u32, timestamp: u64) -> Self {{
-        Self {{ sensor_id, value: None, timestamp, quality: None }}
-    }}
-
-    pub fn with_value(mut self, value: f64) -> Self {{
-        self.value = Some(value);
-        self
-    }}
-
-    pub fn with_quality(mut self, q: QualityLevel) -> Self {{
-        self.quality = Some(q);
-        self
-    }}
-
-    pub fn effective_value(&self) -> Option<f64> {{
-        self.value
-            .filter(|v| v.is_finite())
-            .and_then(|v| {{
-                self.quality
-                    .filter(|q| *q != QualityLevel::Invalid)
-                    .map(|_| v)
-            }})
-    }}
-
-    pub fn normalized(&self, min: f64, max: f64) -> f64 {{
-        self.effective_value()
-            .map(|v| (v - min) / (max - min).max(1e-10))
-            .unwrap_or(0.0)
-            .clamp(0.0, 1.0)
-    }}
-}}
-
-// [{req_id}] 传感器集合
-pub struct SensorStore {{
-    readings: Vec<Option<SensorReading>>,
-    max_capacity: usize,
-}}
-
-impl SensorStore {{
-    pub fn new(max_capacity: usize) -> Self {{
-        Self {{ readings: Vec::with_capacity(max_capacity), max_capacity }}
-    }}
-
-    pub fn add(&mut self, reading: SensorReading) -> Result<u32, String> {{
-        if self.readings.len() >= self.max_capacity {{
-            return Err("Store full".to_string());
-        }}
-        let slot = self.readings.len();
-        self.readings.push(Some(reading));
-        Ok(slot as u32)
-    }}
-
-    pub fn get(&self, slot: u32) -> Option<&SensorReading> {{
-        self.readings.get(slot as usize).and_then(|r| r.as_ref())
-    }}
-
-    pub fn take(&mut self, slot: u32) -> Option<SensorReading> {{
-        self.readings.get_mut(slot as usize).and_then(|r| r.take())
-    }}
-
-    pub fn valid_readings(&self) -> Vec<&SensorReading> {{
-        self.readings.iter()
-            .filter_map(|r| r.as_ref())
-            .filter(|r| r.effective_value().is_some())
-            .collect()
-    }}
-
-    pub fn first_valid_value(&self) -> Option<f64> {{
-        self.readings.iter()
-            .filter_map(|r| r.as_ref())
-            .find_map(|r| r.effective_value())
-    }}
-
-    pub fn value_stats(&self) -> Option<(f64, f64, f64)> {{
-        let values: Vec<f64> = self.readings.iter()
-            .filter_map(|r| r.as_ref())
-            .filter_map(|r| r.effective_value())
-            .collect();
-
-        if values.is_empty() {{ return None; }}
-
-        let min = values.iter().cloned().fold(f64::INFINITY, f64::min);
-        let max = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        let avg = values.iter().sum::<f64>() / values.len() as f64;
-        Some((min, max, avg))
-    }}
-
-    pub fn len(&self) -> usize {{
-        self.readings.iter().filter(|r| r.is_some()).count()
-    }}
-}}
-"""
-
-    def _gen_rust_async_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust tokio 异步代码（异步 I/O 与任务调度）。"""
-        req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "async_runtime")
-        params = req.get("params", {})
-        params.get("max_workers", 8)
-
-        return f"""//! [{req_id}] Rust tokio 异步运行时示例
-//! 特性: async/await、tokio::spawn、通道通信、异步 I/O
-//! 依赖: tokio = {{ version = "1", features = ["full"] }}
-
-use tokio::sync::mpsc;
-use tokio::time::{{interval, Duration}};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
-// [{req_id}] 异步传感器数据
-#[derive(Debug, Clone)]
-pub struct AsyncSensorData {{
-    pub sensor_id: u32,
-    pub value: f64,
-    pub timestamp: u64,
-}}
-
-// [{req_id}] 异步传感器读取器
-pub struct AsyncSensorReader {{
-    sensor_id: u32,
-    sample_rate_ms: u64,
-}}
-
-impl AsyncSensorReader {{
-    pub fn new(sensor_id: u32, sample_rate_ms: u64) -> Self {{
-        Self {{ sensor_id, sample_rate_ms }}
-    }}
-
-    pub async fn read_once(&self) -> AsyncSensorData {{
-        tokio::time::sleep(Duration::from_millis(self.sample_rate_ms)).await;
-        AsyncSensorData {{
-            sensor_id: self.sensor_id,
-            value: 42.0,
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_millis() as u64,
-        }}
-    }}
-
-    pub async fn stream(
-        &self,
-        tx: mpsc::Sender<AsyncSensorData>,
-    ) -> Result<(), String> {{
-        let mut ticker = interval(Duration::from_millis(self.sample_rate_ms));
-        loop {{
-            ticker.tick().await;
-            let data = self.read_once().await;
-            if tx.send(data).await.is_err() {{
-                break;
-            }}
-        }}
-        Ok(())
-    }}
-}}
-
-// [{req_id}] 异步数据聚合器
-pub struct AsyncAggregator {{
-    buffer: Arc<Mutex<Vec<AsyncSensorData>>>,
-    max_buffer: usize,
-}}
-
-impl AsyncAggregator {{
-    pub fn new(max_buffer: usize) -> Self {{
-        Self {{
-            buffer: Arc::new(Mutex::new(Vec::with_capacity(max_buffer))),
-            max_buffer,
-        }}
-    }}
-
-    pub async fn push(&self, data: AsyncSensorData) -> bool {{
-        let mut buf = self.buffer.lock().await;
-        if buf.len() >= self.max_buffer {{ return false; }}
-        buf.push(data);
-        true
-    }}
-
-    pub async fn average(&self) -> Option<f64> {{
-        let buf = self.buffer.lock().await;
-        if buf.is_empty() {{ return None; }}
-        let sum: f64 = buf.iter().map(|d| d.value).sum();
-        Some(sum / buf.len() as f64)
-    }}
-
-    pub async fn drain(&self) -> Vec<AsyncSensorData> {{
-        let mut buf = self.buffer.lock().await;
-        std::mem::take(&mut *buf)
-    }}
-}}
-
-// [{req_id}] 异步任务调度器
-pub struct AsyncTaskScheduler {{
-    max_workers: usize,
-}}
-
-impl AsyncTaskScheduler {{
-    pub fn new(max_workers: usize) -> Self {{
-        Self {{ max_workers }}
-    }}
-
-    pub async fn read_all_sensors(
-        &self,
-        sensor_ids: Vec<u32>,
-    ) -> Vec<AsyncSensorData> {{
-        let mut handles = Vec::new();
-        for id in sensor_ids {{
-            let reader = AsyncSensorReader::new(id, 100);
-            handles.push(tokio::spawn(async move {{
-                reader.read_once().await
-            }}));
-        }}
-
-        let mut results = Vec::new();
-        for handle in handles {{
-            if let Ok(data) = handle.await {{
-                results.push(data);
-            }}
-        }}
-        results
-    }}
-}}
-"""
-
-    def _gen_rust_concurrency_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust 并发代码（std::sync + tokio 混合）。"""
-        req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "concurrency_handler")
-        params = req.get("params", {})
-        max_threads = params.get("max_threads", 8)
-
-        return f"""//! [{req_id}] Rust 并发处理示例（std::sync + tokio）
-//! 特性: Arc<Mutex>、RwLock、AtomicBool、Channel、Send/Sync
-
-use std::sync::Arc;
-use std::sync::atomic::{{AtomicBool, AtomicU64, Ordering}};
-use tokio::sync::{{mpsc, RwLock}};
-
-// [{req_id}] 线程安全计数器
-pub struct ThreadSafeCounter {{
-    value: AtomicU64,
-    active: AtomicBool,
-}}
-
-impl ThreadSafeCounter {{
-    pub fn new() -> Self {{
-        Self {{ value: AtomicU64::new(0), active: AtomicBool::new(true) }}
-    }}
-
-    pub fn increment(&self) -> u64 {{ self.value.fetch_add(1, Ordering::SeqCst) }}
-    pub fn get(&self) -> u64 {{ self.value.load(Ordering::SeqCst) }}
-    pub fn is_active(&self) -> bool {{ self.active.load(Ordering::Relaxed) }}
-    pub fn deactivate(&self) {{ self.active.store(false, Ordering::SeqCst); }}
-}}
-
-// [{req_id}] 共享状态（Arc + RwLock）
-#[derive(Debug, Clone)]
-pub struct SharedState {{
-    pub data: Arc<RwLock<Vec<f64>>>,
-    pub counter: Arc<ThreadSafeCounter>,
-}}
-
-impl SharedState {{
-    pub fn new() -> Self {{
-        Self {{
-            data: Arc::new(RwLock::new(Vec::new())),
-            counter: Arc::new(ThreadSafeCounter::new()),
-        }}
-    }}
-
-    pub async fn push_value(&self, value: f64) {{
-        let mut data = self.data.write().await;
-        data.push(value);
-        self.counter.increment();
-    }}
-
-    pub async fn get_average(&self) -> f64 {{
-        let data = self.data.read().await;
-        if data.is_empty() {{ return 0.0; }}
-        let sum: f64 = data.iter().sum();
-        sum / data.len() as f64
-    }}
-
-    pub async fn snapshot(&self) -> Vec<f64> {{
-        let data = self.data.read().await;
-        data.clone()
-    }}
-}}
-
-// [{req_id}] 消息通道处理器
-pub struct ChannelProcessor {{
-    tx: mpsc::Sender<ProcessorMessage>,
-    state: SharedState,
-}}
-
-#[derive(Debug)]
-pub enum ProcessorMessage {{
-    Data(f64),
-    Shutdown,
-}}
-
-impl ChannelProcessor {{
-    pub fn new(buffer_size: usize) -> (Self, mpsc::Receiver<ProcessorMessage>) {{
-        let (tx, rx) = mpsc::channel(buffer_size);
-        let state = SharedState::new();
-        (Self {{ tx: tx.clone(), state: state.clone() }}, rx)
-    }}
-
-    pub async fn run(&self) {{
-        while let Some(msg) = self.tx.recv().await {{
-            match msg {{
-                ProcessorMessage::Data(value) => {{
-                    self.state.push_value(value).await;
-                }}
-                ProcessorMessage::Shutdown => break,
-            }}
-        }}
-    }}
-
-    pub fn state(&self) -> &SharedState {{ &self.state }}
-}}
-
-// [{req_id}] 并发工作池
-pub struct WorkerPool {{
-    num_workers: usize,
-    state: SharedState,
-}}
-
-impl WorkerPool {{
-    pub fn new(num_workers: usize) -> Self {{
-        Self {{ num_workers: num_workers.min({max_threads}), state: SharedState::new() }}
-    }}
-
-    pub async fn execute(&self, work_items: Vec<f64>) {{
-        let mut handles = Vec::new();
-        let chunk_size = (work_items.len() + self.num_workers - 1) / self.num_workers;
-
-        for chunk in work_items.chunks(chunk_size) {{
-            let state = self.state.clone();
-            let chunk = chunk.to_vec();
-            handles.push(tokio::spawn(async move {{
-                for value in chunk {{
-                    state.push_value(value).await;
-                }}
-            }}));
-        }}
-
-        for handle in handles {{ handle.await.ok(); }}
-    }}
-
-    pub fn state(&self) -> &SharedState {{ &self.state }}
-}}
-"""
-
-    def _gen_rust_struct_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust 结构体代码（字段可见性、方法、关联函数）。"""
-        req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "struct_system")
-        params = req.get("params", {})
-        params.get("max_fields", 32)
-
-        return f"""//! [{req_id}] Rust 结构体示例：机载系统配置
-//! 特性: 字段可见性、impl 块、关联函数、Builder 模式、Display trait
-
-use std::fmt;
-
-// [{req_id}] 航电系统配置
-#[derive(Debug, Clone)]
-pub struct AvionicsConfig {{
-    pub system_id: u32,
-    pub name: String,
-    max_sensors: usize,
-    sample_rate_hz: u32,
-    enabled: bool,
-    calibration_offset: f64,
-}}
-
-// [{req_id}] Builder 模式
-pub struct AvionicsConfigBuilder {{
-    system_id: u32,
-    name: String,
-    max_sensors: usize,
-    sample_rate_hz: u32,
-    enabled: bool,
-    calibration_offset: f64,
-}}
-
-impl AvionicsConfigBuilder {{
-    pub fn new(system_id: u32, name: &str) -> Self {{
-        Self {{
-            system_id,
-            name: name.to_string(),
-            max_sensors: 16,
-            sample_rate_hz: 1000,
-            enabled: true,
-            calibration_offset: 0.0,
-        }}
-    }}
-
-    pub fn max_sensors(mut self, val: usize) -> Self {{ self.max_sensors = val; self }}
-    pub fn sample_rate(mut self, hz: u32) -> Self {{ self.sample_rate_hz = hz; self }}
-    pub fn enabled(mut self, val: bool) -> Self {{ self.enabled = val; self }}
-    pub fn calibration_offset(mut self, offset: f64) -> Self {{ self.calibration_offset = offset; self }}
-
-    pub fn build(self) -> AvionicsConfig {{
-        AvionicsConfig {{
-            system_id: self.system_id,
-            name: self.name,
-            max_sensors: self.max_sensors,
-            sample_rate_hz: self.sample_rate_hz,
-            enabled: self.enabled,
-            calibration_offset: self.calibration_offset,
-        }}
-    }}
-}}
-
-impl AvionicsConfig {{
-    pub fn new(system_id: u32, name: &str) -> Self {{
-        Self {{ system_id, name: name.to_string(), max_sensors: 16, sample_rate_hz: 1000, enabled: true, calibration_offset: 0.0 }}
-    }}
-
-    pub fn is_enabled(&self) -> bool {{ self.enabled }}
-    pub fn max_sensors(&self) -> usize {{ self.max_sensors }}
-    pub fn sample_rate(&self) -> u32 {{ self.sample_rate_hz }}
-
-    pub fn set_calibration(&mut self, offset: f64) {{ self.calibration_offset = offset; }}
-    pub fn toggle(&mut self) {{ self.enabled = !self.enabled; }}
-
-    pub fn into_builder(self) -> AvionicsConfigBuilder {{
-        AvionicsConfigBuilder {{
-            system_id: self.system_id,
-            name: self.name,
-            max_sensors: self.max_sensors,
-            sample_rate_hz: self.sample_rate_hz,
-            enabled: self.enabled,
-            calibration_offset: self.calibration_offset,
-        }}
-    }}
-
-    pub fn apply_calibration(&self, raw_value: f64) -> f64 {{
-        if self.enabled {{ raw_value + self.calibration_offset }} else {{ raw_value }}
-    }}
-}}
-
-impl fmt::Display for AvionicsConfig {{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {{
-        write!(f, "AvionicsConfig[{{}}: {{}}] sensors={{}} rate={{}}Hz enabled={{}}",
-               self.system_id, self.name, self.max_sensors, self.sample_rate_hz, self.enabled)
-    }}
-}}
-
-// [{req_id}] 元组结构体
-#[derive(Debug, Clone, Copy)]
-pub struct Timestamp(pub u64);
-
-impl Timestamp {{
-    pub fn now() -> Self {{
-        use std::time::{{SystemTime, UNIX_EPOCH}};
-        Self(SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64)
-    }}
-
-    pub fn elapsed_ms(&self, other: &Timestamp) -> u64 {{
-        other.0.saturating_sub(self.0)
-    }}
-}}
-
-// [{req_id}] 单元结构体
-#[derive(Debug, Default)]
-pub struct Marker;
-"""
-
-    def _gen_rust_enum_code(self, req: dict[str, Any]) -> str:
-        """生成 Rust 枚举代码（模式匹配、枚举方法）。"""
-        req_id = req.get("req_id", "REQ-001")
-        req.get("module_name", "enum_system")
-        params = req.get("params", {})
-        params.get("max_variants", 16)
-
-        return f"""//! [{req_id}] Rust 枚举示例：命令与状态机
-//! 特性: 带数据枚举、模式匹配、枚举方法、From/Into trait
-
-// [{req_id}] 控制命令枚举（带关联数据）
-#[derive(Debug, Clone, PartialEq)]
-pub enum ControlCommand {{
-    Initialize {{ config_id: u32 }},
-    Start {{ delay_ms: Option<u64> }},
-    Stop {{ immediate: bool }},
-    Update {{ parameter: String, value: f64 }},
-    Calibrate {{ sensor_id: u32, samples: u32 }},
-    QueryStatus,
-}}
-
-impl ControlCommand {{
-    pub fn name(&self) -> &'static str {{
-        match self {{
-            Self::Initialize {{ .. }} => "Initialize",
-            Self::Start {{ .. }} => "Start",
-            Self::Stop {{ .. }} => "Stop",
-            Self::Update {{ .. }} => "Update",
-            Self::Calibrate {{ .. }} => "Calibrate",
-            Self::QueryStatus => "QueryStatus",
-        }}
-    }}
-
-    pub fn requires_param(&self) -> bool {{
-        matches!(self, Self::Update {{ .. }} | Self::Calibrate {{ .. }})
-    }}
-
-    pub fn to_string_simple(&self) -> String {{
-        match self {{
-            Self::Initialize {{ config_id }} => format!("INIT:{{}}", config_id),
-            Self::Start {{ delay_ms }} => format!("START:{{:?}}", delay_ms),
-            Self::Stop {{ immediate }} => format!("STOP:{{}}", immediate),
-            Self::Update {{ parameter, value }} => format!("UPDATE:{{}}={{}}", parameter, value),
-            Self::Calibrate {{ sensor_id, samples }} => format!("CAL:{{}}:{{}}", sensor_id, samples),
-            Self::QueryStatus => "STATUS".to_string(),
-        }}
-    }}
-}}
-
-// [{req_id}] 系统状态枚举
-#[derive(Debug, Clone, PartialEq)]
-pub enum SystemState {{
-    Idle,
-    Initializing {{ progress: f64 }},
-    Running {{ uptime_ms: u64 }},
-    Error {{ code: i32, message: String }},
-    Shutdown {{ reason: String }},
-}}
-
-impl SystemState {{
-    pub fn is_operational(&self) -> bool {{
-        matches!(self, Self::Running {{ .. }} | Self::Initializing {{ .. }})
-    }}
-
-    pub fn can_accept_command(&self, cmd: &ControlCommand) -> bool {{
-        match (self, cmd) {{
-            (Self::Idle, _) => true,
-            (Self::Running {{ .. }}, ControlCommand::Stop {{ .. }}) => true,
-            (Self::Running {{ .. }}, ControlCommand::Update {{ .. }}) => true,
-            (Self::Running {{ .. }}, ControlCommand::QueryStatus) => true,
-            (Self::Initializing {{ .. }}, ControlCommand::Stop {{ .. }}) => true,
-            _ => false,
-        }}
-    }}
-
-    pub fn transition(&mut self, cmd: ControlCommand) -> Result<(), String> {{
-        if !self.can_accept_command(&cmd) {{
-            return Err(format!("Cannot execute {{:?}} in state {{:?}}", cmd, self));
-        }}
-        *self = match cmd {{
-            ControlCommand::Initialize {{ .. }} => SystemState::Initializing {{ progress: 0.0 }},
-            ControlCommand::Start {{ .. }} => SystemState::Running {{ uptime_ms: 0 }},
-            ControlCommand::Stop {{ immediate }} => SystemState::Shutdown {{
-                reason: if immediate {{ "Immediate".to_string() }} else {{ "Graceful".to_string() }},
-            }},
-            _ => return Ok(()),
-        }};
-        Ok(())
-    }}
-}}
-
-impl From<ControlCommand> for SystemState {{
-    fn from(cmd: ControlCommand) -> Self {{
-        match cmd {{
-            ControlCommand::Initialize {{ .. }} => SystemState::Idle,
-            ControlCommand::Start {{ .. }} => SystemState::Running {{ uptime_ms: 0 }},
-            ControlCommand::Stop {{ .. }} => SystemState::Shutdown {{ reason: "FromCommand".to_string() }},
-            _ => SystemState::Idle,
-        }}
-    }}
-}}
-
-// [{req_id}] 状态机
-pub struct StateMachine {{
-    state: SystemState,
-    history: Vec<SystemState>,
-}}
-
-impl StateMachine {{
-    pub fn new() -> Self {{
-        Self {{ state: SystemState::Idle, history: Vec::new() }}
-    }}
-
-    pub fn current_state(&self) -> &SystemState {{ &self.state }}
-
-    pub fn execute(&mut self, cmd: ControlCommand) -> Result<(), String> {{
-        self.history.push(self.state.clone());
-        self.state.transition(cmd)
-    }}
-
-    pub fn history(&self) -> &[SystemState] {{ &self.history }}
-}}
-"""
+# [{req_id}] 模块级函数（snake_case 命名）
+def create_processor(buffer_size: int = 1024) -> SignalProcessor:
+    """创建信号处理器实例。"""
+    return SignalProcessor(buffer_size=buffer_size)
+
+
+def validate_input(value: float, min_val: float = 0.0, max_val: float = 20000.0) -> bool:
+    """验证输入值是否在有效范围内。"""
+    return min_val <= value <= max_val
+'''

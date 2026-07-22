@@ -123,7 +123,10 @@ class MockClient:
 
     def _gen_contract_response(self, prompt: str) -> str:
         import json
-        data = json.loads(prompt) if prompt.startswith("{") else {}
+        try:
+            data = json.loads(prompt) if prompt.startswith("{") else {}
+        except json.JSONDecodeError:
+            data = {}
         module_name = data.get("module_name", "generic_component")
 
         return f"""component: {module_name}
@@ -134,19 +137,22 @@ interface:
   inputs:
     - name: raw_input
       type: double
-      range: [0, 20000]
+      range: [0.0, 20000.0]
   outputs:
     - name: filtered_output
       type: double
+      range: [0.0, 20000.0]
 contracts:
   preconditions:
-    - "raw_input != NULL"
+    - "raw_input is a valid double value (not NaN or Inf)"
   postconditions:
-    - "filtered_output >= 0"
+    - "filtered_output >= 0.0"
+    - "filtered_output <= raw_input_max"
   invariants:
-    - "sample_rate == 100Hz"
+    - "s_prev maintains filter state between calls"
   fault_handling:
-    - "if raw_input == 0: set fault_detected = true"
+    - "if raw_input is NaN or Inf: set filtered_output = 0.0"
+    - "if raw_input < 0: clamp filtered_output to 0.0"
 """
 
     def _gen_code_response(self, prompt: str) -> str:
@@ -157,47 +163,104 @@ contracts:
             data = {}
         module_name = data.get("module_name", "module")
 
-        return f"""/* [REQ-001] [MISRA-Rule-8.13] {module_name} 模块说明 */
-#include "{module_name}.h"
+        # V0.5.1: MISRA-C:2012 合规代码 — 消除 12.1/15.5/8.9 违规
+        return f"""/*
+ * [REQ-001] {module_name} 模块
+ * DO-178C DAL-C 目标代码（自动生成）
+ * 编码标准: MISRA-C:2012
+ */
+#include <stdint.h>
+#include <stddef.h>
 
-static double s_prev = 0.0;  /* [REQ-001] [MISRA-Rule-8.9] */
+/* [REQ-001] [MISRA-Rule-8.9] 模块静态状态 */
+static double s_prev = 0.0;
+static int s_fault = 0;
 
-void {module_name}_init(void) {{
+/*
+ * [REQ-001] [MISRA-Rule-8.7]
+ * 初始化函数：重置模块状态
+ */
+void {module_name}_init(void)
+{{
     s_prev = 0.0;
+    s_fault = 0;
 }}
 
-double {module_name}_apply(double raw_input) {{
-    /* [REQ-001] [MISRA-Rule-15.7] 滤波处理 */
+/*
+ * [REQ-001] [MISRA-Rule-8.13]
+ * 一阶低通滤波: output = alpha * input + (1-alpha) * prev
+ *
+ * @param raw_input 原始输入值 (double)
+ * @return 滤波后输出值 (double)
+ */
+double {module_name}_apply(double raw_input)
+{{
     const double alpha = 0.1;
-    double output = alpha * raw_input + (1.0 - alpha) * s_prev;
-    s_prev = output;
+    double output = 0.0;
+
+    /* MISRA Rule 12.1: 括号明确运算符优先级 */
+    if ((raw_input < 0.0) || (raw_input > 20000.0))
+    {{
+        s_fault = 1;
+        output = 0.0;
+    }}
+    else
+    {{
+        output = (alpha * raw_input) + ((1.0 - alpha) * s_prev);
+        s_prev = output;
+    }}
+
+    /* MISRA Rule 15.5: 单一 return 语句 */
     return output;
 }}
 """
 
     def _gen_repair_response(self, prompt: str) -> str:
-        return """/* [REQ-001] 修复后的代码 */
-#include "module.h"
+        import json
+        # 尝试从 prompt 中提取原始代码和违规信息
+        try:
+            data = json.loads(prompt) if prompt.startswith("{") else {}
+        except json.JSONDecodeError:
+            data = {}
+        module_name = data.get("module_name", "module")
 
+        return json.dumps({
+            "code": f"""/*
+ * [REQ-001] 修复后的 {module_name} 模块
+ * DO-178C DAL-C 目标代码（修复版本）
+ * 编码标准: MISRA-C:2012
+ */
+#include <stdint.h>
+#include <stddef.h>
+
+/* [REQ-001] [MISRA-Rule-8.9] 静态状态变量 */
 static double s_prev = 0.0;
 
-void module_init(void) {
+void {module_name}_init(void)
+{{
     s_prev = 0.0;
-}
+}}
 
-double module_apply(double raw_input) {
+double {module_name}_apply(double raw_input)
+{{
     const double alpha = 0.1;
-    double output = alpha * raw_input + (1.0 - alpha) * s_prev;
-    s_prev = output;
-    return output;
-}
+    double output;
 
-/* 修复说明：
-   - 移除了动态内存分配 (MISRA Rule-21.3)
-   - 添加了变量初始化 (MISRA Rule-8.9)
-   - 修复了隐式类型转换 (MISRA Rule-10.1)
-*/
-"""
+    output = (alpha * raw_input) + ((1.0 - alpha) * s_prev);
+    s_prev = output;
+
+    return output;
+}}
+""",
+            "actions": [
+                {"rule_id": "MISRA-C:2012-Rule-21.3", "line": 0,
+                 "description": "移除动态内存分配，使用静态变量"},
+                {"rule_id": "MISRA-C:2012-Rule-8.9", "line": 0,
+                 "description": "显式初始化静态变量"},
+                {"rule_id": "MISRA-C:2012-Rule-10.1", "line": 0,
+                 "description": "消除隐式类型转换，显式使用括号分组"}
+            ]
+        }, ensure_ascii=False)
 
     def _gen_architecture_response(self, prompt: str) -> str:
         import json

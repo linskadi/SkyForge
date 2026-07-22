@@ -216,28 +216,28 @@ class TestVirtualMCU(unittest.TestCase):
         available = self.mcu.is_gcc_available()
         self.assertIsInstance(available, bool)
 
-    def test_compile_success_or_mock(self) -> None:
-        """编译成功（有 GCC）或 mock 降级（无 GCC）。"""
+    def test_compile_success_or_strict_failure(self) -> None:
+        """显式启用真实 GCC 时：可用则编译成功，不可用则严格失败。"""
         result = self.mcu.compile(FILTER_CODE)
         if self.mcu.is_gcc_available():
             self.assertTrue(result.success)
             self.assertFalse(result.used_mock)
             self.assertNotEqual(result.executable_path, "")
         else:
-            self.assertTrue(result.used_mock)
-            self.assertTrue(result.success)
+            self.assertFalse(result.success)
+            self.assertFalse(result.used_mock)
+            self.assertIn("GCC", result.errors)
         if not result.used_mock:
             self.mcu.cleanup(result)
 
     def test_compile_failure_bad_code(self) -> None:
-        """非法 C 代码编译失败时降级到 Mock，编译错误被记录（GCC 可用时）。"""
+        """非法 C 代码在真实 GCC 路径中必须失败，不能降级到 Mock。"""
         if not self.mcu.is_gcc_available():
             self.skipTest("GCC 未安装，跳过编译失败测试")
         bad_code = "int this is not valid C code;\n"
         result = self.mcu.compile(bad_code)
-        # 设计：GCC 编译失败 → 降级 Mock（success=True, used_mock=True），
-        # errors 保留 GCC 的编译错误信息（证明 GCC 确实识别了非法代码）
-        self.assertTrue(result.used_mock, "编译失败应降级到 mock")
+        self.assertFalse(result.success, "真实 GCC 编译失败应返回失败")
+        self.assertFalse(result.used_mock, "真实 GCC 编译失败不能降级到 mock")
         self.assertNotEqual(result.errors, "", "编译错误信息应被保留")
         self.mcu.cleanup(result)
 

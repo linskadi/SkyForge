@@ -224,8 +224,7 @@ def _find_cppcheck_cfg_dir() -> str | None:
 
     candidates: list[str] = []
     # 通过 cppcheck 可执行文件相对路径推导（最可靠）
-    import shutil
-    cppcheck_path = shutil.which("cppcheck")
+    cppcheck_path = _find_cppcheck() or shutil.which("cppcheck")
     if cppcheck_path:
         cppcheck_dir = Path(cppcheck_path).resolve().parent
         candidates.append(str(cppcheck_dir / ".." / "share" / "cppcheck" / "cfg"))
@@ -292,8 +291,11 @@ def _scan_real_cppcheck(
     """
     with safe_tempdir(prefix="skyforge_cppcheck_") as tmp_dir:
         src_path = os.path.join(tmp_dir, "code.c")
+        # Cppcheck 不支持非 ASCII 字符（如中文注释），
+        # 将非 ASCII 字符替换为 '?' 以避免 unhandledChar 错误
+        ascii_code = code.encode("ascii", errors="replace").decode("ascii")
         with open(src_path, "w", encoding="utf-8") as f:
-            f.write(code)
+            f.write(ascii_code)
 
         # 使用管道分隔模板，便于稳定解析
         # {file}|{line}|{column}|{severity}|{id}|{message}
@@ -308,10 +310,6 @@ def _scan_real_cppcheck(
         # Windows 特殊处理：FILESDIR 硬编码 + addon 路径
         import sys
         if sys.platform == "win32":
-            # 修复 std.cfg 找不到的问题
-            cfg_dir = _find_cppcheck_cfg_dir()
-            if cfg_dir:
-                cmd.append(f"--cfg-path={cfg_dir}")
             # 优先用当前 Python 解释器（venv 内），避免 Windows Store 的 python stub（exitcode 9009）
             python_path = sys.executable
             if not python_path or "WindowsApps" in python_path:

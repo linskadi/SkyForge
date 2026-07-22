@@ -111,6 +111,7 @@ class ContractGeneratorAgent:
             prompt=prompt,
             system_prompt=_SYSTEM_PROMPT,
             temperature=0.4,
+            max_tokens=16384,  # 推理模型需要更大 token 上限
         )
         if not response:
             raise RuntimeError("ContractGeneratorAgent:LLM 调用返回空响应")

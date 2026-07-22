@@ -1,0 +1,32 @@
+component: flight_data_exceedance_monitor
+version: 1.0.0
+safety_level: DAL-A
+traceability:
+  - REQ-001
+interface:
+  inputs:
+    - name: raw_input
+      type: double[64]
+      range: [-10000, 10000]
+  outputs:
+    - name: exceedance_detected
+      type: bool
+      range: [0, 1]
+    - name: event_report_buffer
+      type: char[512]
+      range: [0, 255]
+contracts:
+  preconditions:
+    - "config_loaded == true"
+    - "raw_input != NULL"
+  postconditions:
+    - "exceedance_detected == (instant_flag || trend_flag || duration_flag)"
+    - "event_report_buffer[0] != '\\0' only if exceedance_detected"
+  invariants:
+    - "system_state >= init && system_state <= shutdown"
+    - "total_dynamic_allocations == 0"
+    - "sample_rate == 100.0"
+  fault_handling:
+    - "if config_parse_error: set system_state = fault; halt execution"
+    - "if raw_input[i] out_of_physical_range: set fault_detected = true; clamp to nearest bound"
+    - "if monitor_process called before init: set system_state = fault"

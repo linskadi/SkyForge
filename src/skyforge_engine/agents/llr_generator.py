@@ -178,6 +178,7 @@ class LLRGeneratorAgent:
             prompt=user_prompt,
             system_prompt=self.system_prompt,
             temperature=0.3,
+            max_tokens=16384,  # 推理模型需要更大 token 上限
         )
 
         result = safe_parse_llm_json(raw)

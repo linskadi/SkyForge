@@ -325,14 +325,14 @@ class HILManager:
         timeout: Optional[int] = None,
         task_id: str = "",
     ) -> dict[str, Any]:
-        """创建审批请求，等待人工确认（或超时自动批准）。
+        """创建审批请求，等待人工确认。
 
         检查点：requirement_review / contract_review / code_review / final_review。
 
         行为：
-        - HIL_ENABLED=false：直接返回 approved=True，不阻塞（status=skipped）
+        - HIL_ENABLED=false：直接返回 approved=False，不阻塞演示（status=skipped）
         - HIL_ENABLED=true：创建请求，asyncio.Event 等待 approve/reject 或超时
-        - 超时：自动批准（status=timeout，approved=True）
+        - 超时：返回 approved=False（status=timeout）
 
         Args:
             checkpoint: 检查点名称（必须在 VALID_CHECKPOINTS 中）。
@@ -347,8 +347,9 @@ class HILManager:
         if not self.enabled:
             logger.info(f"HILManager:HIL 未启用，跳过审批 checkpoint={checkpoint}")
             return {
-                "approved": True,
-                "comments": "HIL 已禁用，自动通过",
+                "approved": False,
+                "pipeline_continue": True,
+                "comments": "HIL 已禁用，未执行人工审批；不计入独立性证据",
                 "reviewer": "system",
                 "timestamp": _now_iso(),
                 "status": "skipped",
@@ -359,10 +360,11 @@ class HILManager:
 
         # 2. 检查 checkpoint 合法性
         if checkpoint not in VALID_CHECKPOINTS:
-            logger.warning(f"HILManager:未知检查点 {checkpoint}，自动通过")
+            logger.warning(f"HILManager:未知检查点 {checkpoint}，拒绝审批")
             return {
-                "approved": True,
-                "comments": f"未知检查点 {checkpoint}，自动通过",
+                "approved": False,
+                "pipeline_continue": False,
+                "comments": f"未知检查点 {checkpoint}，未执行人工审批",
                 "reviewer": "system",
                 "timestamp": _now_iso(),
                 "status": "skipped",
@@ -409,17 +411,34 @@ class HILManager:
                 "status": "approved",
             }
         except asyncio.TimeoutError:
-            # 超时自动批准
-            logger.warning(
-                f"HILManager:审批 {request_id} 超时({timeout_value}s)，自动批准"
-            )
-            result = {
-                "approved": True,
-                "comments": f"超时({timeout_value}s)自动批准",
-                "reviewer": "system",
-                "timestamp": _now_iso(),
-                "status": "timeout",
-            }
+            # 超时不再自动批准，避免 system 自己批准自己。
+            # V0.5: HITL_AUTO_APPROVE=true 时超时自动批准（评委演示用）
+            auto_approve = os.getenv("HITL_AUTO_APPROVE", "").lower() == "true"
+            if auto_approve:
+                logger.info(
+                    f"HILManager:审批 {request_id} 超时({timeout_value}s)，"
+                    f"HITL_AUTO_APPROVE=true 自动批准"
+                )
+                result = {
+                    "approved": True,
+                    "pipeline_continue": True,
+                    "comments": f"超时自动批准({timeout_value}s, HITL_AUTO_APPROVE=true)",
+                    "reviewer": "auto-approved",
+                    "timestamp": _now_iso(),
+                    "status": "auto_approved",
+                }
+            else:
+                logger.warning(
+                    f"HILManager:审批 {request_id} 超时({timeout_value}s)，未批准"
+                )
+                result = {
+                    "approved": False,
+                    "pipeline_continue": False,
+                    "comments": f"超时({timeout_value}s)，未执行人工审批",
+                    "reviewer": "system",
+                    "timestamp": _now_iso(),
+                    "status": "timeout",
+                }
 
         # 6. 补全请求元信息 + 移到历史
         result["request_id"] = request_id

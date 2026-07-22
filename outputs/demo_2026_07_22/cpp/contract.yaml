@@ -1,0 +1,31 @@
+component: adsb_message_processor
+version: 1.0.0
+safety_level: DAL-A
+traceability: [REQ-001]
+interface:
+  inputs:
+    - name: frame
+      type: RawFrame
+      range: []   # 无界限，指针有效性由前置条件保证
+  outputs:
+    - name: result
+      type: std::optional<MessageVariant>
+contracts:
+  preconditions:
+    - "frame != nullptr"
+    - "frame->length == 14U"
+    - "frame->data != nullptr"
+    - "!message_queue_empty(queue) -> queue.front().timestamp > (steady_clock::now() - seconds(30))"
+  postconditions:
+    - "result.has_value() -> result->crc_valid == true"
+    - "result.has_value() -> result->icao_address <= 0xFFFFFFU"
+    - "!result.has_value() -> error_counter_unchanged() || error_counter_incremented()"
+  invariants:
+    - "error_counter <= 0xFFFFFFFFU"
+    - "message_queue_size <= 256U"
+    - "sample_period == 10ms"
+    - "no_dynamic_memory_allocated == true"
+  fault_handling:
+    - "if crc_check_fails && !crc_correctable: discard_message; error_counter++"
+    - "if message_queue_full: discard_frame; fault_detected = true"
+    - "if expired_message_detected: remove_from_queue; fault_detected = false"

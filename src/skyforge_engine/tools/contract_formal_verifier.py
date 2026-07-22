@@ -38,9 +38,11 @@ Level 3 — 有界模型检查 (CBMC，可选):
 
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Optional
 
 import yaml
@@ -268,7 +270,7 @@ class Z3ContractVerifier:
                                 model = solver.model()
                                 test_cases.append({
                                     "case": f"{name}_{desc}",
-                                    "input": {name: float(model[var].as_decimal()) if hasattr(model[var], 'as_decimal') else str(model[var])},
+                                    "input": {name: float(model[var].as_decimal(10)) if hasattr(model[var], 'as_decimal') else str(model[var])},
                                     "boundary": desc,
                                 })
                             solver.pop()
@@ -411,47 +413,43 @@ class CbmcContractVerifier:
             return False, "CBMC 不可用", 0.0
 
         import time as time_mod
+        from skyforge_engine.core.verifiers.cbmc_verifier import preprocess_with_gcc
+
         start = time_mod.time()
 
         try:
-            # 生成带断言的 C 代码
             instrumented_code = self._instrument_code(code, contract)
 
-            # 写入临时文件
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".c", prefix="cbmc_verify_", delete=False
-            ) as f:
-                f.write(instrumented_code)
-                tmp_path = f.name
+            with tempfile.TemporaryDirectory() as tmpdir:
+                pp_file = preprocess_with_gcc(instrumented_code, tmpdir)
+                if pp_file:
+                    src = Path(pp_file)
+                else:
+                    src = Path(tmpdir) / "verify.c"
+                    src.write_text(instrumented_code, encoding="utf-8")
 
-            # 运行 CBMC
-            cmd = [
-                "cbmc", tmp_path,
-                "--unwind", str(unwind),
-                "--xml-ui",
-                "--trace",
-            ]
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=120,
-            )
+                cbmc_path = shutil.which("cbmc")
+                if not cbmc_path:
+                    return False, "CBMC not found", 0.0
 
-            elapsed = (time_mod.time() - start) * 1000
+                cmd = [
+                    cbmc_path, str(src),
+                    "--unwind", str(unwind),
+                    "--xml-ui",
+                    "--trace",
+                ]
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=120,
+                )
 
-            # 清理临时文件
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-
-            # 解析结果
-            verified = "VERIFICATION SUCCESSFUL" in result.stdout
-
-            return verified, result.stdout[:2000], elapsed
+                elapsed = (time_mod.time() - start) * 1000
+                verified = "VERIFICATION SUCCESSFUL" in result.stdout
+                return verified, result.stdout[:2000], elapsed
 
         except subprocess.TimeoutExpired:
             elapsed = (time_mod.time() - start) * 1000

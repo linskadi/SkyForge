@@ -106,20 +106,24 @@ DAL_OBJECTIVE_IDS: dict[DAL, list[str]] = {
         "OBJ-1", "OBJ-2", "OBJ-3", "OBJ-4", "OBJ-5", "OBJ-6",
         "OBJ-7", "OBJ-8", "OBJ-9", "OBJ-10", "OBJ-11", "OBJ-12",
         "OBJ-13", "OBJ-14", "OBJ-15", "OBJ-16", "OBJ-17", "OBJ-18", "OBJ-19",
+        "OBJ-20", "OBJ-21",
     ],
     DAL.B: [
         "OBJ-1", "OBJ-2", "OBJ-3", "OBJ-4", "OBJ-5", "OBJ-6",
         "OBJ-7", "OBJ-8", "OBJ-9", "OBJ-10", "OBJ-11", "OBJ-12",
         "OBJ-13", "OBJ-14", "OBJ-16", "OBJ-17", "OBJ-18",
+        "OBJ-20", "OBJ-21",
     ],
     DAL.C: [
         "OBJ-1", "OBJ-2", "OBJ-3", "OBJ-4", "OBJ-5", "OBJ-6",
         "OBJ-7", "OBJ-8", "OBJ-9", "OBJ-10", "OBJ-11", "OBJ-12",
         "OBJ-13", "OBJ-16", "OBJ-18",
+        "OBJ-20", "OBJ-21",
     ],
     DAL.D: [
         "OBJ-1", "OBJ-2", "OBJ-3", "OBJ-5", "OBJ-7",
         "OBJ-8", "OBJ-9", "OBJ-11", "OBJ-13", "OBJ-16", "OBJ-18",
+        "OBJ-20", "OBJ-21",
     ],
     DAL.E: [],
 }
@@ -278,6 +282,21 @@ ALL_OBJECTIVES: list[DALObjectiveDefinition] = [
         name="工具鉴定",
         description="开发工具经鉴定满足 DO-330 要求",
         do178_table="§12.2",
+        applicable_dals={DAL.A, DAL.B, DAL.C, DAL.D},
+    ),
+    # ---- P0: 数据耦合与控制耦合 (DO-178C §6.4.4.2) ----
+    DALObjectiveDefinition(
+        obj_id="OBJ-20",
+        name="数据耦合分析",
+        description="模块间的数据依赖关系已验证（全局变量读写、参数传递）",
+        do178_table="A-7.9",
+        applicable_dals={DAL.A, DAL.B, DAL.C, DAL.D},
+    ),
+    DALObjectiveDefinition(
+        obj_id="OBJ-21",
+        name="控制耦合分析",
+        description="模块间的控制流交互已验证（函数调用图、调用顺序）",
+        do178_table="A-7.10",
         applicable_dals={DAL.A, DAL.B, DAL.C, DAL.D},
     ),
 ]

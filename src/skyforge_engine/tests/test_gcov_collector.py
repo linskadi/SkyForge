@@ -207,23 +207,27 @@ def test_parse_lcov_info_empty():
 
 
 def test_collect_coverage_success_with_mocked_tools(tmp_path):
-    """模拟完整流程：编译、执行、lcov 收集均成功。"""
+    """模拟完整流程：编译、执行、gcov JSON 收集均成功。"""
+    import json, gzip
+
     code = "int main(void) { return 0; }"
-    info_content = """TN:
-SF:test.c
-FN:1,main
-FNDA:1,main
-FNF:1
-FNH:1
-DA:1,1
-LF:1
-LH:1
-BRF:0
-BRH:0
-end_of_record
-"""
-    info_file = tmp_path / "coverage.info"
-    info_file.write_text(info_content, encoding="utf-8")
+
+    # 创建 mock gcov JSON gz 文件
+    gcov_data = {
+        "format_version": "2",
+        "gcc_version": "16.1.0",
+        "files": [{
+            "file": "test.c",
+            "lines": [
+                {"line_number": 1, "count": 1, "unexecuted_block": False,
+                 "branches": [], "conditions": []}
+            ],
+            "functions": [{"name": "main", "start_line": 1}]
+        }]
+    }
+    json_gz = tmp_path / "test_harness.c.gcov.json.gz"
+    with gzip.open(json_gz, "wt", encoding="utf-8") as gf:
+        json.dump(gcov_data, gf)
 
     mock_compile = MagicMock()
     mock_compile.returncode = 0
@@ -232,16 +236,17 @@ end_of_record
     mock_run = MagicMock()
     mock_run.returncode = 0
 
-    mock_lcov = MagicMock()
-    mock_lcov.returncode = 0
-    mock_lcov.stderr = ""
+    mock_gcov = MagicMock()
+    mock_gcov.returncode = 0
+    mock_gcov.stderr = ""
+    mock_gcov.stdout = ""
 
     import skyforge_engine.dal.gcov_collector as gcov_mod
 
     with patch.object(gcov_mod, "_find_gcc", return_value="/usr/bin/gcc"), patch.object(
         gcov_mod, "_find_lcov", return_value="/usr/bin/lcov"
     ), patch.object(
-        gcov_mod.subprocess, "run", side_effect=[mock_compile, mock_run, mock_lcov]
+        gcov_mod.subprocess, "run", side_effect=[mock_compile, mock_run, mock_gcov]
     ), patch.object(
         gcov_mod.tempfile, "TemporaryDirectory"
     ) as mock_tmpdir:

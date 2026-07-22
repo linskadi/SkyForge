@@ -36,7 +36,7 @@ class RepairLoopStage:
     ) -> StageResult:
         from skyforge_engine.agents.code_repairer import CodeRepairerAgent
         from skyforge_engine.tools.contract_checker import check as contract_check
-        from skyforge_engine.tools.cppcheck_scanner import scan as cppcheck_scan
+        from skyforge_engine.tools.cppcheck_scanner import scan_multi as cppcheck_scan
 
         context = context or {}
         hook = _normalize_hook(context.get("log_hook"))
@@ -56,7 +56,7 @@ class RepairLoopStage:
         for iteration in range(1, self._max_iterations + 1):
             await hook("REPAIR", "info", f"第 {iteration} 轮：扫描违规")
             sync_cb, pending_logs = _make_sync_log_collector()
-            violations = cppcheck_scan(current_code, log_callback=sync_cb)
+            violations = cppcheck_scan(current_code, language=language, log_callback=sync_cb)
             await _flush_collected_logs(hook, pending_logs)
             final_violations = violations
 
@@ -82,6 +82,42 @@ class RepairLoopStage:
                 "success",
                 f"第 {iteration} 轮：修复完成 actions={len(repair_result.actions)}",
             )
+
+            # ---- 不退步检测：修复后重新扫描，防止引入新违规 ----
+            sync_cb2, pending_logs2 = _make_sync_log_collector()
+            post_repair_violations = cppcheck_scan(repair_result.code, language=language, log_callback=sync_cb2)
+            await _flush_collected_logs(hook, pending_logs2)
+            if len(post_repair_violations) > len(violations) or (
+                # 检测引入新规则 ID（例如修复 15.5 时引入 15.1 goto）
+                {v.rule_id for v in post_repair_violations} - {v.rule_id for v in violations}
+            ):
+                introduced = {v.rule_id for v in post_repair_violations} - {v.rule_id for v in violations}
+                reason_parts = []
+                if len(post_repair_violations) > len(violations):
+                    reason_parts.append(f"数量退步（{len(violations)} → {len(post_repair_violations)}）")
+                if introduced:
+                    reason_parts.append(f"引入新规则 {introduced}")
+                await hook(
+                    "REPAIR",
+                    "warn",
+                    f"第 {iteration} 轮：修复后退步（{'，'.join(reason_parts)}），"
+                    f"回退到修复前代码并终止修复循环",
+                )
+                # 回退：使用修复前代码，记录回退事件
+                history_entry_degraded: dict[str, Any] = {
+                    "iteration": iteration,
+                    "violations_before": [asdict(v) for v in violations],
+                    "violations_count_before": len(violations),
+                    "post_repair_violations": len(post_repair_violations),
+                    "actions": [asdict(a) for a in repair_result.actions],
+                    "actions_count": len(repair_result.actions),
+                    "code_after": repair_result.code,
+                    "degraded": True,
+                    "reverted": True,
+                }
+                repair_history.append(history_entry_degraded)
+                break
+            # ---- 不退步检测结束 ----
 
             if contract:
                 await hook("SYSTEM", "info", f"第 {iteration} 轮：契约校验")
@@ -113,7 +149,7 @@ class RepairLoopStage:
             current_code = repair_result.code
 
         sync_cb, pending_logs = _make_sync_log_collector()
-        final_violations = cppcheck_scan(current_code, log_callback=sync_cb)
+        final_violations = cppcheck_scan(current_code, language=language, log_callback=sync_cb)
         await _flush_collected_logs(hook, pending_logs)
 
         if contract and contract_check_result is None:

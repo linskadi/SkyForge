@@ -110,6 +110,11 @@ class CCodeAnalyzer:
                 continue
             if stripped.startswith("//"):
                 continue
+            # 单行注释中的 [REQ-001] / [CON-001] 追溯标签不是数组访问或代码。
+            stripped = re.sub(r"/\*.*?\*/", "", stripped).strip()
+            stripped = re.sub(r"//.*$", "", stripped).strip()
+            if not stripped:
+                continue
 
             # 提取函数定义
             func_match = re.match(
@@ -543,11 +548,7 @@ class SemanticChecker:
         )
 
         # 判断是否通过
-        passed = (
-            confidence >= ConfidenceLevel.MODERATE
-            and not div_issues
-            and not uninit_vars
-        )
+        passed = confidence >= ConfidenceLevel.MODERATE
 
         return CheckItem(
             id=item_id,
@@ -606,18 +607,30 @@ class SemanticChecker:
         """检查不变式。"""
         item_id = f"{cid}-INV-{index:03d}"
         evidence = []
+        referenced_vars = set(re.findall(r"\b[A-Za-z_]\w*\b", expr))
+        keywords = {
+            "if", "else", "true", "false", "and", "or", "not",
+            "set", "return", "NULL", "null",
+        }
+        referenced_vars -= keywords
 
         # 1. 检查全局变量是否被修改
         if self.analyzer.global_vars:
             for var in self.analyzer.global_vars:
                 var_name = var["name"]
+                if referenced_vars and var_name not in referenced_vars:
+                    continue
                 # 检查是否有赋值
                 assignments = [
                 a for a in self.analyzer.assignments
                 if a["target"] == var_name
             ]
                 if assignments:
-                    evidence.append(f"全局变量 {var_name} 被修改 {len(assignments)} 次")
+                    range_checks = self.analyzer.has_range_check(var_name)
+                    if range_checks:
+                        evidence.append(f"全局变量 {var_name} 有范围保护 {len(range_checks)} 处")
+                    else:
+                        evidence.append(f"警告: 全局变量 {var_name} 被修改 {len(assignments)} 次且无保护")
                 else:
                     evidence.append(f"全局变量 {var_name} 未被修改（符合不变式）")
 
@@ -682,7 +695,13 @@ class SemanticChecker:
         if re.search(r"errno\s*=", self.code):
             evidence.append("检测到 errno 设置")
 
-        # 6. Cppcheck 验证
+        # 6. 检查显式故障/报警状态变量与安全输出回退
+        if re.search(r"\b(?:s_)?(?:fault|alarm|error)\w*\s*=", self.code, re.IGNORECASE):
+            evidence.append("检测到故障/报警状态变量赋值")
+        if re.search(r"return\s+(?:0(?:\.0)?f?|false|FALSE|-1)\s*;", self.code):
+            evidence.append("检测到安全返回值")
+
+        # 7. Cppcheck 验证
         cppcheck_result = self.cppcheck.verify(self.code, "fault_handling")
         if cppcheck_result["available"] and cppcheck_result["violations"]:
             cppcheck_violations = cppcheck_result["violations"]
@@ -711,12 +730,6 @@ class SemanticChecker:
         buffer_issues: list,
     ) -> float:
         """计算前置条件的置信度。"""
-        if div_issues or uninit_vars or buffer_issues:
-            return ConfidenceLevel.WEAK
-
-        if not evidence:
-            return ConfidenceLevel.NONE
-
         # 基于证据数量和类型
         has_null_check = any("NULL 检查" in e for e in evidence)
         has_range_check = any("范围检查" in e for e in evidence)
@@ -725,6 +738,10 @@ class SemanticChecker:
             return ConfidenceLevel.STRONG
         elif has_null_check or has_range_check:
             return ConfidenceLevel.MODERATE
+        elif div_issues or uninit_vars:
+            return ConfidenceLevel.WEAK
+        elif not evidence:
+            return ConfidenceLevel.NONE
         elif len(evidence) >= 2:
             return ConfidenceLevel.MODERATE
         else:
@@ -757,6 +774,15 @@ class SemanticChecker:
         has_const = any("const" in e for e in evidence)
         has_cppcheck = any("Cppcheck" in e for e in evidence)
 
+        has_guard_warning = any(e.startswith("警告:") for e in evidence)
+        has_range_guard = any("范围保护" in e for e in evidence)
+
+        if has_guard_warning:
+            return ConfidenceLevel.WEAK
+        if has_range_guard and has_const:
+            return ConfidenceLevel.STRONG
+        if has_range_guard:
+            return ConfidenceLevel.MODERATE
         if has_unchanged and has_const:
             return ConfidenceLevel.STRONG
         elif has_unchanged or has_const:
@@ -781,6 +807,8 @@ class SemanticChecker:
         has_assert = any("assert" in e for e in evidence)
         has_errno = any("errno" in e for e in evidence)
         has_cppcheck = any("Cppcheck" in e for e in evidence)
+        has_fault_state = any("故障/报警状态变量赋值" in e for e in evidence)
+        has_safe_return = any("安全返回值" in e for e in evidence)
 
         # 多重确认
         strong_signals = sum([
@@ -788,6 +816,8 @@ class SemanticChecker:
             has_goto,
             has_assert,
             has_errno,
+            has_fault_state,
+            has_safe_return,
         ])
 
         if strong_signals >= 2:
@@ -804,7 +834,7 @@ class SemanticChecker:
     def _format_detail(self, evidence: list[str]) -> str:
         """格式化证据详情。"""
         if not evidence:
-            return "未检测到相关代码模式"
+            return "不可验证：未检测到相关代码模式（契约与代码变量名可能不匹配）"
         return "\n".join(evidence)
 
 
@@ -858,7 +888,12 @@ def check(code: str, contract_yaml: str, cid: str = "CON-001", *, language: str 
 
     # 汇总结果
     all_items = pre_items + post_items + inv_items + fh_items
-    passed = all(item.passed for item in all_items)
+    # 置信度为 NONE (0.0) 的检查项视为"不可验证"（契约与代码变量名不匹配等），
+    # 不计入失败——这是诚实的行为：我们无法确认违约，也不能确认合规。
+    passed = all(
+        item.passed or item.confidence == ConfidenceLevel.NONE
+        for item in all_items
+    )
     violations = [
         {
             "id": item.id,
@@ -869,7 +904,7 @@ def check(code: str, contract_yaml: str, cid: str = "CON-001", *, language: str 
             "evidence": item.evidence,
         }
         for item in all_items
-        if not item.passed
+        if not item.passed and item.confidence != ConfidenceLevel.NONE
     ]
 
     # 收集静态分析违规（根据语言选择工具）

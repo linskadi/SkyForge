@@ -11,10 +11,10 @@
 - test_hil_request_approval：创建审批请求并等待人工批准
 - test_hil_approve：批准审批
 - test_hil_reject：拒绝审批
-- test_hil_timeout：超时自动批准
-- test_hil_disabled：HIL_ENABLED=false 时跳过审批
+- test_hil_timeout：超时不自动批准
+- test_hil_disabled：HIL_ENABLED=false 时跳过审批但不计入批准
 - test_hil_history：审批历史记录
-- test_pipeline_hil_integration：HIL_ENABLED=false 时 pipeline 正常完成
+- test_pipeline_hil_integration：HIL_ENABLED=false 时 pipeline 可继续演示
 - test_pipeline_hil_reject_aborts：HIL 启用且需求评审被拒绝时
   pipeline 正确中止（丢弃并行生成的契约）
 """
@@ -298,7 +298,7 @@ class TestHILManager(unittest.TestCase):
         self.assertEqual(reject_result["comments"], "代码不合规")
 
     def test_hil_timeout(self) -> None:
-        """超时自动批准：等待 timeout 秒后返回 approved=True。"""
+        """超时不自动批准：等待 timeout 秒后返回 approved=False。"""
         manager = HILManager(enabled=True, default_timeout=10)
 
         async def scenario() -> dict:
@@ -310,7 +310,7 @@ class TestHILManager(unittest.TestCase):
             )
 
         result = asyncio.run(scenario())
-        self.assertTrue(result["approved"])
+        self.assertFalse(result["approved"])
         self.assertEqual(result["status"], "timeout")
         self.assertEqual(result["reviewer"], "system")
         self.assertIn("超时", result["comments"])
@@ -321,7 +321,7 @@ class TestHILManager(unittest.TestCase):
         self.assertEqual(history[0]["status"], "timeout")
 
     def test_hil_disabled(self) -> None:
-        """HIL_ENABLED=false 时跳过审批，直接返回 approved=True。"""
+        """HIL_ENABLED=false 时跳过审批，但不返回批准语义。"""
         manager = HILManager(enabled=False)
 
         async def scenario() -> dict:
@@ -332,13 +332,14 @@ class TestHILManager(unittest.TestCase):
             )
 
         result = asyncio.run(scenario())
-        self.assertTrue(result["approved"])
+        self.assertFalse(result["approved"])
+        self.assertTrue(result["pipeline_continue"])
         self.assertEqual(result["status"], "skipped")
         # pending 列表应为空（未创建请求）
         self.assertEqual(manager.get_pending_approvals(), [])
 
     def test_hil_unknown_checkpoint(self) -> None:
-        """未知 checkpoint 自动通过（status=skipped）。"""
+        """未知 checkpoint 不自动通过（status=skipped）。"""
         manager = HILManager(enabled=True)
 
         async def scenario() -> dict:
@@ -349,7 +350,7 @@ class TestHILManager(unittest.TestCase):
             )
 
         result = asyncio.run(scenario())
-        self.assertTrue(result["approved"])
+        self.assertFalse(result["approved"])
         self.assertEqual(result["status"], "skipped")
 
     def test_hil_history(self) -> None:

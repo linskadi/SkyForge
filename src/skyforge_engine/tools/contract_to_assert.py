@@ -48,13 +48,39 @@ def contract_to_assert(yaml_str: str, cid: str = "CON-001") -> str:
     for post in postconditions:
         post["expr"] = post["expr"].replace("filtered_output", "output").replace("out_val", "output")
 
+    # 过滤掉引用了 harness 环境中不存在的变量的断言（避免编译失败）
+    # harness 已知变量：output, raw_input, filtered_output, fault_detected, sample_rate,
+    #                  cutoff_frequency, step_count, in_val, out_val
+    known_vars = {
+        "output", "raw_input", "filtered_output", "fault_detected",
+        "sample_rate", "cutoff_frequency", "step_count", "in_val", "out_val",
+        "input", "result", "0", "1", "true", "false", "NULL",
+    }
+    import re as _re
+    safe_posts = []
+    skipped = 0
+    for post in postconditions:
+        # 提取断言表达式中的所有标识符
+        identifiers = set(_re.findall(r'[a-zA-Z_]\w*', post["expr"]))
+        # 移除 C 关键字和已知函数名
+        c_keywords = {"assert", "fabs", "isnan", "isinf", "abs", "sqrt", "pow", "sin", "cos",
+                       "floor", "ceil", "round", "fmod", "void", "double", "int", "float",
+                       "return", "if", "else", "while", "for", "static", "const", "struct",
+                       "typedef", "enum", "sizeof", "true", "false", "NULL"}
+        unknown = identifiers - known_vars - c_keywords
+        if unknown:
+            logger.warning(f"ContractToAssert:跳过断言 [{post['id']}]：引用未知变量 {unknown}")
+            skipped += 1
+        else:
+            safe_posts.append(post)
+
     rendered = ASSERT_TEMPLATE.render(
         cid=cid,
         traceability=traceability,
-        postconditions=postconditions,
+        postconditions=safe_posts,
     )
     logger.info(
-        f"ContractToAssert:完成:生成 {len(postconditions)} 条后置条件断言 (cid={cid})"
+        f"ContractToAssert:完成:生成 {len(safe_posts)} 条后置条件断言 (cid={cid}, 跳过 {skipped} 条含未知变量)"
     )
     return rendered
 

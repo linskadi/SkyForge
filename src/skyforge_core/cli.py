@@ -47,7 +47,6 @@ def cmd_generate(args: argparse.Namespace) -> int:
         run_full_pipeline(
             requirement=requirement_text,
             simulate=args.simulate,
-            fault_type=args.fault if args.simulate else None,
         )
     )
 
@@ -462,8 +461,10 @@ def main() -> int:
                      help="安全等级（默认 C）")
     gen.add_argument("--use-llm", action="store_true",
                      help="启用 LLM 增强（默认使用规则引擎）")
-    gen.add_argument("--simulate", action="store_true",
-                     help="运行数字孪生仿真")
+    gen.add_argument("--simulate", action="store_true", default=True,
+                     help="运行数字孪生仿真（默认开启）")
+    gen.add_argument("--no-simulate", action="store_false", dest="simulate",
+                     help="跳过数字孪生仿真")
     gen.add_argument("--fault", choices=["bias", "signal_loss", "noise", "stuck", "step"],
                      help="故障注入类型（需 --simulate）")
 

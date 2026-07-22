@@ -3,7 +3,7 @@
 # DO-178C 章节: §6.4 (Verification of Verification Results) + 附录 A
 # DO-330 章节: §11 (Tool Accomplishment Summary)
 # 日期: 2026-07-17
-# 状态: V3.3-Enhanced 正式发布
+# 状态: V3.3-Enhanced 工程辅助证据草案；不代表适航批准
 #
 # 列说明:
 #   OBJ_ID              - 目标编号 (OBJ-1 ~ OBJ-19)
@@ -30,29 +30,31 @@ OBJ-6,故障注入测试,A-6.6,R+,R+,R+,R,N/A,满足,fault_injector.py + virtual
 OBJ-7,代码审查,A-7.1,R+,R+,R+,R+,N/A,满足,HILManager（HITL 人工审查） + GitHub PR,SQAP.md §3.1,2026-07-15,HITL 三检查点 (需求/契约/代码)
 OBJ-8,配置管理,A-8.1,R,R,R,R,N/A,满足,Git + SCMP.md + 基线管理,SCMP.md §3,2026-07-16,4 类基线 (功能/分配/开发/产品)
 OBJ-9,问题报告,A-8.3,R,R,R,R,N/A,满足,pr_manager.py + GitHub Issues,SCMP.md §5,2026-07-16,PR-YYYY-NNNN 年度唯一编号
-OBJ-10,独立性,A-9.1,R+,R+,R+,R,N/A,满足,HITL 人工审查 (独立于开发工具) + CI (独立于开发者),SQAP.md §2.2,2026-07-15,工具自动化 + 人工审查双重机制
-OBJ-11,编译验证,A-5.3,R+,R+,R+,R,N/A,满足,GCC -std=c11 -O2 + virtual_mcu.py,SDP.md §3.2,2026-07-12,真实编译 + 沙盒执行
-OBJ-12,契约违约处理,(自定义),R,R,R,R,N/A,满足,contract_checker.py + simulation_engine.py 断言,—,2026-07-14,前置/后置/不变式/故障处理 4 类
-OBJ-13,语句覆盖率,A-7.5,R+,R+,R+,O,N/A,满足,coverage_analyzer.py (V3.3-Enhanced),SVP.md §3.4,2026-07-17,括号感知条件拆分 + switch case 覆盖统计
-OBJ-14,判定覆盖率,A-7.7,R+,R+,O,O,N/A,满足,coverage_analyzer.py (V3.3-Enhanced),SVP.md §3.4,2026-07-17,故障注入覆盖率修正 + 测试向量生成
-OBJ-15,MC/DC 覆盖率,A-7.8,R+,O,O,O,N/A,满足,mcdc_calculator.py (V3.3-Enhanced),SVP.md §3.4,2026-07-17,Modified Condition/Decision Coverage 完整实现
+OBJ-10,独立性,A-9.1,R+,R+,R+,R,N/A,部分满足,HITL 人工审查 (独立于开发工具) + CI (独立于开发者),SQAP.md §2.2,2026-07-15,仅真实非 system 审查可计入；禁用/超时自动通过不计入
+OBJ-11,编译验证,A-5.3,R+,R+,R+,R,N/A,部分满足,GCC -std=c11 -O2 + virtual_mcu.py,SDP.md §3.2,2026-07-12,USE_REAL_GCC=true 时严格失败；mock 仿真不构成编译验证通过
+OBJ-12,契约违约处理,(自定义),R,R,R,R,N/A,部分满足,contract_checker.py + simulation_engine.py 断言,—,2026-07-14,需聚合 A-3.1 契约校验与仿真断言；no_breach 不可覆盖已检测违约
+OBJ-13,语句覆盖率,A-7.5,R+,R+,R+,O,N/A,未满足,coverage_analyzer.py (V3.3-Enhanced),SVP.md §3.4,2026-07-17,当前真实覆盖率未达 100%；静态分析/0% 不构成达标
+OBJ-14,判定覆盖率,A-7.7,R+,R+,O,O,N/A,未满足,coverage_analyzer.py (V3.3-Enhanced),SVP.md §3.4,2026-07-17,必须由真实 gcov/lcov 达到目标；静态估算/故障注入修正不构成达标
+OBJ-15,MC/DC 覆盖率,A-7.8,R+,O,O,O,N/A,未满足,mcdc_calculator.py (V3.3-Enhanced),SVP.md §3.4,2026-07-17,必须由真实 GCC 14.2+ lcov 2.0+ 证据达到目标
 OBJ-16,HLR/LLR 追溯,A-2.1,R,R,R,R,N/A,满足,traceability_matrix.py,PSAC.md 附录 A,2026-07-15,HLR↔LLR↔Code↔Test 双向追溯矩阵
-OBJ-17,独立验证,A-9.2,R+,R+,O,O,N/A,满足,独立工具(Cppcheck/GCC/Z3)+HIL人工审批,evidence_collector.py record_independent_review(),2026-07-18,非作者工具审查+独立人类审查,17/17目标全覆盖
-OBJ-18,正式 PR 系统,A-8.2,R,R,R,R,N/A,满足,pr_manager.py + GitHub Pull Request,SCMP.md §4,2026-07-16,变更控制流程 + Code Review + Tag 基线
-OBJ-19,工具鉴定,§12.2,R,R,R,R,N/A,满足,TQP.md + TOR.md + TAS.md 三件套 + tool_chain_validator.py,TQP.md §5,2026-07-17,DO-330 TQL-1 鉴定草案完成 (5 项交付物闭环)
+OBJ-17,独立验证,A-9.2,R+,R+,O,O,N/A,部分满足,独立工具(Cppcheck/GCC/Z3)+HIL人工审批,evidence_collector.py record_independent_review(),2026-07-18,仅非作者工具审查+真实独立人类审查可计入；system/超时不计入
+OBJ-18,正式 PR 系统,A-8.2,R,R,R,R,N/A,部分满足,pr_manager.py + GitHub Pull Request,SCMP.md §4,2026-07-16,必须使用隔离分支与真实 PR/review；main 直合不计入
+OBJ-19,工具鉴定,§12.2,R,R,R,R,N/A,部分满足,TQP.md + TOR.md + TAS.md 三件套 + tool_chain_validator.py,TQP.md §5,2026-07-17,DO-330 TQL-1 鉴定资料为工程草案，缺外部正式鉴定
+OBJ-20,数据耦合分析,A-7.9,R,R,R,R,N/A,满足,coupling_analyzer.py,SVP.md §3.5,2026-07-21,DO-178C §6.4.4.2.d 全局变量读写+参数传递+共享数据异常检测
+OBJ-21,控制耦合分析,A-7.10,R,R,R,R,N/A,满足,coupling_analyzer.py,SVP.md §3.5,2026-07-21,DO-178C §6.4.4.2.e 函数调用图+调用顺序+入口点+孤立函数检测
 
 # ===== 汇总统计 =====
+# 汇总统计
 #
 # DAL 等级 | 总目标数 | 满足 | 部分满足 | 不适用 | 完成率
 # ---------|---------|------|---------|--------|------
-# DAL-A    |    19   |  19  |    0    |   0    | 100% (全部满足)
-# DAL-B    |    18   |  18  |    0    |   1    | 100% (MC/DC 不适用)
-# DAL-C    |    16   |  16  |    0    |   3    | 100% (判定/MC/DC 部分不适用)
-# DAL-D    |    13   |  13  |    0    |   6    | 100% (基础验证目标)
-# DAL-E    |     0   |   0  |    0    |  19    | N/A (无安全影响)
+# DAL-A    |    21   |  16  |    4    |   0    | 1 未满足；需真实 GCC/覆盖率/HITL/PR 证据闭环
+# DAL-B    |    19   | 部分满足 | 需真实判定覆盖、编译、HITL/PR 证据 |   2    | 工程辅助，非认证结论
+# DAL-C    |    17   | 部分满足 | 需真实语句覆盖、编译、PR 证据 |   4    | 工程辅助，非认证结论
+# DAL-D    |    13   | 部分满足 | 需项目级审查与配置证据 |   8    | 工程辅助，非认证结论
+# DAL-E    |     0   |   0  |    0    |  21    | N/A (无安全影响,无需验证)
 #
-# * DAL-A 完成率 = 19/19 = 100%
-#
+# V0.5.0 更新: 新增 OBJ-20 (数据耦合) 和 OBJ-21 (控制耦合)，目标总数从 19 增至 21
 # ===== 验证证据索引 =====
 #
 # 计划文档 (8 份):

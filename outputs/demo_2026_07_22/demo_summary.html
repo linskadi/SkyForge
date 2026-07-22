@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkyForge (天锻) — DO-178C DAL-A 航空软件工程平台 演示报告</title>
+<style>
+:root {
+  --bg: #ffffff; --card: #f8f9fa; --border: #e0e0e0;
+  --text: #1a1a2e; --muted: #6c757d; --accent: #2563eb;
+  --pass: #16a34a; --partial: #d97706; --fail: #dc2626; --na: #9ca3af;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; max-width: 1100px; margin: 0 auto; padding: 20px; }
+h1 { font-size: 2rem; border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-bottom: 10px; }
+h2 { font-size: 1.4rem; margin: 30px 0 15px; color: var(--accent); }
+h3 { font-size: 1.1rem; margin: 15px 0 10px; }
+.meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 25px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.card .value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+.card .label { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+table { width: 100%; border-collapse: collapse; margin: 10px 0 20px; font-size: 0.9rem; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: #f1f5f9; font-weight: 600; }
+.pass { color: var(--pass); font-weight: 600; }
+.partial { color: var(--partial); font-weight: 600; }
+.fail { color: var(--fail); font-weight: 600; }
+.na { color: var(--na); }
+code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+pre { background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+.badge-ok { background: #dcfce7; color: var(--pass); }
+.badge-partial { background: #fef3c7; color: var(--partial); }
+.badge-fail { background: #fee2e2; color: var(--fail); }
+.badge-na { background: #f3f4f6; color: var(--na); }
+.footer { text-align: center; color: var(--muted); margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 0.85rem; }
+.toolchain { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.toolchip { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; border: 1px solid var(--border); }
+.toolchip.ok { background: #dcfce7; border-color: #86efac; }
+.toolchip.err { background: #fee2e2; border-color: #fca5a5; }
+</style>
+</head>
+<body>
+
+<h1>SkyForge (天锻)</h1>
+<div class="meta">
+  DO-178C DAL-A 航空机载软件工程平台 &mdash; AI 多智能体驱动<br>
+  版本: v0.5.1 | 日期: 2026-07-22 13:01 | 环境: Windows + GCC 16.1.0 + DeepSeek API
+</div>
+
+<h2>1. 全 Pipeline 运行状态</h2>
+<div class="cards">
+  <div class="card"><div class="value">3</div><div class="label">语言 Pipeline (C/Python/C++)</div></div>
+  <div class="card"><div class="value">DeepSeek</div><div class="label">真实 LLM API 模式</div></div>
+  <div class="card"><div class="value">DAL-A</div><div class="label">目标安全等级</div></div>
+  <div class="card"><div class="value">21</div><div class="label">DO-178C 目标项</div></div>
+</div>
+
+<h3>Pipeline Stage 流程</h3>
+<pre>需求解析 → LLR生成 → 架构设计 → HITL审查 → 契约生成 → HITL审查
+→ 形式化验证(Z3/CBMC) → 代码生成 → HITL审查 → Cppcheck扫描
+→ 修复闭环(扫描→修复→验证) → 数字孪生仿真(含故障注入)
+→ 覆盖率收集(语句/判定/MC/DC) → 耦合分析 → 证据包生成</pre>
+
+<h2>2. 生成代码概览</h2>
+<div class="cards">
+<div class="card"><div class="value" style="color:#16a34a">123</div><div class="label">C (ARINC 429) — 123 行, MISRA 0 条</div></div><div class="card"><div class="value" style="color:#16a34a">278</div><div class="label">Python (Flight Data Monitor) — 278 行, MISRA 0 条</div></div><div class="card"><div class="value" style="color:#16a34a">456</div><div class="label">C++ (ADS-B Processor) — 456 行, MISRA 0 条</div></div>
+</div>
+
+<h2>3. 代码质量与覆盖率</h2>
+<table>
+  <tr><th>语言</th><th>行数</th><th>MISRA 违规</th><th>修复轮数</th><th>语句覆盖</th><th>判定覆盖</th><th>MC/DC</th><th>仿真</th><th>收集方法</th></tr>
+<tr><td>C (ARINC 429)</td><td>123</td><td>0</td><td>0</td><td class="pass">100.0%</td><td>20.0%</td><td>-</td><td><span class="badge badge-fail">FAIL</span></td><td>静态分析</td></tr><tr><td>Python (Flight Data Monitor)</td><td>278</td><td>0</td><td>0</td><td class="pass">100.0%</td><td>-</td><td>-</td><td><span class="badge badge-na">N/A</span></td><td>静态分析</td></tr><tr><td>C++ (ADS-B Processor)</td><td>456</td><td>0</td><td>0</td><td class="pass">100.0%</td><td>-</td><td>-</td><td><span class="badge badge-na">N/A</span></td><td>静态分析</td></tr>
+</table>
+
+<h2>4. DO-178C DAL-A 目标符合性</h2>
+<table>
+  <tr><th>语言</th><th>满足</th><th>部分满足</th><th>未满足</th><th>不适用</th><th>总项数</th><th>通过率</th></tr>
+<tr><td>C (ARINC 429)</td><td class="pass">12</td><td class="partial">4</td><td class="fail">5</td><td class="na">0</td><td>21</td><td><span class="badge badge-partial">57%</span></td></tr><tr><td>Python (Flight Data Monitor)</td><td class="pass">10</td><td class="partial">3</td><td class="fail">8</td><td class="na">0</td><td>21</td><td><span class="badge badge-fail">48%</span></td></tr><tr><td>C++ (ADS-B Processor)</td><td class="pass">8</td><td class="partial">6</td><td class="fail">7</td><td class="na">0</td><td>21</td><td><span class="badge badge-fail">38%</span></td></tr>
+</table>
+
+<h2>5. 工具链状态</h2>
+<div class="toolchain">
+  <span class="toolchip ok">GCC 16.1.0 ✓</span>
+  <span class="toolchip ok">gcov 16.1.0 ✓</span>
+  <span class="toolchip ok">gcov-dump 16.1.0 ✓</span>
+  <span class="toolchip ok">Cppcheck 2.21.0 ✓</span>
+  <span class="toolchip ok">Z3 ✓</span>
+  <span class="toolchip ok">CBMC ✓</span>
+  <span class="toolchip ok">DeepSeek API ✓</span>
+</div>
+<p style="color:var(--muted); font-size:0.85rem; margin-top:10px;">
+  覆盖率收集：gcov JSON + gcov-dump -l 解析 MC/DC 条件覆盖率（Windows 原生，无需 lcov/Perl）
+</p>
+
+<h2>6. 核心创新点</h2>
+<table>
+  <tr><th>特性</th><th>说明</th></tr>
+  <tr><td>AI 多智能体驱动</td><td>8+ Agent 协同：需求解析、架构设计、契约生成、代码生成、代码修复、LLR生成</td></tr>
+  <tr><td>真实 LLM 代码生成</td><td>DeepSeek API 纯 API 模式，非 Mock，生成 C/Python/C++ 三语言航空代码</td></tr>
+  <tr><td>修复闭环 + 退步检测</td><td>扫描→修复→验证循环，检测到代码退化（含新规则引入）自动回退</td></tr>
+  <tr><td>MC/DC 覆盖率</td><td>Windows 上通过 gcov-dump -l 解析 COUNTERS conditions 实现真实 MC/DC 数据</td></tr>
+  <tr><td>DO-178C DAL-A 21 项目标</td><td>自适应 DAL-A/B/C/D/E 目标检查，自动从 requirement.safety_level 推断</td></tr>
+  <tr><td>数字孪生仿真</td><td>虚拟 MCU + 通用 harness + 故障注入（12 种故障类型）</td></tr>
+  <tr><td>HITL 人工审查</td><td>需求/契约/代码三检查点，支持 auto-approve 和 WebSocket 实时推送</td></tr>
+  <tr><td>多语言支持</td><td>C (MISRA-C:2012) / C++ (MISRA-C++/JSF AV) / Python (军工规范)</td></tr>
+</table>
+
+<div class="footer">
+  SkyForge v0.5.1 | DO-178C DAL-A 航空软件工程平台 | 2026-07-22 13:01<br>
+  后端: Python 3.13 | 前端: Vue 3 + TypeScript | Pipeline: 12 Stage × 3 语言
+</div>
+
+</body>
+</html>
