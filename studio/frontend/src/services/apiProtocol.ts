@@ -16,9 +16,9 @@
 import type { LLMMode } from "@/stores/providerStore";
 import type {
 	CompatibilityResult,
+	ComplianceTrendPoint,
 	ComposeConnection,
 	ComposeResult,
-	ComplianceTrendPoint,
 	DashboardStats,
 	DashboardTaskRecord,
 	FaultParams,

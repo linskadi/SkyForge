@@ -57,7 +57,9 @@ export const useHITLStore = defineStore("hitl", () => {
 		}
 	}
 
-	async function fetchTemplate(checkpoint: string): Promise<ReviewTemplate | null> {
+	async function fetchTemplate(
+		checkpoint: string,
+	): Promise<ReviewTemplate | null> {
 		if (templates.value[checkpoint]) {
 			return templates.value[checkpoint];
 		}
@@ -88,7 +90,11 @@ export const useHITLStore = defineStore("hitl", () => {
 		return [];
 	}
 
-	async function addComment(requestId: string, content: string, itemId: string = ""): Promise<boolean> {
+	async function addComment(
+		requestId: string,
+		content: string,
+		itemId: string = "",
+	): Promise<boolean> {
 		try {
 			const res = await fetch(`/api/hil/comments/${requestId}`, {
 				method: "POST",

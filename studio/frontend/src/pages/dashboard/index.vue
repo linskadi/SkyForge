@@ -19,8 +19,8 @@ import {
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
 import VChart from "vue-echarts";
+import { useRouter } from "vue-router";
 import SourceBadge from "@/components/SourceBadge.vue";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,7 +32,14 @@ import type {
 	SystemStatus,
 } from "@/types/domain";
 
-use([CanvasRenderer, LineChart, BarChart, GridComponent, TooltipComponent, LegendComponent]);
+use([
+	CanvasRenderer,
+	LineChart,
+	BarChart,
+	GridComponent,
+	TooltipComponent,
+	LegendComponent,
+]);
 
 const router = useRouter();
 
@@ -225,7 +232,10 @@ const complianceChartOption = computed(() => {
 				type: "bar",
 				stack: "total",
 				data: data.map((d) => d.mandatory),
-				itemStyle: { color: "hsl(var(--destructive))", borderRadius: [0, 0, 0, 0] },
+				itemStyle: {
+					color: "hsl(var(--destructive))",
+					borderRadius: [0, 0, 0, 0],
+				},
 			},
 			{
 				name: "Required",

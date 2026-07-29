@@ -910,9 +910,15 @@ class VirtualMCU:
         func_match = re.search(r'double\s+(\w+)\s*\(\s*double\s+\w+', cleaned_code)
         user_func_name = func_match.group(1) if func_match else "filter"
 
+        # 是否已有 filter 函数定义
+        has_filter = (
+            "double filter(double" in cleaned_code
+            or "filter(double" in cleaned_code
+        )
+
         # 若清理后代码中没有 double filter(double) 函数定义，
         # 自动添加一个示例 filter（避免编译失败）
-        if "double filter(double" not in cleaned_code and "filter(double" not in cleaned_code:
+        if not has_filter:
             # 检测所有非 double 函数定义（而非仅第一个匹配）
             # 优先选择：非 static、非 init、参数最多的函数（通常是主函数）
             func_def_pattern = re.compile(
@@ -953,22 +959,22 @@ class VirtualMCU:
                     f"生成通用 harness（回退匹配）"
                 )
                 return self._generate_generic_harness(cleaned_code, non_double_func.group(1))
-            # 无任何可识别函数 → 注入 mock filter（保持旧行为）
-            cleaned_code = (
-                "double filter(double input) {\n"
-                "    static double last = 0.0;\n"
-                "    double out = 0.9 * last + 0.1 * input;\n"
-                "    last = out;\n"
-                "    return out;\n"
-                "}\n"
-            ) + cleaned_code
-        elif user_func_name != "filter":
-            # 如果用户定义了其他函数名，添加一个wrapper
-            # 在用户代码之前添加，这样wrapper在函数定义之后被调用
-            cleaned_code = (
-                f"/* Wrapper: 将 {user_func_name} 映射到 filter */\n"
-                f"double filter(double input) {{ return {user_func_name}(input); }}\n"
-            ) + cleaned_code
+            # 有可识别的非 filter 函数（如 filter_a）→ 添加 wrapper 映射到 filter
+            if user_func_name != "filter":
+                cleaned_code = (
+                    f"/* Wrapper: 将 {user_func_name} 映射到 filter */\n"
+                    f"double filter(double input) {{ return {user_func_name}(input); }}\n"
+                ) + cleaned_code
+            else:
+                # 无任何可识别函数 → 注入 mock filter（保持旧行为）
+                cleaned_code = (
+                    "double filter(double input) {\n"
+                    "    static double last = 0.0;\n"
+                    "    double out = 0.9 * last + 0.1 * input;\n"
+                    "    last = out;\n"
+                    "    return out;\n"
+                    "}\n"
+                ) + cleaned_code
 
         # 处理断言代码：若非空，则在每步 filter 调用后调用 __check_contract_step_<cid>
         # 但如果代码没有 double filter(double) 函数（如 ARINC 429 的 int8_t parse(uint32_t, ...)），

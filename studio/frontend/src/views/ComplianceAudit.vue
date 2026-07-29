@@ -9,18 +9,13 @@ import {
 	Search,
 	Shield,
 	ShieldCheck,
-	XCircle,
 	X,
+	XCircle,
 } from "@lucide/vue";
 import { computed, ref } from "vue";
 import SourceBadge from "@/components/SourceBadge.vue";
 import Badge from "@/components/ui/badge/Badge.vue";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -28,15 +23,15 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { MisraRule, RuleStandard } from "@/types/domain";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-	MOCK_MISRA_RULES,
 	MOCK_MISRA_CPP_RULES,
+	MOCK_MISRA_RULES,
 	MOCK_PYTHON_SAFETY_RULES,
 	MOCK_RULE_STANDARDS,
 } from "@/mock/data";
+import type { MisraRule, RuleStandard } from "@/types/domain";
 
 const activeTab = ref("misra");
 
@@ -166,8 +161,7 @@ const onMisraHintTag = (tag: string) => {
 };
 
 const toggleMisraExpand = (ruleId: string) => {
-	misraExpandedRule.value =
-		misraExpandedRule.value === ruleId ? null : ruleId;
+	misraExpandedRule.value = misraExpandedRule.value === ruleId ? null : ruleId;
 };
 
 const clearMisraSearch = () => {
@@ -233,8 +227,7 @@ const contractSections: ContractSectionLocal[] = [
 				expression: "0 <= filtered_value <= 65535",
 				description: "输出值在合法范围内",
 				passed: true,
-				assert_code:
-					"assert(result >= 0 && result <= 65535);",
+				assert_code: "assert(result >= 0 && result <= 65535);",
 			},
 			{
 				id: "CON-001-POST-001",
@@ -242,8 +235,7 @@ const contractSections: ContractSectionLocal[] = [
 					"filtered_value == round(alpha * raw_value + (1 - alpha) * prev)",
 				description: "符合一阶 IIR 滤波公式",
 				passed: true,
-				assert_code:
-					"assert(abs(result - expected) < TOLERANCE);",
+				assert_code: "assert(abs(result - expected) < TOLERANCE);",
 			},
 		],
 	},
@@ -256,8 +248,7 @@ const contractSections: ContractSectionLocal[] = [
 				expression: "0.0f <= alpha <= 1.0f",
 				description: "滤波系数 alpha 始终在 [0,1] 范围",
 				passed: true,
-				assert_code:
-					"assert(f->alpha >= 0.0f && f->alpha <= 1.0f);",
+				assert_code: "assert(f->alpha >= 0.0f && f->alpha <= 1.0f);",
 			},
 		],
 	},
@@ -270,18 +261,15 @@ const contractSections: ContractSectionLocal[] = [
 				expression: "if sample_rate == 0 then return prev_filtered",
 				description: "采样率异常时保持上一拍输出",
 				passed: true,
-				assert_code:
-					"if (sample_rate == 0) return f->prev_out;",
+				assert_code: "if (sample_rate == 0) return f->prev_out;",
 			},
 			{
 				id: "CON-001-FLT-001",
 				expression: "if raw_value out of range then clamp",
 				description: "输入越界时钳位到合法范围",
 				passed: false,
-				failure_reason:
-					"反例: raw_value=70000（超出 uint16 上限时未做输入钳位",
-				assert_code:
-					"if (raw_value > 65535) raw_value = 65535;",
+				failure_reason: "反例: raw_value=70000（超出 uint16 上限时未做输入钳位",
+				assert_code: "if (raw_value > 65535) raw_value = 65535;",
 			},
 		],
 	},
@@ -289,8 +277,7 @@ const contractSections: ContractSectionLocal[] = [
 
 const contractPassed = computed(() =>
 	contractSections.reduce(
-		(sum, s) =>
-			sum + s.items.filter((i) => i.passed).length,
+		(sum, s) => sum + s.items.filter((i) => i.passed).length,
 		0,
 	),
 );
@@ -362,13 +349,13 @@ const formalZ3Checks: FormalCheckItem[] = [
 	},
 ];
 
-interface BoundaryTestCase = {
+interface BoundaryTestCase {
 	id: string;
 	description: string;
 	input: string;
 	expected: string;
 	status: "passed" | "failed";
-};
+}
 
 const boundaryTestCases: BoundaryTestCase[] = [
 	{
@@ -468,25 +455,234 @@ interface DO178CObjective {
 const processAreas = ["规划", "需求", "设计", "编码", "验证"];
 
 const do178cObjectives: DO178CObjective[] = [
-	{ id: "OBJ-01", title: "软件计划制定", level: "A", coverage: { 规划: "covered", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-02", title: "开发环境建立", level: "A", coverage: { 规划: "covered", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "partial" } },
-	{ id: "OBJ-03", title: "软件需求分析", level: "A", coverage: { 规划: "na", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-04", title: "软件需求评审", level: "A", coverage: { 规划: "na", 需求: "covered", 设计: "covered", 编码: "partial", 验证: "covered" } },
-	{ id: "OBJ-05", title: "软件架构设计", level: "A", coverage: { 规划: "na", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-06", title: "软件详细设计", level: "A", coverage: { 规划: "na", 需求: "partial", 设计: "covered", 编码: "covered", 验证: "partial" } },
-	{ id: "OBJ-07", title: "软件编码", level: "A", coverage: { 规划: "na", 需求: "na", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-08", title: "代码评审", level: "A", coverage: { 规划: "na", 需求: "na", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-09", title: "单元测试", level: "A", coverage: { 规划: "na", 需求: "na", 设计: "partial", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-10", title: "集成测试", level: "A", coverage: { 规划: "na", 需求: "partial", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-11", title: "软件配置管理", level: "B", coverage: { 规划: "covered", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-12", title: "问题报告与解决", level: "B", coverage: { 规划: "covered", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-13", title: "质量保证", level: "B", coverage: { 规划: "covered", 需求: "covered", 设计: "covered", 编码: "partial", 验证: "covered" } },
-	{ id: "OBJ-14", title: "验证与确认", level: "B", coverage: { 规划: "covered", 需求: "covered", 设计: "covered", 编码: "partial", 验证: "covered" } },
-	{ id: "OBJ-15", title: "需求追溯性分析", level: "C", coverage: { 规划: "na", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "covered" } },
-	{ id: "OBJ-16", title: "软件开发标准", level: "C", coverage: { 规划: "covered", 需求: "covered", 设计: "covered", 编码: "covered", 验证: "na" } },
-	{ id: "OBJ-17", title: "工具鉴定", level: "C", coverage: { 规划: "partial", 需求: "na", 设计: "na", 编码: "na", 验证: "uncovered" } },
-	{ id: "OBJ-18", title: "风险分析", level: "D", coverage: { 规划: "covered", 需求: "covered", 设计: "na", 编码: "na", 验证: "partial" } },
-	{ id: "OBJ-19", title: "适航认证支持", level: "E", coverage: { 规划: "uncovered", 需求: "uncovered", 设计: "uncovered", 编码: "uncovered", 验证: "partial" } },
+	{
+		id: "OBJ-01",
+		title: "软件计划制定",
+		level: "A",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-02",
+		title: "开发环境建立",
+		level: "A",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "partial",
+		},
+	},
+	{
+		id: "OBJ-03",
+		title: "软件需求分析",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-04",
+		title: "软件需求评审",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "covered",
+			设计: "covered",
+			编码: "partial",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-05",
+		title: "软件架构设计",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-06",
+		title: "软件详细设计",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "partial",
+			设计: "covered",
+			编码: "covered",
+			验证: "partial",
+		},
+	},
+	{
+		id: "OBJ-07",
+		title: "软件编码",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "na",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-08",
+		title: "代码评审",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "na",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-09",
+		title: "单元测试",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "na",
+			设计: "partial",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-10",
+		title: "集成测试",
+		level: "A",
+		coverage: {
+			规划: "na",
+			需求: "partial",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-11",
+		title: "软件配置管理",
+		level: "B",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-12",
+		title: "问题报告与解决",
+		level: "B",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-13",
+		title: "质量保证",
+		level: "B",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "covered",
+			编码: "partial",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-14",
+		title: "验证与确认",
+		level: "B",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "covered",
+			编码: "partial",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-15",
+		title: "需求追溯性分析",
+		level: "C",
+		coverage: {
+			规划: "na",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "covered",
+		},
+	},
+	{
+		id: "OBJ-16",
+		title: "软件开发标准",
+		level: "C",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "covered",
+			编码: "covered",
+			验证: "na",
+		},
+	},
+	{
+		id: "OBJ-17",
+		title: "工具鉴定",
+		level: "C",
+		coverage: {
+			规划: "partial",
+			需求: "na",
+			设计: "na",
+			编码: "na",
+			验证: "uncovered",
+		},
+	},
+	{
+		id: "OBJ-18",
+		title: "风险分析",
+		level: "D",
+		coverage: {
+			规划: "covered",
+			需求: "covered",
+			设计: "na",
+			编码: "na",
+			验证: "partial",
+		},
+	},
+	{
+		id: "OBJ-19",
+		title: "适航认证支持",
+		level: "E",
+		coverage: {
+			规划: "uncovered",
+			需求: "uncovered",
+			设计: "uncovered",
+			编码: "uncovered",
+			验证: "partial",
+		},
+	},
 ];
 
 const coverageCellClass = (status: CoverageStatus): string => {

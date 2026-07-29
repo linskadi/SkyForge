@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import {
 	ArrowLeft,
 	CheckCircle2,
@@ -17,32 +16,23 @@ import {
 	ShieldX,
 	XCircle,
 } from "@lucide/vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
-import { Button } from "@/components/ui/button";
-import {
-	Card,
-	CardContent,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
+import { getHITLHistory } from "@/services/api";
+import { getApi } from "@/services/apiSwitcher";
+import { useExecutionStore } from "@/stores/executionStore";
+import type { ReviewComment, ReviewTemplate } from "@/stores/hitlStore";
+import { useHITLStore } from "@/stores/hitlStore";
 import type {
 	HITLApproval,
 	HITLCheckpointType,
 	HITLHistoryItem,
 } from "@/types/domain";
-import { getHITLHistory } from "@/services/api";
-import { getApi } from "@/services/apiSwitcher";
-import { useExecutionStore } from "@/stores/executionStore";
-import { useHITLStore } from "@/stores/hitlStore";
-import type { ReviewTemplate, ReviewComment } from "@/stores/hitlStore";
 
 const router = useRouter();
 const execution = useExecutionStore();
@@ -107,9 +97,15 @@ interface StatCard {
 const stats = computed<StatCard[]>(() => {
 	const s = hitlStore.stats;
 	const pending = s?.pending_count ?? pendingList.value.length;
-	const approved = s?.approved_count ?? historyList.value.filter((h) => h.status === "approved").length;
-	const rejected = s?.rejected_count ?? historyList.value.filter((h) => h.status === "rejected").length;
-	const timeout = s?.timeout_count ?? pendingList.value.filter((item) => item.deadline - now.value <= 0).length;
+	const approved =
+		s?.approved_count ??
+		historyList.value.filter((h) => h.status === "approved").length;
+	const rejected =
+		s?.rejected_count ??
+		historyList.value.filter((h) => h.status === "rejected").length;
+	const timeout =
+		s?.timeout_count ??
+		pendingList.value.filter((item) => item.deadline - now.value <= 0).length;
 
 	return [
 		{
@@ -309,7 +305,10 @@ const onAddComment = async () => {
 	if (!selectedId.value || !newCommentText.value.trim()) return;
 	submittingComment.value = true;
 	try {
-		const ok = await hitlStore.addComment(selectedId.value, newCommentText.value.trim());
+		const ok = await hitlStore.addComment(
+			selectedId.value,
+			newCommentText.value.trim(),
+		);
 		if (ok) {
 			currentComments.value = await hitlStore.fetchComments(selectedId.value);
 			newCommentText.value = "";

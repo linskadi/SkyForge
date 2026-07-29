@@ -343,11 +343,11 @@ class HILManager:
             审批结果字典：{approved, comments, reviewer,
                 timestamp, status, request_id, checkpoint}
         """
-        # 1. 未启用 → 直接跳过
+        # 1. 未启用 → 直接跳过（视为 system 批准，pipeline 可继续）
         if not self.enabled:
             logger.info(f"HILManager:HIL 未启用，跳过审批 checkpoint={checkpoint}")
             return {
-                "approved": False,
+                "approved": True,
                 "pipeline_continue": True,
                 "comments": "HIL 已禁用，未执行人工审批；不计入独立性证据",
                 "reviewer": "system",

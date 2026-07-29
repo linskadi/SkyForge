@@ -31,14 +31,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getHITLHistory } from "@/services/api";
 import { getApi } from "@/services/apiSwitcher";
+import { useExecutionStore } from "@/stores/executionStore";
+import type { ReviewTemplate } from "@/stores/hitlStore";
+import { useHITLStore } from "@/stores/hitlStore";
 import type {
 	HITLApproval,
 	HITLCheckpointType,
 	HITLHistoryItem,
 } from "@/types/domain";
-import { useExecutionStore } from "@/stores/executionStore";
-import { useHITLStore } from "@/stores/hitlStore";
-import type { ReviewTemplate } from "@/stores/hitlStore";
 
 const execution = useExecutionStore();
 const hitlStore = useHITLStore();

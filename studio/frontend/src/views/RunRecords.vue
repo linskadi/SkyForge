@@ -56,7 +56,9 @@ const filteredTasks = computed(() => {
 	});
 });
 
-function getStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+function getStatusVariant(
+	status: string,
+): "default" | "secondary" | "destructive" | "outline" {
 	const s = status?.toLowerCase() || "";
 	if (s.includes("running") || s.includes("progress")) return "default";
 	if (s.includes("complete") || s.includes("success")) return "secondary";
@@ -88,7 +90,9 @@ function getSourceLabel(source: string): string {
 	return source || "--";
 }
 
-function getSourceType(source: string): "observed" | "simulated" | "unavailable" | "failed" {
+function getSourceType(
+	source: string,
+): "observed" | "simulated" | "unavailable" | "failed" {
 	if (source === "simulated") return "simulated";
 	if (source === "live" || source === "replay") return "observed";
 	if (source === "failed") return "failed";

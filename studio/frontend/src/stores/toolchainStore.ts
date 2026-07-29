@@ -16,7 +16,9 @@ export const useToolchainStore = defineStore("toolchain", () => {
 	const loading = ref(false);
 	const error = ref<string | null>(null);
 
-	const availableCount = computed(() => tools.value.filter((t) => t.found).length);
+	const availableCount = computed(
+		() => tools.value.filter((t) => t.found).length,
+	);
 	const totalCount = computed(() => tools.value.length);
 
 	async function fetchTools() {
@@ -55,7 +57,9 @@ export const useToolchainStore = defineStore("toolchain", () => {
 		}
 	}
 
-	async function getInstallHint(toolName: string): Promise<Record<string, string>> {
+	async function getInstallHint(
+		toolName: string,
+	): Promise<Record<string, string>> {
 		try {
 			const res = await fetch(`/api/tools/${toolName}/install-hint`);
 			if (res.ok) {

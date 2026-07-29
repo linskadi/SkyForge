@@ -54,8 +54,20 @@ const mockGetDashboardStats = vi.fn().mockResolvedValue({
 });
 
 const mockGetComplianceTrend = vi.fn().mockResolvedValue([
-	{ ts: new Date().toISOString(), mandatory: 0, required: 2, advisory: 1, total: 3 },
-	{ ts: new Date().toISOString(), mandatory: 1, required: 1, advisory: 0, total: 2 },
+	{
+		ts: new Date().toISOString(),
+		mandatory: 0,
+		required: 2,
+		advisory: 1,
+		total: 3,
+	},
+	{
+		ts: new Date().toISOString(),
+		mandatory: 1,
+		required: 1,
+		advisory: 0,
+		total: 2,
+	},
 ]);
 
 vi.mock("@/services/apiSwitcher", () => ({
@@ -124,14 +136,19 @@ describe("Professional Dashboard", () => {
 		await actionCards[1].trigger("click");
 		expect(mockPush).toHaveBeenCalled();
 		const callArg = mockPush.mock.calls[0][0];
-		expect(callArg === "/records" || callArg.startsWith("/records/")).toBe(true);
+		expect(callArg === "/records" || callArg.startsWith("/records/")).toBe(
+			true,
+		);
 	});
 
 	it("navigates to /generate with scade param on import action", async () => {
 		const wrapper = mountDashboard();
 		const actionCards = wrapper.findAll(".action-card");
 		await actionCards[2].trigger("click");
-		expect(mockPush).toHaveBeenCalledWith({ path: "/generate", query: { scade: "1" } });
+		expect(mockPush).toHaveBeenCalledWith({
+			path: "/generate",
+			query: { scade: "1" },
+		});
 	});
 
 	it("fetches dashboard data on mount", async () => {

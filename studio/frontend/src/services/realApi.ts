@@ -17,9 +17,9 @@
 import type { LLMMode } from "@/stores/providerStore";
 import type {
 	CompatibilityResult,
+	ComplianceTrendPoint,
 	ComposeConnection,
 	ComposeResult,
-	ComplianceTrendPoint,
 	DashboardStats,
 	DashboardTaskRecord,
 	FaultParams,
@@ -769,8 +769,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 	return getJSON<DashboardStats>("/api/dashboard/stats");
 }
 
-export async function getComplianceTrend(limit = 10): Promise<ComplianceTrendPoint[]> {
-	return getJSON<ComplianceTrendPoint[]>(`/api/dashboard/compliance-trend?limit=${limit}`);
+export async function getComplianceTrend(
+	limit = 10,
+): Promise<ComplianceTrendPoint[]> {
+	return getJSON<ComplianceTrendPoint[]>(
+		`/api/dashboard/compliance-trend?limit=${limit}`,
+	);
 }
 
 // ====================================================================

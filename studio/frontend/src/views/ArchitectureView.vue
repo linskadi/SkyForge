@@ -32,12 +32,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const isMounted = ref(false);
 onMounted(() => {
@@ -309,7 +304,8 @@ const quickSteps: QuickStep[] = [
 	{
 		id: 2,
 		title: "配置模型连接",
-		description: "配置云 API 地址、密钥或本地 Ollama/LM Studio 端点，确保 LLM 服务可用。",
+		description:
+			"配置云 API 地址、密钥或本地 Ollama/LM Studio 端点，确保 LLM 服务可用。",
 		icon: Cog,
 		action: "配置模型",
 		route: "/settings",
@@ -317,7 +313,8 @@ const quickSteps: QuickStep[] = [
 	{
 		id: 3,
 		title: "创建第一个代码生成任务",
-		description: "在代码生成页面输入自然语言需求，选择编程语言，启动全流水线任务。",
+		description:
+			"在代码生成页面输入自然语言需求，选择编程语言，启动全流水线任务。",
 		icon: PlayCircle,
 		action: "开始生成",
 		route: "/generate",
@@ -333,7 +330,8 @@ const quickSteps: QuickStep[] = [
 	{
 		id: 5,
 		title: "理解验证证据",
-		description: "学习如何阅读 DO-178C 合规报告、追溯矩阵、MISRA 检查结果与形式化验证证明。",
+		description:
+			"学习如何阅读 DO-178C 合规报告、追溯矩阵、MISRA 检查结果与形式化验证证明。",
 		icon: ShieldCheck,
 		action: "了解更多",
 		route: "/lab",
@@ -461,7 +459,11 @@ const codingStandards: CodingStandard[] = [
 			},
 		],
 		scenarios: ["航空航天", "国防军工", "高可靠性嵌入式系统"],
-		references: ["MISRA C++:2023", "JSF AV C++ Coding Standards", "AUTOSAR C++14"],
+		references: [
+			"MISRA C++:2023",
+			"JSF AV C++ Coding Standards",
+			"AUTOSAR C++14",
+		],
 	},
 	{
 		id: "python-safety",
@@ -533,11 +535,7 @@ const codingStandards: CodingStandard[] = [
 				],
 			},
 		],
-		scenarios: [
-			"机载软件 DAL A/B/C/D",
-			"民用航空适航审定",
-			"军用航空软件合规",
-		],
+		scenarios: ["机载软件 DAL A/B/C/D", "民用航空适航审定", "军用航空软件合规"],
 		references: [
 			"RTCA DO-178C / EUROCAE ED-12C",
 			"DO-330 (工具鉴定)",

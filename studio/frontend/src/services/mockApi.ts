@@ -14,9 +14,9 @@ import type {
 	AgentLog,
 	AgentType,
 	CompatibilityResult,
+	ComplianceTrendPoint,
 	ComposeConnection,
 	ComposeResult,
-	ComplianceTrendPoint,
 	DashboardStats,
 	DashboardTaskRecord,
 	FaultParams,
@@ -1160,7 +1160,8 @@ async function mockGetRecentTasks(limit = 8): Promise<RecentTask[]> {
 			const tasks: RecentTask[] = [
 				{
 					id: "task-001",
-					requirement: "实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声",
+					requirement:
+						"实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声",
 					language: "c",
 					status: "done",
 					degraded: false,
@@ -1171,7 +1172,8 @@ async function mockGetRecentTasks(limit = 8): Promise<RecentTask[]> {
 				},
 				{
 					id: "task-002",
-					requirement: "实现 PID 控制器，Kp=2.0, Ki=0.5, Kd=0.1，控制无人机俯仰角",
+					requirement:
+						"实现 PID 控制器，Kp=2.0, Ki=0.5, Kd=0.1，控制无人机俯仰角",
 					language: "cpp",
 					status: "done",
 					degraded: false,
@@ -1182,7 +1184,8 @@ async function mockGetRecentTasks(limit = 8): Promise<RecentTask[]> {
 				},
 				{
 					id: "task-003",
-					requirement: "实现 ARINC 429 字解析函数，将 32 位字解码为标签、SDI、数据",
+					requirement:
+						"实现 ARINC 429 字解析函数，将 32 位字解码为标签、SDI、数据",
 					language: "c",
 					status: "running",
 					degraded: false,
@@ -1243,7 +1246,9 @@ async function mockGetDashboardStats(): Promise<DashboardStats> {
 	});
 }
 
-async function mockGetComplianceTrend(limit = 10): Promise<ComplianceTrendPoint[]> {
+async function mockGetComplianceTrend(
+	limit = 10,
+): Promise<ComplianceTrendPoint[]> {
 	return new Promise((resolve) => {
 		setTimeout(() => {
 			const now = Date.now();

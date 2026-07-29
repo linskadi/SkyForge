@@ -24,6 +24,7 @@ import {
 	Zap,
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import SettingsDialog from "@/components/SettingsDialog.vue";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -42,15 +43,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-	Tabs,
-	TabsContent,
-	TabsList,
-	TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast/use-toast";
-import SettingsDialog from "@/components/SettingsDialog.vue";
-import { useExecutionStore } from "@/stores/executionStore";
 import { useTheme } from "@/composables/useTheme";
 import {
 	getLLMConfig,
@@ -59,9 +53,10 @@ import {
 	saveLLMConfig,
 	testLLMConnection,
 } from "@/services/api";
-import type { ExecutionProfileId } from "@/types/execution";
+import { useExecutionStore } from "@/stores/executionStore";
 import { useProviderStore } from "@/stores/providerStore";
 import { useToolchainStore } from "@/stores/toolchainStore";
+import type { ExecutionProfileId } from "@/types/execution";
 
 const execution = useExecutionStore();
 const providerStore = useProviderStore();
@@ -88,7 +83,8 @@ async function showInstallHint(toolName: string) {
 	let key = "linux";
 	if (platform.includes("win")) key = "windows";
 	else if (platform.includes("mac")) key = "macos";
-	activeInstallHint.value = hints[key] || hints["linux"] || "请参考官方文档安装";
+	activeInstallHint.value =
+		hints[key] || hints["linux"] || "请参考官方文档安装";
 }
 
 function closeInstallHint() {
@@ -104,7 +100,10 @@ function getToolStatusLabel(tool: { found: boolean; version: string }) {
 const llmSettingsOpen = ref(false);
 const activeTab = ref("profile");
 
-const profileDescriptions: Record<ExecutionProfileId, { title: string; description: string; limitation: string }> = {
+const profileDescriptions: Record<
+	ExecutionProfileId,
+	{ title: string; description: string; limitation: string }
+> = {
 	cloud: {
 		title: "云 API",
 		description: "DeepSeek、Qwen、OpenAI、Anthropic 或自定义兼容 API。",
@@ -155,7 +154,10 @@ const isBusy = computed(() => testStatus.value === "testing" || saving.value);
 
 watch(apiProvider, (next, prev) => {
 	if (!next || !prev || next === prev) return;
-	if (!apiBaseUrl.value || apiBaseUrl.value === PROVIDER_DEFAULT_BASE_URL[prev]) {
+	if (
+		!apiBaseUrl.value ||
+		apiBaseUrl.value === PROVIDER_DEFAULT_BASE_URL[prev]
+	) {
 		apiBaseUrl.value = PROVIDER_DEFAULT_BASE_URL[next];
 	}
 });
@@ -165,12 +167,15 @@ async function loadLlmConfig() {
 	activeMode.value = local.mode;
 	if (local.mode === "api") {
 		apiProvider.value = (
-			["deepseek", "qwen", "openai", "anthropic", "custom"].includes(local.provider ?? "")
+			["deepseek", "qwen", "openai", "anthropic", "custom"].includes(
+				local.provider ?? "",
+			)
 				? local.provider
 				: "deepseek"
 		) as ApiProvider;
 		apiKey.value = local.apiKey;
-		apiBaseUrl.value = local.baseUrl || PROVIDER_DEFAULT_BASE_URL[apiProvider.value];
+		apiBaseUrl.value =
+			local.baseUrl || PROVIDER_DEFAULT_BASE_URL[apiProvider.value];
 		apiModel.value = local.model ?? "";
 	} else if (local.mode === "local") {
 		localBaseUrl.value = local.baseUrl || "http://localhost:11434/v1";
@@ -187,13 +192,16 @@ async function loadLlmConfig() {
 		if (remote.mode) activeMode.value = remote.mode;
 		if (remote.mode === "api") {
 			apiProvider.value = (
-				["deepseek", "qwen", "openai", "anthropic", "custom"].includes(remote.provider ?? "")
+				["deepseek", "qwen", "openai", "anthropic", "custom"].includes(
+					remote.provider ?? "",
+				)
 					? remote.provider
 					: "deepseek"
 			) as ApiProvider;
 			storedApiKeyMask.value = remote.apiKey ?? "";
 			apiKey.value = "";
-			apiBaseUrl.value = remote.baseUrl || PROVIDER_DEFAULT_BASE_URL[apiProvider.value];
+			apiBaseUrl.value =
+				remote.baseUrl || PROVIDER_DEFAULT_BASE_URL[apiProvider.value];
 			apiModel.value = remote.model ?? "";
 		} else if (remote.mode === "local") {
 			localBaseUrl.value = remote.baseUrl || "http://localhost:11434/v1";
@@ -284,9 +292,7 @@ async function handleSaveLlm() {
 	try {
 		const config = buildConfig();
 		await saveLLMConfig(config);
-		execution.setProfile(
-			config.mode === "local" ? "local" : "cloud",
-		);
+		execution.setProfile(config.mode === "local" ? "local" : "cloud");
 		if (config.mode === "api") {
 			providerStore.setProvider(config.provider ?? "deepseek");
 		} else if (config.mode === "local") {
@@ -313,16 +319,25 @@ const themeMode = ref<"light" | "dark" | "system">(
 	isDark.value ? "dark" : "light",
 );
 const defaultLanguage = ref<"c" | "cpp" | "python">(
-	(localStorage.getItem("skyforge-default-lang") as "c" | "cpp" | "python") || "c",
+	(localStorage.getItem("skyforge-default-lang") as "c" | "cpp" | "python") ||
+		"c",
 );
-const desktopNotifications = ref(localStorage.getItem("skyforge-notif-desktop") !== "false");
-const browserNotifications = ref(localStorage.getItem("skyforge-notif-browser") !== "false");
-const reduceMotion = ref(localStorage.getItem("skyforge-reduce-motion") === "true");
+const desktopNotifications = ref(
+	localStorage.getItem("skyforge-notif-desktop") !== "false",
+);
+const browserNotifications = ref(
+	localStorage.getItem("skyforge-notif-browser") !== "false",
+);
+const reduceMotion = ref(
+	localStorage.getItem("skyforge-reduce-motion") === "true",
+);
 
 function applyThemeMode() {
 	const root = document.documentElement;
 	if (themeMode.value === "system") {
-		const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+		const prefersDark = window.matchMedia(
+			"(prefers-color-scheme: dark)",
+		).matches;
 		isDark.value = prefersDark;
 	} else {
 		isDark.value = themeMode.value === "dark";
@@ -355,7 +370,11 @@ function setReduceMotion(val: boolean) {
 	}
 }
 
-const savedThemeMode = localStorage.getItem("skyforge-theme-mode") as "light" | "dark" | "system" | null;
+const savedThemeMode = localStorage.getItem("skyforge-theme-mode") as
+	| "light"
+	| "dark"
+	| "system"
+	| null;
 if (savedThemeMode) {
 	themeMode.value = savedThemeMode;
 }

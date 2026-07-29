@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
 import {
 	Cpu,
 	Download,
@@ -9,6 +8,9 @@ import {
 	SearchCode,
 	UserCheck,
 } from "@lucide/vue";
+import { computed, ref } from "vue";
+import FaultInjectPanel from "@/components/FaultInjectPanel.vue";
+import SimulationResult from "@/components/SimulationResult.vue";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -22,12 +24,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import FaultInjectPanel from "@/components/FaultInjectPanel.vue";
 import WaveformChart from "@/components/WaveformChart.vue";
-import SimulationResult from "@/components/SimulationResult.vue";
+import { MOCK_CODE, SIM_STEPS } from "@/mock/data";
 import { getApi } from "@/services/api";
 import { genSineInput, lowpassFilter } from "@/services/simulation";
-import { MOCK_CODE, SIM_STEPS } from "@/mock/data";
 import type {
 	FaultParams,
 	FaultType,
@@ -85,17 +85,26 @@ function buildContractYaml(): string {
 	const preList = preconditions.value
 		.split("\n")
 		.filter((l) => l.trim())
-		.map((expr, i) => `  - id: CON-LAB-PRE-${String(i).padStart(3, "0")}\n    expression: "${expr.trim()}"`)
+		.map(
+			(expr, i) =>
+				`  - id: CON-LAB-PRE-${String(i).padStart(3, "0")}\n    expression: "${expr.trim()}"`,
+		)
 		.join("\n");
 	const postList = postconditions.value
 		.split("\n")
 		.filter((l) => l.trim())
-		.map((expr, i) => `  - id: CON-LAB-POST-${String(i).padStart(3, "0")}\n    expression: "${expr.trim()}"`)
+		.map(
+			(expr, i) =>
+				`  - id: CON-LAB-POST-${String(i).padStart(3, "0")}\n    expression: "${expr.trim()}"`,
+		)
 		.join("\n");
 	const invList = invariants.value
 		.split("\n")
 		.filter((l) => l.trim())
-		.map((expr, i) => `  - id: CON-LAB-INV-${String(i).padStart(3, "0")}\n    expression: "${expr.trim()}"`)
+		.map(
+			(expr, i) =>
+				`  - id: CON-LAB-INV-${String(i).padStart(3, "0")}\n    expression: "${expr.trim()}"`,
+		)
 		.join("\n");
 	return `component: LabComponent
 description: 仿真实验室自定义组件
@@ -116,10 +125,7 @@ fault_handling:
 `;
 }
 
-async function runSimulation(
-	faultType?: FaultType,
-	faultParams?: FaultParams,
-) {
+async function runSimulation(faultType?: FaultType, faultParams?: FaultParams) {
 	isSimulating.value = true;
 	try {
 		const contract = buildContractYaml();
@@ -142,9 +148,7 @@ function handleStartSimulation() {
 	runSimulation();
 }
 
-function handleFaultInject(
-	faults: { type: FaultType; params: FaultParams }[],
-) {
+function handleFaultInject(faults: { type: FaultType; params: FaultParams }[]) {
 	if (!faults.length) return;
 	const first = faults[0];
 	runSimulation(first.type, first.params);
@@ -191,8 +195,7 @@ const quickStats = computed(() => {
 function computeVariance(data: number[]): number {
 	if (!data.length) return 0;
 	const mean = data.reduce((a, b) => a + b, 0) / data.length;
-	const variance =
-		data.reduce((a, b) => a + (b - mean) ** 2, 0) / data.length;
+	const variance = data.reduce((a, b) => a + (b - mean) ** 2, 0) / data.length;
 	return Math.round(variance * 100) / 100;
 }
 </script>

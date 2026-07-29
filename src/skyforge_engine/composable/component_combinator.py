@@ -194,8 +194,15 @@ class ComponentCombinator:
             " */\n\n"
         )
 
+        forward_decls = (
+            "/* ===== 前向声明 ===== */\n"
+            "double filter_a(double input);\n"
+            "double filter_b(double input);\n\n"
+        )
+
         return (
             header
+            + forward_decls
             + "/* ===== 组件 A ===== */\n"
             + renamed_a
             + "\n\n"
