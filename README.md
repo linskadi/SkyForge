@@ -3,16 +3,14 @@
 > **SkyForge** — AI 驱动的航空机载软件工程平台，面向 DO-178C 开发活动提供需求、代码、验证与追溯辅助证据；不宣称工具本身已完成适航鉴定。
 > *AI-Powered Aviation Software Development Platform for DO-178C Compliance.*
 
-**航空工业软件开源创新大赛** · 机上软件开发工具研发赛道 · 赛题二:AI 智能体驱动的机载软件轻量化开发工具
-
 **多语言支持**: C / C++ / Python | **安全标准**: DO-178C Level A | **编码规范**: MISRA-C / MISRA C++ / JSF AV C++ / 军工Python指南
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![Vue 3](https://img.shields.io/badge/Vue-3-42B883.svg?logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![DO-178C](https://img.shields.io/badge/DO--178C-Engineering%20Support-red.svg)](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md)
-[![MISRA-C:2012](https://img.shields.io/badge/MISRA--C-2012-AutoFix-orange.svg)](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md)
+[![DO-178C](https://img.shields.io/badge/DO--178C-Engineering%20Support-red.svg)](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md)
+[![MISRA-C:2012](https://img.shields.io/badge/MISRA--C-2012-AutoFix-orange.svg)](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md)
 [![Z3](https://img.shields.io/badge/Formal-Z3-purple.svg)](./src/skyforge_engine/tools/z3_verifier.py)
 [![CBMC](https://img.shields.io/badge/Verify-CBMC-teal.svg)](./src/skyforge_engine/tools/cbmc_verifier.py)
 [![Multi-Agent](https://img.shields.io/badge/Multi--Agent-8%2B-green.svg)](#-multi-agent-协同管道)
@@ -42,7 +40,7 @@
 
 | 目标 | 状态 | 原因 |
 |------|------|------|
-| OBJ-2 契约验证 | 部分满足 | Mock 代码与契约语义不完全匹配（需真实 LLM） |
+| OBJ-2 契约验证 | 部分满足 | 契约语义与生成代码不完全匹配（需真实 LLM） |
 | OBJ-10 独立性 | 部分满足 | 缺少真实人工审查（HITL 禁用，无硬件平台） |
 | OBJ-12 契约违约 | 部分满足 | 与 OBJ-2 联动 |
 | OBJ-17 独立验证 | 部分满足 | 缺少独立人工/CI 审查（HITL 禁用） |
@@ -84,7 +82,7 @@ SkyForge 采用**六层引擎架构**(Layer 0-5),自底向上逐层增强,每一
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-> 详见 [系统工程审计](../competition/docs/SYSTEM_ENGINEERING_AUDIT_2026-07-19.md) | [架构详解](./docs/ARCHITECTURE.md) | [插件开发](./docs/PLUGIN_DEVELOPMENT.md)
+> 详见 [架构详解](./docs/ARCHITECTURE.md) | [插件开发](./docs/PLUGIN_DEVELOPMENT.md)
 
 ---
 
@@ -125,7 +123,7 @@ docker compose up --build
 docker compose -f docker-compose.dev.yml up
 ```
 
-> 💡 **演示模式开箱即用且完全离线**。界面和报告始终标记为 `simulated`；外部工具缺失不会被解释为“零违规”或“验证通过”。
+> 💡 **前端模拟模式开箱即用且完全离线**。界面和报告始终标记为 `simulated`；外部工具缺失不会被解释为"零违规"或"验证通过"。
 
 ### 🧰 工具链安装（可选,离线模式无需安装）
 
@@ -143,7 +141,7 @@ docker compose -f docker-compose.dev.yml up
 
 ### 🛡️ 离线运行模式
 
-SkyForge 支持完全离线运行，无需外部 API 或本地模型。界面和报告会标注数据来源（`simulated` / `live`），便于区分演示与真实执行。
+SkyForge 支持完全离线运行，无需外部 API 或本地模型。界面和报告会标注数据来源（`simulated` / `live`），便于区分模拟与真实执行。
 
 | 外部依赖 | 离线时的行为 | 实现位置 |
 |----------|----------------|----------|
@@ -164,33 +162,9 @@ HITL (Human-in-the-Loop) 在需求、契约和代码检查点等待人工决定�
 | `HIL_ENABLED` 环境变量 | **`false`** | `start.sh` 默认禁用,避免阻塞自动化流程 |
 | `POST /api/hil/toggle` | — | 兼容路径：运行时切换 HITL 启用状态（无需重启后端） |
 | `GET /api/hil/pending` | — | 兼容路径：查询待人工审查任务与 HITL 状态 |
-| Generate 页面 HITL 开关 | 关 / 开 | “开始生成”按钮左侧的 UserCheck 图标按钮，关=灰色 / 开=琥珀色 |
+| Generate 页面 HITL 开关 | 关 / 开 | "开始生成"按钮左侧的 UserCheck 图标按钮，关=灰色 / 开=琥珀色 |
 
 > 旧 `/api/hil/*` 路径保留一版兼容；新产品文案和页面统一使用 HITL。
-
-### ⚡ 比赛版前端
-
-首页与比赛工作台不再轮询后端。演示 profile 使用浏览器内 `DemoTaskGateway`，首页、运行记录与 HITL 页面在后端关闭时仍可工作。
-
-| 组件 | 轮询周期 | 文件 |
-|------|----------|------|
-| TopStatusBar(顶部状态栏) | 10s | `studio/frontend/src/components/TopStatusBar.vue` |
-| Dashboard(仪表盘系统状态) | 10s | `studio/frontend/src/pages/dashboard/index.vue` |
-| HILPanel（HITL 审查倒计时，文件名兼容保留） | 1s | `studio/frontend/src/components/HILPanel.vue` |
-| LLM 长任务超时 | 180s | `studio/frontend/src/services/api.ts`(`LLM_LONG_TIMEOUT_MS`) |
-
-> 顶部状态栏使用 8s HTTP 超时 + 10s 轮询,避免 LLM 阻塞期间健康检查堆积;LLM 生成 / 修复 / 报告接口统一 3 分钟超时,兼容本地模型推理时间。
-
----
-
-## 🏆 比赛评分维度对照
-
-| 评分维度 | 分值 | 对应能力 | 详见章节 |
-|----------|------|----------|----------|
-| **创新性** | 30 | Multi-Agent 协同、DO-178C 工程辅助证据、形式化验证、数字孪生故障注入、HITL 人工审查 | [架构概览](#-架构概览) · [Multi-Agent](#-multi-agent-协同管道) |
-| **赛道契合度** | 25 | 商飞产业需求、ARINC 653 分区调度、FreeRTOS 任务调度、SCADE G-Lustre 集成 | [产业应用案例](../competition/docs/COMPETITION_EDITION.md) · [ARINC 653 示例](./examples/arinc653_partition/) |
-| **落地可行性** | 25 | 六层引擎架构、离线运行模式、12 个基准测试全过、Docker 一键部署 | [基准报告](./docs/benchmark/benchmark_report.md) · [部署说明](./docs/USER_GUIDE.md) |
-| **应用价值** | 20 | 效率提升 6-12x、人力节约 70-75%、年成本节约 70-75%、ROI 量化 | [效率数据](../competition/docs/PROJECT_REVIEW.md) · [竞品对比](../competition/docs/PROJECT_REVIEW.md) |
 
 ---
 
@@ -252,9 +226,9 @@ SkyForge/
 │   │   └── main.py                    ←   FastAPI入口
 │   └── frontend/                      ← Vue 3 前端
 │       ├── src/
-│       │   ├── pages/                 ←   路由页面(11个页面)
-│       │   │   └── dashboard/         ←     比赛演示首页(/)
-│       │   ├── views/                 ←   页面视图(Generate / Compose / HITLPage / Demo / Records / Lab / Settings / ArchitectureView)
+│       │   ├── pages/                 ←   路由页面(10个页面)
+│       │   │   └── dashboard/         ←     首页(/)
+│       │   ├── views/                 ←   页面视图(Generate / Compose / HITLPage / RecordDetail / Records / Lab / Settings / ArchitectureView)
 │       │   ├── components/            ←   40+ UI组件 + shadcn-vue
 │       │   ├── stores/                ←   Pinia状态(5个store)
 │       │   ├── services/              ←   API 调用 / 离线模式 + 任务网关
@@ -269,36 +243,32 @@ SkyForge/
 │   ├── MULTI_LANGUAGE_GUIDE.md        ← 多语言支持指南
 │   ├── USER_GUIDE.md                  ← 用户指南
 │   ├── COMPLIANCE_MATRIX.csv          ← DO-178C 合规矩阵
-│   ├── benchmark/                     ← 性能基准报告
-│   ├── thirdparty/                    ← 第三方工具安装说明
-│   └── verification/                  ← 验证报告
+│   └── compliance/                    ← DO-178C 合规文档(PSAC/SDP/SVP/SQAP/SCMP/TQP/TOR/TAS)
 │
 ├── examples/                          ← 示例代码库(12 + 5完整案例)
-├── tools/                             ← 工具脚本(安装/演示/基准/一键启动)
 ├── config/                            ← 集中配置(.env/pyright)
 ├── docker/                            ← Docker部署
 └── .github/                           ← CI/CD工作流
 ```
 
-### 前端路由(11个页面)
+### 前端路由(10个页面)
 
 | 路径 | 页面 | 文件 |
 |------|------|------|
-| `/` | 比赛演示首页 | `pages/dashboard/index.vue` |
+| `/` | 首页 | `pages/dashboard/index.vue` |
 | `/architecture` | 六层架构 | `views/ArchitectureView.vue` |
 | `/generate` | 代码生成 | `views/Generate.vue` |
 | `/records` | 运行记录 | `views/RunRecords.vue` |
-| `/records/:taskId` | 回放模式 | `views/CompetitionDemo.vue` |
+| `/records/:taskId` | 记录详情 | `views/RecordDetail.vue` |
 | `/lab` | 能力实验室 | `views/CapabilityLab.vue` |
 | `/settings` | 系统设置 | `views/SystemSettings.vue` |
-| `/demo` | 比赛工作台 | `views/CompetitionDemo.vue` |
 | `/compose` | 组件组合验证 | `views/Compose.vue` |
 | `/misra` | MISRA规则搜索 | `pages/misra/index.vue` |
 | `/hitl` | HITL人工审查 | `views/HITLPage.vue` |
 
 ### 顶部导航栏(6个)
 
-1. 比赛演示 (`/`)
+1. 首页 (`/`)
 2. 六层架构 (`/architecture`)
 3. 代码生成 (`/generate`)
 4. 运行记录 (`/records`)
@@ -309,7 +279,7 @@ SkyForge/
 
 | Profile | 模式 | 说明 |
 |---------|------|------|
-| `demo` | simulated | 浏览器模拟,完全离线可用 |
+| `mock` | simulated | 前端模拟,完全离线可用 |
 | `cloud` | live | 云模型,后端真实运行 |
 | `local` | live/replay | 本地模型,支持已验证回放 |
 
@@ -347,17 +317,17 @@ SkyForge/
 
 ## 🛡️ DO-178C 合规状态
 
-SkyForge 提供 DO-178C 工程辅助证据，不宣称工具本身已经完成适航鉴定。合规草案详见 [DO-178C 合规包](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md)。
+SkyForge 提供 DO-178C 工程辅助证据，不宣称工具本身已经完成适航鉴定。合规草案详见 [DO-178C 合规包](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md)。
 
 ### 五大核心过程覆盖
 
 | DO-178C 过程 | 章节 | 文档 | 状态 |
 |-------------|------|------|------|
-| **计划过程** | §4 | [PSAC](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) / [SDP](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) / [SVP](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) | ⚠️ 工程草案 (8/8 文档) |
+| **计划过程** | §4 | [PSAC](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) / [SDP](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) / [SVP](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) | ⚠️ 工程草案 (8/8 文档) |
 | **开发过程** | §5 | HLR / LLR 层级 + 契约式设计 + MISRA-C 代码生成 | ⚠️ 工程辅助实现，需真实项目审查 |
 | **验证过程** | §6 | Cppcheck + 契约校验 + 数字孪生 + V3.3 覆盖分析器 | ⚠️ 部分满足；真实覆盖率依赖 GCC/lcov |
-| **配置管理** | §7 | [SCMP](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) + Git + PR 系统 + 基线管理 | ⚠️ 需真实隔离分支 PR/review |
-| **质量保证** | §8 | [SQAP](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) + CI 自动检查 (Ruff/Biome/Pyright) | ⚠️ 需独立人工/CI provenance |
+| **配置管理** | §7 | [SCMP](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) + Git + PR 系统 + 基线管理 | ⚠️ 需真实隔离分支 PR/review |
+| **质量保证** | §8 | [SQAP](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) + CI 自动检查 (Ruff/Biome/Pyright) | ⚠️ 需独立人工/CI provenance |
 
 ### DAL 等级目标覆盖
 
@@ -370,16 +340,16 @@ DO-178C 共 **19 项可判定目标**(OBJ-1 ~ OBJ-19),涵盖问题报告、配�
 | C | 重大 | 部分满足 | 语句覆盖必须 | 需真实语句覆盖率证据 |
 | D | 轻微 | 工程辅助覆盖 | 基础验证 | 仍需项目级审查 |
 
-> 目标状态以 `do178_objectives.py` 和证据包中的真实字段为准；Mock、静态估算、HIL 禁用/超时、main 直合 PR 不计入满足。
+> 目标状态以 `do178_objectives.py` 和证据包中的真实字段为准；模拟数据、静态估算、HIL 禁用/超时、main 直合 PR 不计入满足。
 > 完整合规矩阵详见 [`COMPLIANCE_MATRIX.csv`](./docs/COMPLIANCE_MATRIX.csv) (19 OBJ × 5 DAL)。
 
 ### 工具鉴定(TQL)
 
 | 工具 | TQL 级别 | 状态 | 文档 |
 |------|---------|------|------|
-| Agent Pipeline | TQL-1 | ✅ 草案完成 | [TQP](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) |
-| LLM 推理引擎 | TQL-1 | ✅ 草案完成 | [TOR](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) |
-| Contract Checker | TQL-2 | ✅ 草案完成 | [TAS](../developer-../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) |
+| Agent Pipeline | TQL-1 | ✅ 草案完成 | [TQP](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) |
+| LLM 推理引擎 | TQL-1 | ✅ 草案完成 | [TOR](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) |
+| Contract Checker | TQL-2 | ✅ 草案完成 | [TAS](../developer-docs/DO178C_COMPLIANCE_PACKAGE.md) |
 | 工具链验证 | — | ✅ 已实施 | [`tool_chain_validator.py`](./src/skyforge_engine/tools/tool_chain_validator.py) |
 | Cppcheck / GCC | TQL-3 / TQL-1 | 可引用已有 | 工业标准工具 |
 
@@ -394,20 +364,12 @@ make do178c-check
 
 | 文档 | 路径 | 用途 |
 |------|------|------|
-| **使用教程** | [docs/user/使用教程.md](./docs/USER_GUIDE.md) | 功能模块详解与操作指南 |
-| **部署说明** | [docs/user/部署说明.md](./docs/USER_GUIDE.md) | 环境配置与 API 接口文档 |
-| **测试报告** | [docs/user/测试报告.md](./docs/USER_GUIDE.md) | 测试覆盖与质量评估 |
-| **架构详解** | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 四层架构设计深度剖析 |
-| **系统工程审计** | [competition/docs/SYSTEM_ENGINEERING_AUDIT_2026-07-19.md](../competition/docs/SYSTEM_ENGINEERING_AUDIT_2026-07-19.md) | 比赛版任务协议、执行来源与风险口径 |
-| **基准报告** | [docs/benchmark/benchmark_report.md](./docs/benchmark/benchmark_report.md) | 12 个示例性能基准 |
-| **效率数据** | [competition/docs/PROJECT_REVIEW.md](../competition/docs/PROJECT_REVIEW.md) | ROI 与效率提升量化 |
-| **竞品分析** | [competition/docs/PROJECT_REVIEW.md](../competition/docs/PROJECT_REVIEW.md) | vs SCADE Suite / Polyspace |
-| **差距分析** | [competition/docs/PROJECT_REVIEW.md](../competition/docs/PROJECT_REVIEW.md) | 比赛要求差距与对策 |
-| **产业案例** | [competition/docs/COMPETITION_EDITION.md](../competition/docs/COMPETITION_EDITION.md) | 商飞产业需求对接 |
-| **LLM / 回放验证** | [docs/verification/LLM验证报告.md](../developer-docs/VERIFICATION_REPORT.md) | 云 API、本地模型与已验证运行包口径 |
+| **用户指南** | [docs/USER_GUIDE.md](./docs/USER_GUIDE.md) | 功能模块详解、部署说明与操作指南 |
+| **架构详解** | [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | 六层架构设计深度剖析 |
 | **项目路线图** | [docs/ROADMAP.md](./docs/ROADMAP.md) | 后续规划 |
 | **插件开发** | [docs/PLUGIN_DEVELOPMENT.md](./docs/PLUGIN_DEVELOPMENT.md) | 二次开发扩展指南(含编码标准插件) |
 | **多语言支持** | [docs/MULTI_LANGUAGE_GUIDE.md](./docs/MULTI_LANGUAGE_GUIDE.md) | C/C++/Python 多语言支持指南 |
+| **合规矩阵** | [docs/COMPLIANCE_MATRIX.csv](./docs/COMPLIANCE_MATRIX.csv) | 19 OBJ × 5 DAL 合规矩阵 |
 
 ---
 
@@ -424,7 +386,6 @@ make do178c-check
 
 完整第三方组件清单(含许可证信息):
 - 📄 [ThirdParty.md(根目录)](./ThirdParty.md)
-- 📁 [docs/thirdparty/](./docs/thirdparty/)
 
 ---
 
@@ -440,18 +401,8 @@ Copyright (c) 2026 SkyForge Contributors
 
 | 渠道 | 地址 |
 |------|------|
-| **AtomGit 仓库** | [atomgit.com/gcw_TTqe9ALQ/SkyForge](https://atomgit.com/gcw_TTqe9ALQ/SkyForge) |
 | **GitHub 仓库** | [github.com/linskadi/SkyForge](https://github.com/linskadi/SkyForge) |
-| **比赛官方邮箱** | kefu@jsopen.org.cn |
 | **项目路线图** | [docs/ROADMAP.md](./docs/ROADMAP.md) |
-
-### 比赛信息
-
-- **赛事**: 航空工业软件开源创新大赛
-- **赛道**: 机上软件开发工具研发
-- **赛题**: 二 — AI 智能体驱动的机载软件轻量化开发工具
-- **AtomGit 仓库**: https://atomgit.com/gcw_TTqe9ALQ/SkyForge
-- **GitHub 仓库**: https://github.com/linskadi/SkyForge
 
 ---
 

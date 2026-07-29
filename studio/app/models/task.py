@@ -14,7 +14,7 @@ from app.db import Base
 
 
 class Task(Base):
-    """Durable execution record for demo, cloud, and local profiles."""
+    """Durable execution record for cloud and local profiles."""
 
     __tablename__ = "tasks"
 

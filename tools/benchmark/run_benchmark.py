@@ -409,7 +409,7 @@ class BenchmarkRunner:
                 conclusion_parts.append(
                     "数据表明 SkyForge 在无 LLM / 无真实工具链的降级模式下仍可"
                     "稳定完成需求→契约→代码→静态扫描的完整流水线，"
-                    "满足航空软件工程比赛\"落地可行性\"维度的量化评估需求。"
+                    "为航空软件工程的落地可行性提供量化评估数据。"
                 )
             conclusion = " ".join(conclusion_parts)
         lines.append(conclusion)

@@ -26,6 +26,7 @@ import {
  * 注意：与 HIL（Hardware-in-the-Loop 硬件在环）无关，HIL 位于 digital_twin/ 目录。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import SourceBadge from "@/components/SourceBadge.vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getHITLHistory } from "@/services/api";
@@ -34,15 +35,15 @@ import type {
 	HITLApproval,
 	HITLCheckpointType,
 	HITLHistoryItem,
-} from "@/services/mockApi";
-import {
-	mockApprove,
-	mockGetPendingApprovals,
-	mockReject,
-} from "@/services/mockApi";
+} from "@/types/domain";
 import { useExecutionStore } from "@/stores/executionStore";
+import { useHITLStore } from "@/stores/hitlStore";
+import type { ReviewTemplate } from "@/stores/hitlStore";
 
 const execution = useExecutionStore();
+const hitlStore = useHITLStore();
+
+const expandedTemplate = ref<ReviewTemplate | null>(null);
 
 /** 待审批列表 */
 const pendingList = ref<HITLApproval[]>([]);
@@ -85,14 +86,10 @@ const loadPending = async () => {
 	loading.value = true;
 	errorMsg.value = "";
 	try {
-		// 演示 profile 必须完全离线，审批列表和历史都来自浏览器数据源。
-		const [pending, history] =
-			execution.profileId === "demo"
-				? [await mockGetPendingApprovals(), [] as HITLHistoryItem[]]
-				: await Promise.all([
-						getApi().getHITLPendingApprovals(),
-						getHITLHistory(),
-					]);
+		const [pending, history] = await Promise.all([
+			getApi().getHITLPendingApprovals(),
+			getHITLHistory(),
+		]);
 		pendingList.value = pending;
 		historyList.value = history;
 	} catch (err) {
@@ -114,6 +111,17 @@ const toggleExpand = (id: string) => {
 	}
 };
 
+watch(expandedId, async (newId) => {
+	if (newId) {
+		const item = pendingList.value.find((p) => p.request_id === newId);
+		if (item) {
+			expandedTemplate.value = await hitlStore.fetchTemplate(item.checkpoint);
+		}
+	} else {
+		expandedTemplate.value = null;
+	}
+});
+
 /** 获取评论 */
 const getComment = (id: string): string => {
 	return commentMap.value[id] ?? "";
@@ -129,9 +137,7 @@ const onApprove = async (item: HITLApproval) => {
 	actionLoading.value = { ...actionLoading.value, [item.request_id]: true };
 	try {
 		const comments = getComment(item.request_id);
-		if (execution.profileId === "demo")
-			await mockApprove(item.request_id, comments);
-		else await getApi().hitlApprove(item.request_id, comments);
+		await getApi().hitlApprove(item.request_id, comments);
 		await loadPending();
 		showHistory.value = true;
 	} catch (err) {
@@ -151,9 +157,7 @@ const onReject = async (item: HITLApproval) => {
 	}
 	actionLoading.value = { ...actionLoading.value, [item.request_id]: true };
 	try {
-		if (execution.profileId === "demo")
-			await mockReject(item.request_id, comments);
-		else await getApi().hitlReject(item.request_id, comments);
+		await getApi().hitlReject(item.request_id, comments);
 		await loadPending();
 		showHistory.value = true;
 	} catch (err) {
@@ -228,7 +232,10 @@ function handleVisibilityChange() {
     <CardHeader>
       <CardTitle class="card-title">
         <ClipboardList class="title-icon" />
-        HITL 人工审查
+        <div class="flex items-center gap-2">
+          <span>HITL 人工审查</span>
+          <SourceBadge source="observed" label="人工审查" />
+        </div>
         <span class="title-hint">
           待审批
           <span class="count-badge">{{ pendingCount }}</span>
@@ -294,6 +301,22 @@ function handleVisibilityChange() {
             <div class="meta-row">
               <span>提交时间：{{ formatTime(item.submitted_at) }}</span>
               <span>截止时间：{{ formatTime(item.deadline) }}</span>
+            </div>
+            <div v-if="expandedTemplate && expandedTemplate.items.length > 0" class="template-section">
+              <div class="template-header">
+                <span class="template-title">审查模板</span>
+                <span class="template-version">v{{ expandedTemplate.version }}</span>
+              </div>
+              <div class="template-items">
+                <div
+                  v-for="tplItem in expandedTemplate.items"
+                  :key="tplItem.id"
+                  class="template-item"
+                >
+                  <span class="template-item-title">{{ tplItem.title }}</span>
+                  <span class="template-item-category">{{ tplItem.category }}</span>
+                </div>
+              </div>
             </div>
             <textarea
               class="comment-input"
@@ -640,6 +663,64 @@ function handleVisibilityChange() {
 .comment-input:focus {
   border-color: #ea580c;
   box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.15);
+}
+
+.template-section {
+  margin-bottom: 10px 0;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.template-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.template-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.template-version {
+  font-size: 10px;
+  color: #6b7280;
+  background: #e5e7eb;
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+
+.template-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.template-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+}
+
+.template-item-title {
+  font-size: 11px;
+  color: #374151;
+}
+
+.template-item-category {
+  font-size: 10px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 1px 6px;
+  border-radius: 8px;
 }
 
 .action-row {

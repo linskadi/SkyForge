@@ -162,12 +162,14 @@ const hasCode = computed(() => props.code.length > 0);
 .code-viewer {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 13px;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  height: 100%;
 }
 
 .code-block {
@@ -177,6 +179,7 @@ const hasCode = computed(() => props.code.length > 0);
   overflow-y: auto;
   flex: 1;
   display: block;
+  background: hsl(var(--muted));
 }
 
 .code-block::-webkit-scrollbar {
@@ -185,11 +188,11 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .code-block::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: hsl(var(--muted));
 }
 
 .code-block::-webkit-scrollbar-thumb {
-  background: #3c3c3c;
+  background: hsl(var(--muted-foreground) / 0.3);
   border-radius: 4px;
 }
 
@@ -202,13 +205,13 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .code-line.highlighted {
-  background: rgba(255, 213, 79, 0.18);
-  box-shadow: inset 4px 0 0 #f59e0b;
+  background: hsl(var(--warning) / 0.18);
+  box-shadow: inset 4px 0 0 hsl(var(--warning));
   border-left: none;
 }
 
 .code-line.highlighted .line-no {
-  color: #f59e0b;
+  color: hsl(var(--warning));
   font-weight: 700;
 }
 
@@ -217,8 +220,9 @@ const hasCode = computed(() => props.code.length > 0);
   width: 40px;
   text-align: right;
   margin-right: 16px;
-  color: #6e7681;
+  color: hsl(var(--muted-foreground));
   user-select: none;
+  background: hsl(var(--muted));
 }
 
 .line-content {
@@ -228,7 +232,7 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .text-token {
-  color: #d4d4d4;
+  color: hsl(var(--foreground));
 }
 
 /* 徽章通用样式 */
@@ -245,13 +249,13 @@ const hasCode = computed(() => props.code.length > 0);
 
 /* REQ 徽章：蓝色（与 AgentTerminal REQ-Parser 配色对齐） */
 .req-badge {
-  background: #0EA5E9;
-  color: #d6e8ff;
+  background: hsl(var(--agent-req) / 0.85);
+  color: hsl(var(--primary-foreground));
   cursor: pointer;
 }
 
 .req-badge:hover {
-  background: #2884d1;
+  background: hsl(var(--agent-req));
 }
 
 .req-badge.clickable {
@@ -259,33 +263,33 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .req-badge.active {
-  background: #f59e0b;
-  color: #1e1e1e;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.4), 0 0 12px rgba(245, 158, 11, 0.3);
+  background: hsl(var(--warning));
+  color: hsl(var(--background));
+  box-shadow: 0 0 0 3px hsl(var(--warning) / 0.4), 0 0 12px hsl(var(--warning) / 0.3);
   transform: scale(1.08);
   font-weight: 700;
 }
 
 /* MISRA 徽章：橙色 */
 .misra-badge {
-  background: #b45309;
-  color: #ffedd5;
+  background: hsl(var(--warning) / 0.7);
+  color: hsl(var(--warning-foreground));
   cursor: help;
 }
 
 .misra-badge:hover {
-  background: #d97706;
+  background: hsl(var(--warning));
 }
 
 /* CON 徽章：紫色 */
 .con-badge {
-  background: #6b21a8;
-  color: #f0e6ff;
+  background: hsl(var(--agent-con) / 0.7);
+  color: hsl(var(--primary-foreground));
   cursor: help;
 }
 
 .con-badge:hover {
-  background: #7e22ce;
+  background: hsl(var(--agent-con));
 }
 
 .con-badge.clickable {
@@ -293,22 +297,22 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .con-badge.active {
-  background: #a855f7;
-  color: #fff;
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.4), 0 0 12px rgba(168, 85, 247, 0.3);
+  background: hsl(var(--agent-con));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 0 0 3px hsl(var(--agent-con) / 0.4), 0 0 12px hsl(var(--agent-con) / 0.3);
   transform: scale(1.08);
   font-weight: 700;
 }
 
 /* TST 徽章：绿色 */
 .tst-badge {
-  background: #15803d;
-  color: #dcfce7;
+  background: hsl(var(--success) / 0.7);
+  color: hsl(var(--success-foreground));
   cursor: help;
 }
 
 .tst-badge:hover {
-  background: #16a34a;
+  background: hsl(var(--success));
 }
 
 .tst-badge.clickable {
@@ -316,9 +320,9 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .tst-badge.active {
-  background: #22c55e;
-  color: #052e16;
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), 0 0 12px rgba(34, 197, 94, 0.3);
+  background: hsl(var(--success));
+  color: hsl(var(--success-foreground));
+  box-shadow: 0 0 0 3px hsl(var(--success) / 0.4), 0 0 12px hsl(var(--success) / 0.3);
   transform: scale(1.08);
   font-weight: 700;
 }
@@ -326,19 +330,19 @@ const hasCode = computed(() => props.code.length > 0);
 .empty-hint {
   padding: 24px;
   text-align: center;
-  color: #6a6a6a;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
 }
 
 .legend {
   padding: 6px 12px;
-  background: #252526;
-  border-top: 1px solid #3c3c3c;
+  background: hsl(var(--muted));
+  border-top: 1px solid hsl(var(--border));
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
   font-size: 11px;
-  color: #9d9d9d;
+  color: hsl(var(--muted-foreground));
 }
 
 .legend-item {
@@ -348,12 +352,12 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .active-legend {
-  color: #f59e0b;
+  color: hsl(var(--warning));
   font-weight: 700;
-  background: rgba(245, 158, 11, 0.1);
+  background: hsl(var(--warning) / 0.1);
   padding: 2px 8px;
   border-radius: 4px;
-  border: 1px solid rgba(245, 158, 11, 0.3);
+  border: 1px solid hsl(var(--warning) / 0.3);
 }
 
 .dot {
@@ -364,18 +368,18 @@ const hasCode = computed(() => props.code.length > 0);
 }
 
 .req-dot {
-  background: #0EA5E9;
+  background: hsl(var(--agent-req));
 }
 
 .misra-dot {
-  background: #b45309;
+  background: hsl(var(--warning));
 }
 
 .con-dot {
-  background: #6b21a8;
+  background: hsl(var(--agent-con));
 }
 
 .tst-dot {
-  background: #15803d;
+  background: hsl(var(--success));
 }
 </style>

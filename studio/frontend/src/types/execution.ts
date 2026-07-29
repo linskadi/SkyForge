@@ -1,6 +1,6 @@
 import type { GenerateResult } from "@/types/domain";
 
-export type ExecutionProfileId = "demo" | "cloud" | "local";
+export type ExecutionProfileId = "cloud" | "local";
 export type RunSource = "simulated" | "live" | "replay";
 export type EvidenceStatus =
 	| "observed"

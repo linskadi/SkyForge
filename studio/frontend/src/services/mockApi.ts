@@ -16,6 +16,8 @@ import type {
 	CompatibilityResult,
 	ComposeConnection,
 	ComposeResult,
+	ComplianceTrendPoint,
+	DashboardStats,
 	DashboardTaskRecord,
 	FaultParams,
 	FaultType,
@@ -24,9 +26,11 @@ import type {
 	HITLHistoryItem,
 	LogLevel,
 	MisraRule,
+	RecentTask,
 	ReportResult,
 	RuleStandard,
 	SimulationResult,
+	SystemStatus,
 } from "@/types/domain";
 import type {
 	VerificationCheck,
@@ -990,7 +994,7 @@ export function mockDownloadReport(): string {
  * mock 形式化验证契约
  *
  * 模拟一个典型场景：5 项检查中 4 项通过、1 项失败、1 项跳过，
- * 用于前端独立演示形式化验证结果展示（无需后端 / Z3 / CBMC）。
+ * 用于前端独立展示形式化验证结果（无需后端 / Z3 / CBMC）。
  *
  * @param payload 契约数据（mock 模式下仅用于日志展示）
  */
@@ -1124,6 +1128,144 @@ async function mockGetTaskDetail(taskId: string): Promise<DashboardTaskRecord> {
 	};
 }
 
+async function mockGetSystemStatus(): Promise<SystemStatus> {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve({
+				backend: "online",
+				llm: {
+					mode: "mock",
+					provider: null,
+					model: null,
+					available: true,
+				},
+				tools: {
+					gcc: true,
+					z3: true,
+					cbmc: null,
+				},
+				persistence: {
+					db_rows: 128,
+					last_write: new Date().toISOString(),
+				},
+			});
+		}, 200);
+	});
+}
+
+async function mockGetRecentTasks(limit = 8): Promise<RecentTask[]> {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			const now = Date.now();
+			const tasks: RecentTask[] = [
+				{
+					id: "task-001",
+					requirement: "实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声",
+					language: "c",
+					status: "done",
+					degraded: false,
+					violation_count: 2,
+					stage_reached: "done",
+					duration_ms: 45000,
+					created_at: new Date(now - 1000 * 60 * 5).toISOString(),
+				},
+				{
+					id: "task-002",
+					requirement: "实现 PID 控制器，Kp=2.0, Ki=0.5, Kd=0.1，控制无人机俯仰角",
+					language: "cpp",
+					status: "done",
+					degraded: false,
+					violation_count: 0,
+					stage_reached: "done",
+					duration_ms: 62000,
+					created_at: new Date(now - 1000 * 60 * 30).toISOString(),
+				},
+				{
+					id: "task-003",
+					requirement: "实现 ARINC 429 字解析函数，将 32 位字解码为标签、SDI、数据",
+					language: "c",
+					status: "running",
+					degraded: false,
+					violation_count: 0,
+					stage_reached: "code",
+					duration_ms: 0,
+					created_at: new Date(now - 1000 * 60 * 2).toISOString(),
+				},
+				{
+					id: "task-004",
+					requirement: "数据预处理函数，处理传感器原始数据的校准和滤波",
+					language: "python",
+					status: "done",
+					degraded: true,
+					violation_count: 5,
+					stage_reached: "done",
+					duration_ms: 38000,
+					created_at: new Date(now - 1000 * 60 * 60 * 2).toISOString(),
+				},
+				{
+					id: "task-005",
+					requirement: "温度控制系统的 PID 算法实现",
+					language: "c",
+					status: "error",
+					degraded: false,
+					violation_count: 12,
+					stage_reached: "repair",
+					duration_ms: 25000,
+					created_at: new Date(now - 1000 * 60 * 60 * 4).toISOString(),
+				},
+				{
+					id: "task-006",
+					requirement: "姿态解算算法，基于四元数的方向余弦矩阵计算",
+					language: "cpp",
+					status: "done",
+					degraded: false,
+					violation_count: 1,
+					stage_reached: "done",
+					duration_ms: 71000,
+					created_at: new Date(now - 1000 * 60 * 60 * 8).toISOString(),
+				},
+			];
+			resolve(tasks.slice(0, limit));
+		}, 300);
+	});
+}
+
+async function mockGetDashboardStats(): Promise<DashboardStats> {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			resolve({
+				today_count: 12,
+				today_done: 8,
+				total_count: 256,
+				avg_compliance_rate: 0.92,
+			});
+		}, 200);
+	});
+}
+
+async function mockGetComplianceTrend(limit = 10): Promise<ComplianceTrendPoint[]> {
+	return new Promise((resolve) => {
+		setTimeout(() => {
+			const now = Date.now();
+			const points: ComplianceTrendPoint[] = [];
+			for (let i = limit - 1; i >= 0; i--) {
+				const ts = new Date(now - i * 1000 * 60 * 30).toISOString();
+				const mandatory = Math.floor(Math.random() * 3);
+				const required = Math.floor(Math.random() * 5);
+				const advisory = Math.floor(Math.random() * 4);
+				points.push({
+					ts,
+					mandatory,
+					required,
+					advisory,
+					total: mandatory + required + advisory,
+				});
+			}
+			resolve(points);
+		}, 300);
+	});
+}
+
 /**
  * mockApi 的 ApiClient 实例。
  *
@@ -1173,4 +1315,8 @@ export const mockApiClient: ApiClient = {
 	saveLLMConfig: mockSaveLLMConfig,
 	testLLMConnection: mockTestLLMConnection,
 	getTaskDetail: mockGetTaskDetail,
+	getSystemStatus: mockGetSystemStatus,
+	getRecentTasks: mockGetRecentTasks,
+	getDashboardStats: mockGetDashboardStats,
+	getComplianceTrend: mockGetComplianceTrend,
 };

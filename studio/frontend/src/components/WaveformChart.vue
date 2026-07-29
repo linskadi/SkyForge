@@ -354,7 +354,7 @@ const exportPNG = () => {
     <v-chart
       ref="chartRef"
       :option="option"
-      :style="{ height: height + 'px' }"
+      :style="{ width: '100%', height: height + 'px', flex: 1 }"
       autoresize
     />
     <!-- 操作提示 -->
@@ -370,6 +370,8 @@ const exportPNG = () => {
   flex-direction: column;
   gap: 8px;
   width: 100%;
+  height: 100%;
+  flex: 1;
 }
 
 .chart-toolbar {
@@ -385,7 +387,7 @@ const exportPNG = () => {
   align-items: center;
   gap: 16px;
   font-size: 12px;
-  color: #4b5563;
+  color: hsl(var(--muted-foreground));
 }
 
 .legend-item {
@@ -402,19 +404,19 @@ const exportPNG = () => {
 }
 
 .legend-line.input {
-  background: #0EA5E9;
+  background: hsl(var(--chart-1));
 }
 
 .legend-line.output {
-  background: #22c55e;
+  background: hsl(var(--chart-2));
 }
 
 .legend-line.baseline {
-  background: #94a3b8;
+  background: hsl(var(--muted-foreground));
   background-image: repeating-linear-gradient(
     90deg,
-    #94a3b8 0,
-    #94a3b8 6px,
+    hsl(var(--muted-foreground)) 0,
+    hsl(var(--muted-foreground)) 6px,
     transparent 6px,
     transparent 10px
   );
@@ -422,8 +424,8 @@ const exportPNG = () => {
 }
 
 .legend-line.fault {
-  background: rgba(239, 68, 68, 0.5);
-  border: 1px dashed #dc2626;
+  background: hsl(var(--destructive) / 0.5);
+  border: 1px dashed hsl(var(--destructive));
 }
 
 .toolbar-actions {
@@ -433,7 +435,7 @@ const exportPNG = () => {
 
 .chart-hint {
   font-size: 11px;
-  color: #9ca3af;
+  color: hsl(var(--muted-foreground));
   text-align: right;
 }
 </style>

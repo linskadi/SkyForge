@@ -1,10 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 
-/** 路由配置
- *
- * 仅保留比赛演示所需的路由，删除 v1 时代的 /login /chat /task/:task_id 等孤立页面，
- * 以及与 / 重复的 /dashboard 别名。
- */
 const routes = [
 	{
 		path: "/",
@@ -15,17 +10,12 @@ const routes = [
 		component: () => import("@/views/Generate.vue"),
 	},
 	{
-		path: "/demo",
-		component: () => import("@/views/CompetitionDemo.vue"),
-	},
-	{
 		path: "/records",
 		component: () => import("@/views/RunRecords.vue"),
 	},
 	{
-		// 回放模式：通过运行记录点击进入，加载历史任务详情
 		path: "/records/:taskId",
-		component: () => import("@/views/CompetitionDemo.vue"),
+		component: () => import("@/views/Generate.vue"),
 		props: true,
 	},
 	{
@@ -53,6 +43,10 @@ const routes = [
 		name: "Architecture",
 		component: () => import("@/views/ArchitectureView.vue"),
 		meta: { title: "六层架构" },
+	},
+	{
+		path: "/compliance",
+		component: () => import("@/views/ComplianceAudit.vue"),
 	},
 ];
 

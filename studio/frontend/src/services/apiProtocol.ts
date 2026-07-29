@@ -18,15 +18,19 @@ import type {
 	CompatibilityResult,
 	ComposeConnection,
 	ComposeResult,
+	ComplianceTrendPoint,
+	DashboardStats,
 	DashboardTaskRecord,
 	FaultParams,
 	GenerateResult,
 	HITLApproval,
 	HITLHistoryItem,
 	MisraRule,
+	RecentTask,
 	ReportResult,
 	RuleStandard,
 	SimulationResult,
+	SystemStatus,
 } from "@/types/domain";
 import type { VerificationResult, VerifyRequest } from "@/types/verification";
 
@@ -163,6 +167,18 @@ export interface ApiClient {
 	// ---- Dashboard ----
 	/** 获取 Dashboard 任务详情 */
 	getTaskDetail(taskId: string): Promise<DashboardTaskRecord>;
+
+	/** 获取系统状态概览 */
+	getSystemStatus(): Promise<SystemStatus>;
+
+	/** 获取最近任务列表 */
+	getRecentTasks(limit?: number): Promise<RecentTask[]>;
+
+	/** 获取 Dashboard 统计指标 */
+	getDashboardStats(): Promise<DashboardStats>;
+
+	/** 获取合规率趋势数据 */
+	getComplianceTrend(limit?: number): Promise<ComplianceTrendPoint[]>;
 }
 
 /**

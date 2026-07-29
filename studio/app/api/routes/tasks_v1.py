@@ -235,12 +235,6 @@ async def execution_profiles() -> dict[str, Any]:
     return {
         "profiles": [
             {
-                "id": "demo",
-                "label": "演示模式（模拟）",
-                "available": True,
-                "source": "simulated",
-            },
-            {
                 "id": "cloud",
                 "label": "云 API",
                 "available": bool(settings.LLM_API_KEY),

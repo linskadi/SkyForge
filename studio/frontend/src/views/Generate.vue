@@ -31,6 +31,7 @@ import RepairTimeline from "@/components/RepairTimeline.vue";
 import ReportDownload from "@/components/ReportDownload.vue";
 import ReviewConfirm from "@/components/ReviewConfirm.vue";
 import SimulationResultView from "@/components/SimulationResult.vue";
+import SourceBadge from "@/components/SourceBadge.vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -608,9 +609,7 @@ async function loadTaskFromId(taskId: string): Promise<void> {
 			decisions.value = [];
 			terminalRef.value?.clear?.();
 		} else {
-			// 已完成任务：跳转到回放页（/records/:taskId），由 CompetitionDemo
-			// 在 onMounted 中通过 TaskGateway.getTask 加载历史详情并展示评委摘要。
-			// 不再使用已删除的 v1 路由 /task/:task_id。
+			// 已完成任务：跳转到回放页（/records/:taskId），由 Generate.vue 处理
 			router.replace(`/records/${taskId}`);
 		}
 	} catch (err) {
@@ -627,7 +626,7 @@ watch(
 );
 </script>
 <template>
-  <div class="h-full overflow-y-auto">
+  <div class="h-full w-full overflow-hidden">
     <div class="generate-page">
 
       <!-- ===== 页头 ===== -->
@@ -643,286 +642,329 @@ watch(
         </div>
       </header>
 
-      <!-- ===== 阶段 1: 需求输入 ===== -->
-      <div class="generate-stage">
-        <div class="flex items-center gap-2 mb-3">
-          <div class="w-6 h-6 rounded-full bg-sky-500/10 flex items-center justify-center text-[11px] font-bold text-sky-500">1</div>
-          <h2 class="text-sm font-semibold text-foreground">需求输入</h2>
-          <div class="flex-1 h-px bg-border/50 ml-2" />
-          <div class="flex items-center gap-2">
-            <button
-              v-for="lang in (['c', 'cpp', 'python'] as const)"
-              :key="lang"
-              type="button"
-              class="lang-btn"
-              :class="{ active: selectedLanguage === lang }"
-              @click="selectedLanguage = lang"
-            >{{ { c: 'C', cpp: 'C++', python: 'Python' }[lang] }}</button>
+      <!-- ===== 三栏主容器 ===== -->
+      <div class="generate-grid">
+
+        <!-- ===== 阶段 1: 需求输入（左栏） ===== -->
+        <div class="generate-col col-left">
+          <div class="col-header">
+            <div class="col-number">1</div>
+            <h2 class="col-title">需求输入</h2>
           </div>
-        </div>
-
-        <textarea
-          v-model="requirement"
-          class="req-textarea"
-          placeholder="例如：实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声..."
-          :disabled="status === 'generating'"
-          rows="4"
-        />
-
-        <div class="flex items-center justify-between mt-3">
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-[10px] text-muted-foreground mr-1">示例:</span>
-            <button
-              v-for="(ex, idx) in EXAMPLE_REQUIREMENTS"
-              :key="idx"
-              type="button"
-              class="example-btn"
-              :disabled="status === 'generating'"
-              @click="fillExample(ex)"
-            >{{ ex.length > 24 ? ex.slice(0, 24) + '...' : ex }}</button>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <Button
-              v-if="providerStore.derivedMode !== 'mock'"
-              size="sm"
-              variant="outline"
-              :disabled="hitlLoading || status === 'generating'"
-              :class="['hitl-toggle-btn', { active: hitlEnabled }]"
-              :title="hitlEnabled ? 'HITL 已开启：pipeline 将在评审检查点暂停等待人工审查' : 'HITL 已关闭：pipeline 直接跑完全流程'"
-              @click="onToggleHITL"
-            >
-              <Loader2 v-if="hitlLoading" class="w-3.5 h-3.5 animate-spin" />
-              <UserCheck v-else class="w-3.5 h-3.5" />
-              HITL {{ hitlEnabled ? '开' : '关' }}
-            </Button>
-            <Button size="sm" :disabled="!canGenerate" @click="onGenerate" class="generate-btn">
-              <Loader2 v-if="status === 'generating'" class="w-3.5 h-3.5 animate-spin" />
-              <Play v-else class="w-3.5 h-3.5" />
-              {{ status === 'generating' ? '生成中...' : '开始生成' }}
-            </Button>
-            <Button v-if="status !== 'idle'" size="sm" variant="outline" @click="onReset">
-              <RotateCcw class="w-3.5 h-3.5" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ===== 阶段 2: Agent 执行 ===== -->
-      <div v-if="status !== 'idle'" class="generate-stage">
-        <div class="flex items-center gap-2 mb-3">
-          <div class="w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold"
-               :class="status === 'generating' ? 'bg-sky-500/10 text-sky-500' : status === 'done' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'">2</div>
-          <h2 class="text-sm font-semibold text-foreground">Agent 执行</h2>
-          <div class="flex-1 h-px bg-border/50 ml-2" />
-          <span v-if="status === 'generating'" class="text-[10px] text-sky-400 flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" /> 执行中
-          </span>
-          <span v-else-if="status === 'done'" class="text-[10px] text-emerald-400 flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" /> 完成
-          </span>
-          <span v-else-if="status === 'error'" class="text-[10px] text-red-400">失败</span>
-        </div>
-
-        <div class="terminal-wrapper rounded-lg border border-border/50 bg-black/20 overflow-hidden">
-          <AgentTerminal
-            ref="terminalRef"
-            :use-mock="useMockAgentTerminal"
-            :requirement="requirement"
-            :language="selectedLanguage"
-            :subscribe-task-id="subscribeTaskId"
-            channel-mode="v1"
-            @complete="onTerminalComplete"
-          />
-        </div>
-      </div>
-
-      <!-- ===== 阶段 3: 结果面板 ===== -->
-      <div v-if="status === 'done' && result" class="generate-stage">
-        <div class="flex items-center gap-2 mb-3">
-          <div class="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center text-[11px] font-bold text-emerald-500">3</div>
-          <h2 class="text-sm font-semibold text-foreground">生成结果</h2>
-          <div class="flex-1 h-px bg-border/50 ml-2" />
-          <div class="flex items-center gap-2">
-            <span class="text-[10px] text-muted-foreground">{{ result.code.length }} 字符</span>
-            <span class="text-[10px] text-muted-foreground">·</span>
-            <span class="text-[10px] text-muted-foreground">{{ result.repair_history.length }} 次修复</span>
-            <Button size="sm" variant="outline" @click="onDownloadCFile" class="h-7 text-[11px]">
-              <Download class="w-3 h-3 mr-1" /> 下载
-            </Button>
-          </div>
-        </div>
-
-        <!-- 降级模式警告横幅 -->
-        <div v-if="result.degraded" class="mb-3 rounded-lg border border-amber-900/50 bg-amber-950/30 px-3 py-2 text-xs text-amber-300 flex items-center gap-2">
-          <span class="text-amber-400 font-bold">⚠ 降级模式</span>
-          <span>LLM 不可用，Agent 已走降级（mock）路径。代码由模板生成，可能不反映真实需求。请检查 LLM 设置。</span>
-        </div>
-
-        <Tabs v-model="activeTab" class="result-tabs">
-          <TabsList class="tabs-list">
-            <TabsTrigger value="result">代码</TabsTrigger>
-            <TabsTrigger value="repair">修复 <span class="tab-count">{{ result.repair_history.length }}</span></TabsTrigger>
-            <TabsTrigger value="contract">契约 <span class="tab-count" :class="result.contract_check_result.overall_passed ? 'ok' : 'fail'">{{ result.contract_check_result.passed_count }}/{{ result.contract_check_result.total_count }}</span></TabsTrigger>
-            <TabsTrigger value="simulation">仿真 <span v-if="simResult" class="tab-count" :class="simResult.passed ? 'ok' : 'fail'">{{ simResult.passed ? '✓' : '✗' }}</span></TabsTrigger>
-            <TabsTrigger value="verify">验证</TabsTrigger>
-            <TabsTrigger value="report">报告</TabsTrigger>
-            <TabsTrigger value="trace">追溯</TabsTrigger>
-            <!-- T4.4: 审核按钮为死链（后端无 /api/review/{task_id}），暂时隐藏 -->
-            <TabsTrigger v-if="false" value="review">审核</TabsTrigger>
-          </TabsList>
-
-          <!-- 代码 Tab -->
-          <TabsContent value="result">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card class="lg:col-span-2 result-card">
-                <CardHeader class="py-3">
-                  <CardTitle class="text-xs font-semibold flex items-center justify-between">
-                    <span>代码 <span class="text-muted-foreground font-normal">（含追溯徽章）</span></span>
-                    <div class="flex items-center gap-1">
-                      <button @click="onCopyCode" class="icon-action" :title="copiedCode ? '已复制' : '复制'">
-                        <Check v-if="copiedCode" class="w-3 h-3 text-emerald-500" />
-                        <Copy v-else class="w-3 h-3" />
-                      </button>
-                      <button @click="onDownloadCFile" class="icon-action" title="下载">
-                        <Download class="w-3 h-3" />
-                      </button>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent class="pt-0">
-                  <CodeViewer
-                    :code="result.code"
-                    :traceability="result.traceability"
-                    :highlight-enabled="highlightEnabled"
-                    :active-tag="activeTag"
-                    @tag-click="onCodeTagClick"
-                  />
-                </CardContent>
-              </Card>
-
-              <div class="space-y-4">
-                <Card class="result-card">
-                  <CardHeader class="py-3">
-                    <CardTitle class="text-xs font-semibold">契约</CardTitle>
-                  </CardHeader>
-                  <CardContent class="pt-0">
-                    <ContractViewer
-                      :contract="result.contract"
-                      :active-tag="activeTag"
-                      @tag-click="onContractTagClick"
-                    />
-                  </CardContent>
-                </Card>
-
-                <Card class="result-card">
-                  <CardHeader class="py-3">
-                    <CardTitle class="text-xs font-semibold flex items-center justify-between">
-                      <span>MISRA 校验</span>
-                      <span class="text-[10px] font-normal">
-                        <span class="text-red-400">Err {{ violationStats.error }}</span>
-                        <span class="text-muted-foreground mx-1">·</span>
-                        <span class="text-amber-400">Warn {{ violationStats.warn }}</span>
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent class="pt-0 max-h-[300px] overflow-y-auto">
-                    <div v-if="result.violations.length > 0" class="space-y-1.5">
-                      <div v-for="(v, idx) in result.violations" :key="idx"
-                           class="p-2 rounded-md text-[11px] border"
-                           :class="v.severity === 'error' ? 'bg-red-950/30 border-red-900/50' : 'bg-amber-950/30 border-amber-900/50'">
-                        <div class="flex items-center gap-1.5 mb-0.5">
-                          <span class="font-mono font-medium" :class="v.severity === 'error' ? 'text-red-400' : 'text-amber-400'">{{ v.rule }}</span>
-                          <span class="text-muted-foreground">@L{{ v.line }}</span>
-                        </div>
-                        <div class="text-muted-foreground">{{ v.message }}</div>
-                      </div>
-                    </div>
-                    <div v-else class="text-[11px] text-emerald-400 text-center py-4">无 MISRA 违规</div>
-                  </CardContent>
-                </Card>
+          <div class="col-body">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="flex items-center gap-2 ml-auto">
+                <button
+                  v-for="lang in (['c', 'cpp', 'python'] as const)"
+                  :key="lang"
+                  type="button"
+                  class="lang-btn"
+                  :class="{ active: selectedLanguage === lang }"
+                  @click="selectedLanguage = lang"
+                >{{ { c: 'C', cpp: 'C++', python: 'Python' }[lang] }}</button>
               </div>
             </div>
-          </TabsContent>
 
-          <!-- 修复 Tab -->
-          <TabsContent value="repair">
-            <Card class="result-card">
-              <CardContent class="pt-4">
-                <RepairTimeline :history="result.repair_history" />
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <textarea
+              v-model="requirement"
+              class="req-textarea"
+              placeholder="例如：实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声..."
+              :disabled="status === 'generating'"
+              rows="4"
+            />
 
-          <!-- 契约校验 Tab -->
-          <TabsContent value="contract">
-            <Card class="result-card">
-              <CardContent class="pt-4">
-                <ContractCheckResult :result="result.contract_check_result" />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <!-- 仿真 Tab -->
-          <TabsContent value="simulation">
-            <div class="space-y-4">
-              <FaultInjectPanel @inject="onInjectFault" />
-              <Card class="result-card">
-                <CardContent class="pt-4">
-                  <SimulationResultView v-if="simResult" :result="simResult" :loading="simulating" />
-                </CardContent>
-              </Card>
+            <div class="flex flex-col gap-3 mt-3">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="text-[10px] text-muted-foreground mr-1">示例:</span>
+                <button
+                  v-for="(ex, idx) in EXAMPLE_REQUIREMENTS"
+                  :key="idx"
+                  type="button"
+                  class="example-btn"
+                  :disabled="status === 'generating'"
+                  @click="fillExample(ex)"
+                >{{ ex.length > 24 ? ex.slice(0, 24) + '...' : ex }}</button>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <Button
+                  v-if="providerStore.derivedMode !== 'mock'"
+                  size="sm"
+                  variant="outline"
+                  :disabled="hitlLoading || status === 'generating'"
+                  :class="['hitl-toggle-btn', { active: hitlEnabled }]"
+                  :title="hitlEnabled ? 'HITL 已开启：pipeline 将在评审检查点暂停等待人工审查' : 'HITL 已关闭：pipeline 直接跑完全流程'"
+                  @click="onToggleHITL"
+                >
+                  <Loader2 v-if="hitlLoading" class="w-3.5 h-3.5 animate-spin" />
+                  <UserCheck v-else class="w-3.5 h-3.5" />
+                  HITL {{ hitlEnabled ? '开' : '关' }}
+                </Button>
+                <Button size="sm" :disabled="!canGenerate" @click="onGenerate" class="generate-btn">
+                  <Loader2 v-if="status === 'generating'" class="w-3.5 h-3.5 animate-spin" />
+                  <Play v-else class="w-3.5 h-3.5" />
+                  {{ status === 'generating' ? '生成中...' : '开始生成' }}
+                </Button>
+                <Button v-if="status !== 'idle'" size="sm" variant="outline" @click="onReset">
+                  <RotateCcw class="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
-          </TabsContent>
-
-          <!-- 验证 Tab -->
-          <TabsContent value="verify">
-            <div class="space-y-4">
-              <Card class="result-card">
-                <CardContent class="pt-4">
-                  <div class="flex items-center gap-3">
-                    <Button :disabled="verifying" @click="onVerify" size="sm">
-                      <Loader2 v-if="verifying" class="w-3.5 h-3.5 animate-spin" />
-                      <ShieldCheck v-else class="w-3.5 h-3.5" />
-                      {{ verifyResult ? '重新验证' : '开始验证' }}
-                    </Button>
-                    <span class="text-[10px] text-muted-foreground">Z3 SMT + CBMC 有界模型检查</span>
-                  </div>
-                </CardContent>
-              </Card>
-              <FormalVerificationResult :result="verifyResult" :loading="verifying" @start-verify="onVerify" />
-            </div>
-          </TabsContent>
-
-          <!-- 报告 Tab -->
-          <TabsContent value="report">
-            <ReportDownload :result="result" />
-          </TabsContent>
-
-          <!-- 追溯 Tab -->
-          <TabsContent value="trace">
-            <DecisionTrace :decisions="decisions" />
-          </TabsContent>
-
-          <!-- 审核 Tab -->
-          <!-- T4.4: 审核按钮为死链（后端无 /api/review/{task_id}），暂时隐藏整个 Tab 内容 -->
-          <TabsContent v-if="false" value="review">
-            <div class="space-y-3">
-              <ReviewConfirm stage="代码生成审核" :content="`AI已生成${result?.code?.length || 0}字符的C代码，请审核`" @approve="onReviewApprove" @reject="onReviewReject" />
-              <ReviewConfirm stage="MISRA-C修复审核" :content="`已修复${result?.repair_history?.length || 0}处违规`" @approve="onReviewApprove" @reject="onReviewReject" />
-              <ReviewConfirm stage="DO-178C报告审核" content="AI已生成DO-178C合规报告，请审核" @approve="onReviewApprove" @reject="onReviewReject" />
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      <!-- 错误提示 -->
-      <div v-if="status === 'error'" class="rounded-lg border border-red-900/50 bg-red-950/30 p-4 text-sm text-red-400">
-        <div class="flex items-center justify-between gap-3">
-          <span>{{ errorMsg }}</span>
-          <Button size="sm" variant="outline" :disabled="!canGenerate" @click="onGenerate" class="shrink-0 border-red-900/50 text-red-400 hover:bg-red-950/50 hover:text-red-300">
-            <RotateCcw class="w-3.5 h-3.5 mr-1" /> 重试
-          </Button>
+          </div>
         </div>
+
+        <!-- ===== 阶段 2: Agent 执行（中栏） ===== -->
+        <div class="generate-col col-center">
+          <div class="col-header">
+            <div
+              class="col-number"
+              :class="{
+                'is-active': status === 'generating',
+                'is-done': status === 'done',
+                'is-error': status === 'error',
+              }"
+            >2</div>
+            <h2 class="col-title">Agent 执行</h2>
+            <div class="col-header-spacer" />
+            <span v-if="status === 'generating'" class="status-indicator status-active">
+              <span class="status-dot" /> 执行中
+            </span>
+            <span v-else-if="status === 'done'" class="status-indicator status-done">
+              <span class="status-dot" /> 完成
+            </span>
+            <span v-else-if="status === 'error'" class="status-indicator status-error">失败</span>
+            <span v-else class="status-indicator status-idle">等待启动</span>
+          </div>
+          <div class="col-body">
+            <div v-if="status !== 'idle'" class="terminal-wrapper">
+              <AgentTerminal
+                ref="terminalRef"
+                :use-mock="useMockAgentTerminal"
+                :requirement="requirement"
+                :language="selectedLanguage"
+                :subscribe-task-id="subscribeTaskId"
+                channel-mode="v1"
+                @complete="onTerminalComplete"
+              />
+            </div>
+            <div v-else class="empty-state">
+              <div class="empty-state-icon">▶</div>
+              <p class="empty-state-title">Pipeline 待命</p>
+              <p class="empty-state-desc">在左侧输入需求并点击「开始生成」</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===== 阶段 3: 结果面板（右栏） ===== -->
+        <div class="generate-col col-right">
+          <div class="col-header">
+            <div
+              class="col-number"
+              :class="{ 'is-done': status === 'done' && result }"
+            >3</div>
+            <h2 class="col-title">生成结果</h2>
+            <div class="col-header-spacer" />
+            <template v-if="status === 'done' && result">
+              <span class="text-[10px] text-muted-foreground">{{ result.code.length }} 字符</span>
+              <span class="text-[10px] text-muted-foreground">·</span>
+              <span class="text-[10px] text-muted-foreground">{{ result.repair_history.length }} 次修复</span>
+              <Button size="sm" variant="outline" @click="onDownloadCFile" class="h-7 text-[11px]">
+                <Download class="w-3 h-3 mr-1" /> 下载
+              </Button>
+            </template>
+          </div>
+          <div class="col-body">
+            <div v-if="status === 'done' && result" class="result-content">
+              <!-- 降级模式警告横幅 -->
+              <div v-if="result.degraded" class="degraded-banner border-amber-900/50">
+                <span class="degraded-title">⚠ 降级模式</span>
+                <span class="degraded-desc">LLM 不可用，Agent 已走降级（mock）路径。代码由模板生成，可能不反映真实需求。请检查 LLM 设置。</span>
+              </div>
+
+              <Tabs v-model="activeTab" class="result-tabs">
+                <TabsList class="tabs-list">
+                  <TabsTrigger value="result">代码</TabsTrigger>
+                  <TabsTrigger value="repair">修复 <span class="tab-count">{{ result.repair_history.length }}</span></TabsTrigger>
+                  <TabsTrigger value="contract">契约 <span class="tab-count" :class="result.contract_check_result.overall_passed ? 'ok' : 'fail'">{{ result.contract_check_result.passed_count }}/{{ result.contract_check_result.total_count }}</span></TabsTrigger>
+                  <TabsTrigger value="simulation">仿真 <span v-if="simResult" class="tab-count" :class="simResult.passed ? 'ok' : 'fail'">{{ simResult.passed ? '✓' : '✗' }}</span></TabsTrigger>
+                  <TabsTrigger value="verify">验证</TabsTrigger>
+                  <TabsTrigger value="report">报告</TabsTrigger>
+                  <TabsTrigger value="trace">追溯</TabsTrigger>
+                </TabsList>
+
+                <!-- 代码 Tab -->
+                <TabsContent value="result">
+                  <div class="result-inner-grid">
+                    <Card class="result-card result-card-main">
+                      <CardHeader class="py-3">
+                        <CardTitle class="text-xs font-semibold flex items-center justify-between">
+                          <div class="flex items-center gap-2">
+                            <span>代码 <span class="text-muted-foreground font-normal">（含追溯徽章）</span></span>
+                            <SourceBadge source="observed" label="实时生成" />
+                          </div>
+                          <div class="flex items-center gap-1">
+                            <button @click="onCopyCode" class="icon-action" :title="copiedCode ? '已复制' : '复制'">
+                              <Check v-if="copiedCode" class="w-3 h-3 text-emerald-500" />
+                              <Copy v-else class="w-3 h-3" />
+                            </button>
+                            <button @click="onDownloadCFile" class="icon-action" title="下载">
+                              <Download class="w-3 h-3" />
+                            </button>
+                          </div>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent class="pt-0">
+                        <CodeViewer
+                          :code="result.code"
+                          :traceability="result.traceability"
+                          :highlight-enabled="highlightEnabled"
+                          :active-tag="activeTag"
+                          @tag-click="onCodeTagClick"
+                        />
+                      </CardContent>
+                    </Card>
+
+                    <div class="result-side-stack">
+                      <Card class="result-card">
+                        <CardHeader class="py-3">
+                          <CardTitle class="text-xs font-semibold flex items-center gap-2">
+                            <span>契约</span>
+                            <SourceBadge source="observed" label="契约生成" />
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent class="pt-0">
+                          <ContractViewer
+                            :contract="result.contract"
+                            :active-tag="activeTag"
+                            @tag-click="onContractTagClick"
+                          />
+                        </CardContent>
+                      </Card>
+
+                      <Card class="result-card">
+                        <CardHeader class="py-3">
+                          <CardTitle class="text-xs font-semibold flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                              <span>MISRA 校验</span>
+                              <SourceBadge source="observed" label="静态分析" />
+                            </div>
+                            <span class="text-[10px] font-normal">
+                              <span class="text-destructive">Err {{ violationStats.error }}</span>
+                              <span class="text-muted-foreground mx-1">·</span>
+                              <span class="text-warning">Warn {{ violationStats.warn }}</span>
+                            </span>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent class="pt-0 max-h-[300px] overflow-y-auto">
+                          <div v-if="result.violations.length > 0" class="space-y-1.5">
+                            <div v-for="(v, idx) in result.violations" :key="idx"
+                                 class="violation-item"
+                                 :class="v.severity === 'error' ? 'is-error' : 'is-warn'">
+                              <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="font-mono font-medium violation-rule" :class="v.severity === 'error' ? 'is-error' : 'is-warn'">{{ v.rule }}</span>
+                                <span class="text-muted-foreground">@L{{ v.line }}</span>
+                              </div>
+                              <div class="text-muted-foreground">{{ v.message }}</div>
+                            </div>
+                          </div>
+                          <div v-else class="violation-empty">无 MISRA 违规</div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <!-- 修复 Tab -->
+                <TabsContent value="repair">
+                  <Card class="result-card">
+                    <CardContent class="pt-4">
+                      <RepairTimeline :history="result.repair_history" />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <!-- 契约校验 Tab -->
+                <TabsContent value="contract">
+                  <Card class="result-card">
+                    <CardContent class="pt-4">
+                      <ContractCheckResult :result="result.contract_check_result" />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <!-- 仿真 Tab -->
+                <TabsContent value="simulation">
+                  <div class="space-y-4">
+                    <FaultInjectPanel @inject="onInjectFault" />
+                    <Card class="result-card">
+                      <CardHeader class="py-3">
+                        <CardTitle class="text-xs font-semibold flex items-center gap-2">
+                          <span>仿真结果</span>
+                          <SourceBadge source="simulated" label="数字孪生" />
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent class="pt-0">
+                        <SimulationResultView v-if="simResult" :result="simResult" :loading="simulating" />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </TabsContent>
+
+                <!-- 验证 Tab -->
+                <TabsContent value="verify">
+                  <div class="space-y-4">
+                    <Card class="result-card">
+                      <CardHeader class="py-3">
+                        <CardTitle class="text-xs font-semibold flex items-center gap-2">
+                          <span>形式化验证</span>
+                          <SourceBadge source="observed" label="Z3+CBMC" />
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent class="pt-0">
+                        <div class="flex items-center gap-3">
+                          <Button :disabled="verifying" @click="onVerify" size="sm">
+                            <Loader2 v-if="verifying" class="w-3.5 h-3.5 animate-spin" />
+                            <ShieldCheck v-else class="w-3.5 h-3.5" />
+                            {{ verifyResult ? '重新验证' : '开始验证' }}
+                          </Button>
+                          <span class="text-[10px] text-muted-foreground">Z3 SMT + CBMC 有界模型检查</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <FormalVerificationResult :result="verifyResult" :loading="verifying" @start-verify="onVerify" />
+                  </div>
+                </TabsContent>
+
+                <!-- 报告 Tab -->
+                <TabsContent value="report">
+                  <ReportDownload :result="result" />
+                </TabsContent>
+
+                <!-- 追溯 Tab -->
+                <TabsContent value="trace">
+                  <DecisionTrace :decisions="decisions" />
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            <!-- 错误提示 -->
+            <div v-else-if="status === 'error'" class="error-state">
+              <div class="flex items-center justify-between gap-3">
+                <span>{{ errorMsg }}</span>
+                <Button size="sm" variant="outline" :disabled="!canGenerate" @click="onGenerate" class="shrink-0 error-retry-btn">
+                  <RotateCcw class="w-3.5 h-3.5 mr-1" /> 重试
+                </Button>
+              </div>
+            </div>
+
+            <!-- 空状态 -->
+            <div v-else class="empty-state">
+              <div class="empty-state-icon">◆</div>
+              <p class="empty-state-title">暂无结果</p>
+              <p class="empty-state-desc">Pipeline 完成后将在此展示生成结果</p>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>

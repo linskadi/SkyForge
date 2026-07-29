@@ -19,6 +19,8 @@ import type {
 	CompatibilityResult,
 	ComposeConnection,
 	ComposeResult,
+	ComplianceTrendPoint,
+	DashboardStats,
 	DashboardTaskRecord,
 	FaultParams,
 	FaultType,
@@ -27,9 +29,11 @@ import type {
 	HITLCheckpointType,
 	HITLHistoryItem,
 	MisraRule,
+	RecentTask,
 	ReportResult,
 	RuleStandard,
 	SimulationResult,
+	SystemStatus,
 } from "@/types/domain";
 import type { VerificationResult, VerifyRequest } from "@/types/verification";
 import type {
@@ -753,6 +757,22 @@ export async function getTaskDetail(
 	);
 }
 
+export async function getSystemStatus(): Promise<SystemStatus> {
+	return getJSON<SystemStatus>("/api/dashboard/system-status");
+}
+
+export async function getRecentTasks(limit = 8): Promise<RecentTask[]> {
+	return getJSON<RecentTask[]>(`/api/dashboard/recent-tasks?limit=${limit}`);
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+	return getJSON<DashboardStats>("/api/dashboard/stats");
+}
+
+export async function getComplianceTrend(limit = 10): Promise<ComplianceTrendPoint[]> {
+	return getJSON<ComplianceTrendPoint[]>(`/api/dashboard/compliance-trend?limit=${limit}`);
+}
+
 // ====================================================================
 // ApiClient 协议实现（realApiClient）
 // ====================================================================
@@ -784,4 +804,8 @@ export const realApiClient: ApiClient = {
 	saveLLMConfig,
 	testLLMConnection,
 	getTaskDetail,
+	getSystemStatus,
+	getRecentTasks,
+	getDashboardStats,
+	getComplianceTrend,
 };

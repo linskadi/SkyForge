@@ -6,12 +6,6 @@ import type { ExecutionProfile, ExecutionProfileId } from "@/types/execution";
 export const EXECUTION_PROFILE_STORAGE_KEY = "skyforge-execution-profile";
 
 const PROFILES: Record<ExecutionProfileId, ExecutionProfile> = {
-	demo: {
-		id: "demo",
-		label: "演示模式（模拟）",
-		available: true,
-		source: "simulated",
-	},
 	cloud: {
 		id: "cloud",
 		label: "云 API · 实时/回放",
@@ -29,11 +23,9 @@ const PROFILES: Record<ExecutionProfileId, ExecutionProfile> = {
 };
 
 export const useExecutionStore = defineStore("execution-profile", () => {
-	// 仅读取现有值；不进行 setItem 写入（避免覆盖 storage）
-	// 旧值（"demo" / "cloud" / "local"）以外的任何内容默认回退到 "demo"
 	const saved = localStorage.getItem(EXECUTION_PROFILE_STORAGE_KEY);
 	const profileId = ref<ExecutionProfileId>(
-		saved === "cloud" || saved === "local" ? saved : "demo",
+		saved === "cloud" || saved === "local" ? saved : "cloud",
 	);
 	const profile = computed(() => PROFILES[profileId.value]);
 

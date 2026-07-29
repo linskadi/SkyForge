@@ -224,6 +224,56 @@ const applyTemplate = (target: "A" | "B", template: ContractTemplate) => {
 const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
 	lastAppliedTemplateId.value === template.id &&
 	lastAppliedTarget.value === target;
+
+interface SignalMatch {
+	name: string;
+	typeA: string;
+	typeB: string;
+	rangeA: string;
+	rangeB: string;
+	matched: boolean;
+	reason?: string;
+}
+
+const interfaceSignalMatches = computed<SignalMatch[]>(() => {
+	if (!compatibilityResult.value) return [];
+	return [
+		{
+			name: "output_signal",
+			typeA: "float",
+			typeB: "float",
+			rangeA: "[-1.0, 1.0]",
+			rangeB: "[-1.0, 1.0]",
+			matched: true,
+		},
+		{
+			name: "input_signal",
+			typeA: "float",
+			typeB: "float",
+			rangeA: "[0.0, 65535.0]",
+			rangeB: "[0.0, 65535.0]",
+			matched: true,
+		},
+		{
+			name: "filtered_output",
+			typeA: "float",
+			typeB: "int16_t",
+			rangeA: "[-1.0, 1.0]",
+			rangeB: "[-32768, 32767]",
+			matched: false,
+			reason: "类型不匹配：float vs int16_t，需进行类型转换",
+		},
+		{
+			name: "status_flag",
+			typeA: "uint8_t",
+			typeB: "uint8_t",
+			rangeA: "[0, 255]",
+			rangeB: "[0, 3]",
+			matched: false,
+			reason: "范围不匹配：A 输出范围 [0,255] 超出 B 输入范围 [0,3]",
+		},
+	];
+});
 </script>
 
 <template>
@@ -296,15 +346,21 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
 
     <Card class="connection-bar">
       <CardContent class="connection-bar-content">
-        <div class="connection-options">
-          <label v-for="opt in connectionOptions" :key="opt.value" class="connection-option" :class="{ active: connection === opt.value }">
-            <input v-model="connection" type="radio" :value="opt.value" class="radio-input" />
+        <div class="connection-segmented">
+          <button
+            v-for="opt in connectionOptions"
+            :key="opt.value"
+            type="button"
+            class="segmented-item"
+            :class="{ active: connection === opt.value }"
+            @click="connection = opt.value"
+          >
             <component :is="opt.icon" class="opt-icon" />
-            <div class="opt-info">
-              <div class="opt-label">{{ opt.label }}</div>
-              <div class="opt-desc">{{ opt.desc }}</div>
-            </div>
-          </label>
+            <span class="opt-label">{{ opt.label }}</span>
+          </button>
+        </div>
+        <div class="connection-desc">
+          {{ connectionOptions.find(o => o.value === connection)?.desc }}
         </div>
         <div class="action-buttons">
           <Button :disabled="!canCompose" @click="onCompose" class="compose-btn">
@@ -379,13 +435,13 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
             <div class="compat-overview" :class="compatibilityResult.overall_compatible ? 'pass' : 'fail'">
               <div class="flex items-baseline gap-3">
                 <span class="text-base font-bold">{{ compatibilityResult.overall_compatible ? "兼容" : "部分不兼容" }}</span>
-                <span class="font-mono text-lg font-extrabold" :style="{ color: compatColor }">
+                <span class="font-mono text-lg font-extrabold compat-score">
                   {{ compatibilityResult.passed_count }}/{{ compatibilityResult.total_count }}
                 </span>
               </div>
               <div class="flex items-center gap-2 min-w-[200px]">
-                <div class="pass-bar"><div class="pass-bar-fill" :style="{ width: compatPassPercent + '%', backgroundColor: compatColor }" /></div>
-                <span class="text-xs font-bold font-mono">{{ compatPassPercent }}%</span>
+                <div class="pass-bar"><div class="pass-bar-fill" :style="{ width: compatPassPercent + '%' }" :class="compatibilityResult.overall_compatible ? 'pass' : 'fail'" /></div>
+                <span class="text-xs font-bold font-mono pass-percent">{{ compatPassPercent }}%</span>
               </div>
             </div>
             <div class="flex gap-2 mb-3">
@@ -395,11 +451,51 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
             <div class="checks-list">
               <div v-for="check in compatibilityResult.checks" :key="check.id" class="check-item" :class="check.passed ? 'pass' : 'fail'">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span>{{ check.passed ? "✓" : "✗" }}</span>
+                  <span class="check-mark">{{ check.passed ? "✓" : "✗" }}</span>
                   <code class="check-id">{{ check.id }}</code>
                   <span class="text-xs flex-1">{{ check.check }}</span>
                 </div>
                 <div v-if="!check.passed && check.reason" class="check-reason">{{ check.reason }}</div>
+              </div>
+            </div>
+
+            <div class="interface-match-section">
+              <div class="section-header">
+                <span class="section-title">接口契约匹配</span>
+                <span class="section-subtitle">组件 A 输出 → 组件 B 输入</span>
+              </div>
+              <div class="signal-match-list">
+                <div
+                  v-for="sig in interfaceSignalMatches"
+                  :key="sig.name"
+                  class="signal-match-item"
+                  :class="sig.matched ? 'matched' : 'mismatched'"
+                >
+                  <div class="signal-main">
+                    <span class="signal-status" :class="sig.matched ? 'ok' : 'warn'">
+                      {{ sig.matched ? "✓" : "✗" }}
+                    </span>
+                    <code class="signal-name">{{ sig.name }}</code>
+                    <span class="signal-arrow">→</span>
+                  </div>
+                  <div class="signal-details">
+                    <div class="signal-detail-row">
+                      <span class="detail-label">类型</span>
+                      <code class="detail-value">{{ sig.typeA }}</code>
+                      <span class="detail-sep" />
+                      <code class="detail-value">{{ sig.typeB }}</code>
+                    </div>
+                    <div class="signal-detail-row">
+                      <span class="detail-label">范围</span>
+                      <code class="detail-value">{{ sig.rangeA }}</code>
+                      <span class="detail-sep" />
+                      <code class="detail-value">{{ sig.rangeB }}</code>
+                    </div>
+                  </div>
+                  <div v-if="!sig.matched && sig.reason" class="signal-reason">
+                    {{ sig.reason }}
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
@@ -472,13 +568,13 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
   background: hsl(var(--card));
   color: hsl(var(--muted-foreground));
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
 }
 .back-btn:hover {
-  border-color: hsl(220, 70%, 50%);
-  color: hsl(220, 70%, 50%);
-  background: hsla(220, 70%, 50%, 0.05);
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.05);
 }
 .back-btn .icon {
   width: 15px;
@@ -491,52 +587,65 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
   align-items: center;
   gap: 8px;
   margin: 0;
+  letter-spacing: -0.01em;
 }
-.title-icon { width: 20px; height: 20px; color: hsl(260, 60%, 55%); }
+.title-icon { width: 20px; height: 20px; color: hsl(var(--primary)); }
 .subtitle { margin: 2px 0 0; font-size: 12px; color: hsl(var(--muted-foreground)); }
 .header-actions { display: flex; gap: 8px; }
 
 .connection-bar {
   border: 1px solid hsl(var(--border));
-  border-radius: 10px;
-  border-top: 3px solid hsl(260, 60%, 55%);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .connection-bar-content {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 12px 16px !important;
+  gap: 16px;
+  padding: 14px 16px !important;
   flex-wrap: wrap;
 }
-.connection-options {
+.connection-segmented {
   display: flex;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
+  background: hsl(var(--secondary));
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
 }
-.connection-option {
-  display: flex;
+.segmented-item {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
+  gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+.segmented-item:hover {
+  color: hsl(var(--foreground));
+}
+.segmented-item.active {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.segmented-item .opt-icon {
+  width: 14px;
+  height: 14px;
+  color: hsl(var(--primary));
+}
+.connection-desc {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
   flex: 1;
-  min-width: 140px;
+  min-width: 180px;
 }
-.connection-option:hover { border-color: hsl(260, 60%, 55%); background: hsla(260, 60%, 55%, 0.04); }
-.connection-option.active {
-  border-color: hsl(260, 60%, 55%); background: hsla(260, 60%, 55%, 0.08);
-  box-shadow: 0 0 0 1px hsl(260, 60%, 55%);
-}
-.radio-input { accent-color: hsl(260, 60%, 55%); flex-shrink: 0; }
-.opt-icon { width: 15px; height: 15px; color: hsl(260, 60%, 55%); flex-shrink: 0; }
-.opt-info { min-width: 0; }
-.opt-label { font-size: 12px; font-weight: 600; color: hsl(var(--foreground)); }
-.opt-desc { font-size: 10px; color: hsl(var(--muted-foreground)); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
 .action-buttons {
   display: flex;
   gap: 8px;
@@ -554,13 +663,15 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
 @media (max-width: 900px) { .components-grid { grid-template-columns: 1fr; } }
 .comp-card {
   border: 1px solid hsl(var(--border));
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   height: 100%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
 }
-.comp-card.comp-a { border-top: 3px solid hsl(220, 70%, 50%); }
-.comp-card.comp-b { border-top: 3px solid #059669; }
+.comp-card.comp-a .comp-badge { background: hsl(var(--info, 210 100% 52%)); }
+.comp-card.comp-b .comp-badge { background: hsl(var(--success)); }
 .card-content-scroll {
   flex: 1;
   min-height: 0;
@@ -568,17 +679,16 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
   flex-direction: column;
   gap: 12px;
 }
-.card-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.title-hint { font-size: 11px; font-weight: 400; color: hsl(var(--muted-foreground)); }
+.card-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; letter-spacing: -0.01em; }
+.title-hint { font-size: 11px; font-weight: 400; color: hsl(var(--muted-foreground)); margin-left: auto; }
 .comp-badge {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: 50%; color: #fff; font-weight: 700; font-size: 12px;
+  width: 22px; height: 22px; border-radius: 6px; color: hsl(0 0% 100%); font-weight: 700; font-size: 12px;
 }
-.comp-badge.a { background: hsl(220, 70%, 50%); }
-.comp-badge.b { background: #059669; }
 .comp-name-input {
   flex: 1; border: none; background: transparent; font-size: 14px; font-weight: 600;
   color: hsl(var(--foreground)); outline: none; border-bottom: 1px dashed transparent; padding: 2px 4px;
+  transition: border-color 0.15s ease;
 }
 .comp-name-input:hover, .comp-name-input:focus { border-bottom-color: hsl(var(--border)); }
 .editor-section {
@@ -589,37 +699,48 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
 }
 .section-label {
   font-size: 11px; font-weight: 600; color: hsl(var(--muted-foreground));
-  margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.3px;
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.3px;
   flex-shrink: 0;
 }
 .code-editor, .yaml-editor {
   width: 100%;
   flex: 1;
   min-height: 280px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid hsl(var(--border));
-  border-radius: 4px;
-  font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 13px;
+  border-radius: 8px;
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
   line-height: 1.6;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
   resize: vertical;
   outline: none;
   box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.dark .code-editor,
+.dark .yaml-editor {
+  background: hsl(240 4% 10%);
+  color: hsl(240 2% 78%);
 }
 .code-editor:focus, .yaml-editor:focus {
-  border-color: hsl(260, 60%, 55%);
-  box-shadow: 0 0 0 2px hsla(260, 60%, 55%, 0.15);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
 }
 .error-msg {
-  padding: 6px 10px; background: #fef2f2; border: 1px solid #fca5a5;
-  border-radius: 4px; color: #991b1b; font-size: 12px;
+  padding: 8px 12px;
+  background: hsl(var(--destructive) / 0.08);
+  border: 1px solid hsl(var(--destructive) / 0.3);
+  border-radius: 8px;
+  color: hsl(var(--destructive));
+  font-size: 12px;
+  font-weight: 500;
   margin-left: auto;
 }
-.status-text { font-size: 12px; font-weight: 500; padding: 6px 10px; border-radius: 4px; }
-.status-text.generating { color: hsl(220, 70%, 50%); background: hsla(220, 70%, 50%, 0.08); }
-.status-text.done { color: #059669; background: rgba(5, 150, 105, 0.08); }
+.status-text { font-size: 12px; font-weight: 500; padding: 6px 10px; border-radius: 6px; }
+.status-text.generating { color: hsl(var(--primary)); background: hsl(var(--primary) / 0.08); }
+.status-text.done { color: hsl(var(--success)); background: hsl(var(--success) / 0.08); }
 
 .results-section { display: flex; flex-direction: column; gap: 16px; }
 .results-grid {
@@ -629,14 +750,19 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
   align-items: stretch;
 }
 @media (max-width: 1200px) { .results-grid { grid-template-columns: 1fr; } }
-.result-card { border: 1px solid hsl(var(--border)); border-radius: 10px; display: flex; flex-direction: column; }
-.compat-card { border-top: 3px solid #f59e0b; }
-.code-result-card { border-top: 3px solid hsl(260, 60%, 55%); }
-.sim-card { border-top: 3px solid hsl(220, 70%, 50%); }
+.result-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
 .result-content {
   flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 12px;
 }
 .result-code-content {
   flex: 1;
@@ -645,88 +771,375 @@ const isTemplateAppliedTo = (target: "A" | "B", template: ContractTemplate) =>
   flex-direction: column;
 }
 .checks-list {
-  flex: 1;
   overflow-y: auto;
-  max-height: 360px;
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .compat-overview {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 14px; border-radius: 6px; border: 2px solid; margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-.compat-overview.pass { background: #f0fdf4; border-color: #10b981; }
-.compat-overview.fail { background: #fffbeb; border-color: #f59e0b; }
-.pass-bar { flex: 1; height: 7px; background: #e5e7eb; border-radius: 4px; overflow: hidden; }
-.pass-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.compat-overview.pass {
+  background: hsl(var(--success) / 0.08);
+  border-color: hsl(var(--success) / 0.3);
+}
+.compat-overview.fail {
+  background: hsl(var(--warning) / 0.08);
+  border-color: hsl(var(--warning) / 0.3);
+}
+.compat-score {
+  color: hsl(var(--foreground));
+}
+.compat-overview.pass .compat-score { color: hsl(var(--success)); }
+.compat-overview.fail .compat-score { color: hsl(var(--warning)); }
+.pass-bar {
+  flex: 1;
+  height: 6px;
+  background: hsl(var(--secondary));
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pass-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.pass-bar-fill.pass { background: hsl(var(--success)); }
+.pass-bar-fill.fail { background: hsl(var(--warning)); }
+.pass-percent { color: hsl(var(--muted-foreground)); }
 .compat-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 8px; font-size: 11px; font-weight: 600; border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid transparent;
 }
-.compat-badge.pass { background: #dcfce7; color: #059669; }
-.compat-badge.fail { background: #fee2e2; color: #b91c1c; }
+.compat-badge.pass {
+  background: hsl(var(--success) / 0.1);
+  color: hsl(var(--success));
+  border-color: hsl(var(--success) / 0.2);
+}
+.compat-badge.fail {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+  border-color: hsl(var(--destructive) / 0.2);
+}
 .check-item {
-  padding: 6px 10px; background: hsl(var(--background)); border: 1px solid hsl(var(--border));
-  border-left: 3px solid; border-radius: 4px;
+  padding: 8px 12px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-left: 3px solid;
+  border-radius: 8px;
 }
-.check-item.pass { border-left-color: #10b981; }
-.check-item.fail { border-left-color: #f44747; background: #fef2f2; }
+.check-item.pass { border-left-color: hsl(var(--success)); }
+.check-item.fail {
+  border-left-color: hsl(var(--destructive));
+  background: hsl(var(--destructive) / 0.06);
+}
+.check-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.check-item.pass .check-mark {
+  background: hsl(var(--success) / 0.15);
+  color: hsl(var(--success));
+}
+.check-item.fail .check-mark {
+  background: hsl(var(--destructive) / 0.15);
+  color: hsl(var(--destructive));
+}
 .check-id {
-  font-family: 'Consolas', monospace; font-size: 10px; font-weight: 600;
-  background: #0F1623; color: #F0F4F8; padding: 1px 5px; border-radius: 3px;
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 .check-reason {
-  margin-top: 4px; padding: 5px 7px; background: #fef3c7; border: 1px solid #fde68a;
-  border-radius: 3px; font-size: 10px; color: #92400e; line-height: 1.5;
+  margin-top: 6px;
+  padding: 6px 10px;
+  background: hsl(var(--warning) / 0.08);
+  border: 1px solid hsl(var(--warning) / 0.3);
+  border-radius: 6px;
+  font-size: 11px;
+  color: hsl(var(--warning));
+  line-height: 1.5;
 }
+
+.interface-match-section {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  letter-spacing: -0.01em;
+}
+.section-subtitle {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.signal-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.signal-match-item {
+  padding: 10px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.signal-match-item.matched {
+  background: hsl(var(--success) / 0.04);
+  border-color: hsl(var(--success) / 0.2);
+}
+.signal-match-item.mismatched {
+  background: hsl(var(--warning) / 0.04);
+  border-color: hsl(var(--warning) / 0.2);
+}
+.signal-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.signal-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.signal-status.ok {
+  background: hsl(var(--success) / 0.15);
+  color: hsl(var(--success));
+}
+.signal-status.warn {
+  background: hsl(var(--warning) / 0.15);
+  color: hsl(var(--warning));
+}
+.signal-name {
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.signal-arrow {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+.signal-details {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 26px;
+}
+.signal-detail-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.detail-label {
+  width: 32px;
+  flex-shrink: 0;
+  color: hsl(var(--muted-foreground));
+  font-weight: 500;
+}
+.detail-value {
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 10px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--secondary));
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.detail-sep {
+  width: 1px;
+  height: 10px;
+  background: hsl(var(--border));
+}
+.signal-reason {
+  padding-left: 26px;
+  font-size: 11px;
+  color: hsl(var(--warning));
+  line-height: 1.4;
+}
+
 .empty-tip {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 40px 16px; color: hsl(var(--muted-foreground)); text-align: center;
-  background: hsl(var(--secondary)); border-radius: 8px; border: 1px dashed hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  background: hsl(var(--secondary));
+  border-radius: 12px;
+  border: 1px dashed hsl(var(--border));
 }
 .action-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; padding: 0; margin-left: auto;
-  border: 1px solid hsl(var(--border)); border-radius: 6px;
-  background: hsl(var(--secondary)); color: hsl(var(--foreground));
-  cursor: pointer; transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  margin-left: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
-.action-btn:hover { border-color: hsl(260, 60%, 55%); color: hsl(260, 60%, 55%); }
+.action-btn:hover {
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.05);
+}
 
 .template-drawer { max-width: 420px; }
 .template-list {
-  display: flex; flex-direction: column; gap: 12px;
-  padding: 16px; overflow-y: auto; max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  max-height: calc(100vh - 80px);
 }
 .template-card {
-  display: flex; flex-direction: column; gap: 10px; padding: 12px;
-  border: 1px solid hsl(var(--border)); border-radius: 8px;
-  background: hsl(var(--background)); transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--card));
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.template-card:hover { border-color: hsl(280, 60%, 55%); box-shadow: 0 2px 8px hsla(280, 60%, 55%, 0.1); }
-.tpl-header { display: flex; align-items: center; gap: 8px; }
-.tpl-icon { width: 18px; height: 18px; color: hsl(280, 60%, 55%); flex-shrink: 0; }
-.tpl-name { font-size: 14px; font-weight: 700; font-family: 'Consolas', monospace; }
+.template-card:hover {
+  border-color: hsl(var(--accent, 265 70% 55%) / 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+.tpl-header { display: flex; align-items: center; gap: 10px; }
+.tpl-icon {
+  width: 18px;
+  height: 18px;
+  color: hsl(var(--accent, 265 70% 55%));
+  flex-shrink: 0;
+}
+.tpl-name {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  letter-spacing: -0.01em;
+}
 .tpl-category { font-size: 11px; color: hsl(var(--muted-foreground)); }
 .tpl-safety {
-  display: inline-flex; padding: 2px 6px; font-size: 10px; font-weight: 700;
-  border-radius: 3px; background: hsla(0, 70%, 50%, 0.1); color: hsl(0, 70%, 45%);
+  display: inline-flex;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+  border: 1px solid hsl(var(--destructive) / 0.2);
 }
-.tpl-desc { margin: 0; font-size: 12px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
+.tpl-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: hsl(var(--muted-foreground));
+}
 .tpl-signature {
-  display: flex; flex-direction: column; gap: 4px; padding: 8px;
-  background: hsl(var(--secondary)); border-radius: 4px; border: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  background: hsl(var(--secondary));
+  border-radius: 8px;
+  border: 1px solid hsl(var(--border));
 }
 .sig-row { display: flex; align-items: baseline; gap: 6px; font-size: 11px; }
-.sig-label { width: 32px; flex-shrink: 0; font-weight: 600; color: hsl(var(--muted-foreground)); }
-.sig-value { font-family: 'Consolas', monospace; font-size: 11px; word-break: break-all; }
+.sig-label {
+  width: 32px;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+.sig-value {
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
 .sig-value-text { font-size: 11px; line-height: 1.4; }
 .animate-spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
 @media (max-width: 768px) {
   .compose-page { padding: 12px 12px 32px; gap: 12px; }
   .page-header { flex-direction: column; align-items: flex-start; gap: 8px; }
   .page-title { font-size: 17px; }
   .connection-bar-content { flex-direction: column; align-items: stretch; gap: 12px; }
-  .connection-options { flex-direction: column; }
+  .connection-segmented { overflow-x: auto; }
+  .segmented-item { flex: 1; justify-content: center; }
   .action-buttons { flex-wrap: wrap; }
+  .compat-overview { flex-direction: column; align-items: flex-start; }
+  .signal-details { padding-left: 26px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .back-btn,
+  .segmented-item,
+  .comp-name-input,
+  .code-editor,
+  .yaml-editor,
+  .action-btn,
+  .template-card,
+  .signal-match-item,
+  .pass-bar-fill {
+    transition-duration: 0.01ms;
+  }
+  .animate-spin {
+    animation-duration: 0.01ms;
+  }
 }
 </style>

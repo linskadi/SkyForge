@@ -111,7 +111,7 @@ export function useTaskLifecycle(options: UseTaskLifecycleOptions = {}) {
 	async function loadReplayTask(): Promise<void> {
 		if (!replayTaskId.value) return;
 		try {
-			// 优先尝试异步加载真实演示数据
+			// 优先尝试异步加载真实数据
 			const detail = await fetchVerifiedRecordingTask(replayTaskId.value);
 			if (detail) {
 				task.value = detail;

@@ -134,14 +134,7 @@ const DEFAULT_PROVIDERS: ProviderConfig[] = [
 	},
 ];
 
-/**
- * 将 ExecutionProfileId 映射为 LLMMode：
- * - demo  → mock
- * - cloud → api
- * - local → local
- */
-function profileIdToMode(profileId: "demo" | "cloud" | "local"): LLMMode {
-	if (profileId === "demo") return "mock";
+function profileIdToMode(profileId: "cloud" | "local"): LLMMode {
 	if (profileId === "cloud") return "api";
 	return "local";
 }
@@ -217,8 +210,8 @@ export const useProviderStore = defineStore("provider", () => {
 		if (provider) {
 			provider.apiKey = key;
 			provider.enabled = key.length > 0;
-			// Kept in memory only for legacy dialogs. Competition profiles obtain
-			// cloud credentials from the backend and never persist the key here.
+			// Kept in memory only for legacy dialogs. Cloud profiles obtain
+			// credentials from the backend and never persist the key here.
 			persist();
 		}
 	}

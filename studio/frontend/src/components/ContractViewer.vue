@@ -232,26 +232,32 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 .contract-viewer {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 13px;
-  color: #d4d4d4;
-  background: #1e1e1e;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
   border-radius: 8px;
   overflow: hidden;
   padding: 12px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid hsl(var(--border));
 }
 
 .empty {
   padding: 24px;
   text-align: center;
-  color: #6a6a6a;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
-  background: #1e1e1e;
+  background: hsl(var(--card));
   border-radius: 8px;
   font-family: 'Consolas', monospace;
+  border: 1px solid hsl(var(--border));
 }
 
 .contract-header {
   padding-bottom: 10px;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid hsl(var(--border));
   margin-bottom: 10px;
 }
 
@@ -261,7 +267,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
   gap: 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #d4d4d4;
+  color: hsl(var(--foreground));
 }
 
 .component-name .icon {
@@ -270,7 +276,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 
 .component-desc {
   margin-top: 4px;
-  color: #9d9d9d;
+  color: hsl(var(--muted-foreground));
   font-size: 12px;
   font-family: 'Inter', sans-serif;
 }
@@ -283,14 +289,15 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 }
 
 .io-block {
-  background: #252526;
+  background: hsl(var(--muted));
   padding: 8px 10px;
   border-radius: 6px;
+  border: 1px solid hsl(var(--border));
 }
 
 .io-title {
   font-weight: 600;
-  color: #4ec9b0;
+  color: hsl(var(--success));
   margin-bottom: 6px;
   font-size: 12px;
 }
@@ -303,11 +310,11 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 }
 
 .io-key {
-  color: #569cd6;
+  color: hsl(var(--info));
 }
 
 .io-type {
-  color: #ce9178;
+  color: hsl(var(--warning));
   font-size: 12px;
   word-break: break-all;
 }
@@ -330,7 +337,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  color: #d4d4d4;
+  color: hsl(var(--foreground));
   border-left: 3px solid;
   padding-left: 8px;
   font-size: 12px;
@@ -342,26 +349,28 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 }
 
 .count {
-  background: #3c3c3c;
-  color: #d4d4d4;
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
   font-size: 10px;
   padding: 0 6px;
   border-radius: 8px;
   font-weight: 600;
+  border: 1px solid hsl(var(--border));
 }
 
 .empty-section {
-  color: #6a6a6a;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
   padding-left: 8px;
   font-size: 11px;
 }
 
 .condition-item {
-  background: #252526;
+  background: hsl(var(--muted));
   padding: 6px 8px;
   border-left: 3px solid;
   border-radius: 4px;
+  border: 1px solid hsl(var(--border));
 }
 
 .cond-row {
@@ -377,7 +386,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
   border-radius: 3px;
   font-size: 10px;
   font-weight: 600;
-  color: #fff;
+  color: hsl(var(--primary-foreground));
   letter-spacing: 0.3px;
   white-space: nowrap;
   cursor: pointer;
@@ -389,19 +398,19 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 }
 
 .con-badge.active {
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.5), 0 0 10px rgba(245, 158, 11, 0.4);
+  box-shadow: 0 0 0 3px hsl(var(--warning) / 0.5), 0 0 10px hsl(var(--warning) / 0.4);
   transform: scale(1.08);
 }
 
 .cond-expr {
   flex: 1;
-  color: #ce9178;
+  color: hsl(var(--warning));
   word-break: break-all;
   font-size: 12px;
 }
 
 .con-tag {
-  color: #c586c0;
+  color: hsl(var(--agent-con));
   font-weight: 600;
   cursor: pointer;
   border-radius: 2px;
@@ -410,16 +419,16 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 }
 
 .con-tag:hover {
-  background: rgba(197, 134, 192, 0.2);
+  background: hsl(var(--agent-con) / 0.2);
 }
 
 .con-tag.active {
-  background: #f59e0b;
-  color: #1e1e1e;
+  background: hsl(var(--warning));
+  color: hsl(var(--background));
 }
 
 .cond-desc {
-  color: #9d9d9d;
+  color: hsl(var(--muted-foreground));
   font-size: 11px;
   margin-top: 4px;
   font-family: 'Inter', sans-serif;
@@ -427,43 +436,44 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 
 .yaml-block {
   margin-top: 8px;
-  border-top: 1px solid #3c3c3c;
+  border-top: 1px solid hsl(var(--border));
   padding-top: 8px;
 }
 
 .yaml-block summary {
   cursor: pointer;
-  color: #4ec9b0;
+  color: hsl(var(--success));
   font-size: 12px;
   font-weight: 600;
   user-select: none;
 }
 
 .yaml-pre {
-  background: #181818;
+  background: hsl(var(--muted));
   padding: 10px;
   border-radius: 4px;
   margin: 6px 0 0;
   overflow-x: auto;
-  color: #d4d4d4;
+  color: hsl(var(--foreground));
   font-size: 12px;
   line-height: 1.5;
+  border: 1px solid hsl(var(--border));
 }
 
 :deep(.yaml-key) {
-  color: #569cd6;
+  color: hsl(var(--info));
 }
 
 :deep(.yaml-str) {
-  color: #ce9178;
+  color: hsl(var(--warning));
 }
 
 :deep(.yaml-num) {
-  color: #b5cea8;
+  color: hsl(var(--success));
 }
 
 :deep(.yaml-comment) {
-  color: #6a9955;
+  color: hsl(var(--muted-foreground));
   font-style: italic;
 }
 </style>

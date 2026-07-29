@@ -6,6 +6,17 @@ import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
 import App from "@/App.vue";
 import router from "@/router";
 
+const keysToRemove = [
+	"skyforge-task-history",
+];
+keysToRemove.forEach(key => localStorage.removeItem(key));
+
+const profileKey = "skyforge-execution-profile";
+const saved = localStorage.getItem(profileKey);
+if (saved === "demo" || (saved !== "cloud" && saved !== "local")) {
+	localStorage.setItem(profileKey, "cloud");
+}
+
 const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 const app = createApp(App);

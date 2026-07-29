@@ -117,3 +117,73 @@ async def hitl_history() -> dict[str, Any]:
         "history": history,
         "count": len(history),
     }
+
+
+# ============================================================================
+# 审查模板、意见追踪、统计端点
+# ============================================================================
+
+from app.core.hil.hil_manager import (
+    add_comment,
+    compute_stats,
+    get_comments,
+    get_review_template,
+    update_comment_status,
+)
+from app.schemas.hitl import ReviewComment
+
+
+@router.get("/api/hil/template/{checkpoint}")
+async def get_template(checkpoint: str) -> dict[str, Any]:
+    """返回指定检查点的审查模板。"""
+    template = get_review_template(checkpoint)
+    return template.model_dump()
+
+
+@router.get("/api/hil/comments/{request_id}")
+async def get_review_comments(request_id: str) -> dict[str, Any]:
+    """返回指定审批请求的所有审查意见。"""
+    bundle = get_comments(request_id)
+    return bundle.model_dump()
+
+
+@router.post("/api/hil/comments/{request_id}")
+async def add_review_comment(
+    request_id: str,
+    payload: dict,
+    _user: str = Depends(require_write_access),
+) -> dict[str, Any]:
+    """添加一条审查意见。"""
+    import uuid as _uuid
+
+    comment = ReviewComment(
+        id=payload.get("id") or f"cmt_{_uuid.uuid4().hex[:8]}",
+        item_id=payload.get("item_id", ""),
+        content=payload.get("content", ""),
+        author=payload.get("author", "reviewer"),
+        status=payload.get("status", "open"),
+        code_ref=payload.get("code_ref", ""),
+        contract_ref=payload.get("contract_ref", ""),
+    )
+    add_comment(request_id, comment)
+    return {"ok": True, "comment_id": comment.id}
+
+
+@router.patch("/api/hil/comments/{request_id}/{comment_id}")
+async def update_comment(
+    request_id: str,
+    comment_id: str,
+    payload: dict,
+    _user: str = Depends(require_write_access),
+) -> dict[str, Any]:
+    """更新审查意见状态。"""
+    status = payload.get("status", "open")
+    ok = update_comment_status(request_id, comment_id, status)
+    return {"ok": ok}
+
+
+@router.get("/api/hil/stats")
+async def hitl_stats() -> dict[str, Any]:
+    """返回 HITL 审查统计指标。"""
+    stats = compute_stats()
+    return stats.model_dump()

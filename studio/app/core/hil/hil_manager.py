@@ -330,7 +330,7 @@ class HILManager:
         检查点：requirement_review / contract_review / code_review / final_review。
 
         行为：
-        - HIL_ENABLED=false：直接返回 approved=False，不阻塞演示（status=skipped）
+        - HIL_ENABLED=false：直接返回 approved=False，不阻塞流程（status=skipped）
         - HIL_ENABLED=true：创建请求，asyncio.Event 等待 approve/reject 或超时
         - 超时：返回 approved=False（status=timeout）
 
@@ -412,7 +412,7 @@ class HILManager:
             }
         except asyncio.TimeoutError:
             # 超时不再自动批准，避免 system 自己批准自己。
-            # V0.5: HITL_AUTO_APPROVE=true 时超时自动批准（评委演示用）
+            # V0.5: HITL_AUTO_APPROVE=true 时超时自动批准（开发调试用）
             auto_approve = os.getenv("HITL_AUTO_APPROVE", "").lower() == "true"
             if auto_approve:
                 logger.info(
@@ -656,3 +656,214 @@ def reset_hil_manager() -> None:
     HILManager._redis_client = None
     # 4. 丢弃单例引用
     _hil_manager = None
+
+
+# ============================================================================
+# 审查模板、意见追踪、统计
+# ============================================================================
+
+from app.schemas.hitl import (
+    HITLStats,
+    ReviewComment,
+    ReviewCommentsBundle,
+    ReviewTemplate,
+    ReviewTemplateItem,
+)
+
+
+# 标准审查模板
+REVIEW_TEMPLATES: dict[str, ReviewTemplate] = {
+    "requirement_review": ReviewTemplate(
+        checkpoint="requirement_review",
+        items=[
+            ReviewTemplateItem(
+                id="req_01",
+                title="需求完整性",
+                description="需求是否包含所有必要的功能和非功能描述？",
+                category="mandatory",
+                guideline_ref="DO-178C/PSAC.02",
+            ),
+            ReviewTemplateItem(
+                id="req_02",
+                title="需求可验证性",
+                description="每条需求是否可以通过测试或分析进行验证？",
+                category="mandatory",
+                guideline_ref="DO-178C/SVP.01",
+            ),
+            ReviewTemplateItem(
+                id="req_03",
+                title="需求一致性",
+                description="需求之间是否存在冲突或矛盾？",
+                category="required",
+                guideline_ref="DO-178C/PSAC.02",
+            ),
+            ReviewTemplateItem(
+                id="req_04",
+                title="需求追踪性",
+                description="需求是否分配了唯一标识以支持全生命周期追踪？",
+                category="mandatory",
+                guideline_ref="DO-178C/PSAC.03",
+            ),
+        ],
+    ),
+    "contract_review": ReviewTemplate(
+        checkpoint="contract_review",
+        items=[
+            ReviewTemplateItem(
+                id="contract_01",
+                title="前置条件完整性",
+                description="前置条件是否覆盖了所有必要的输入约束？",
+                category="mandatory",
+                guideline_ref="DO-178C/SDP.01",
+            ),
+            ReviewTemplateItem(
+                id="contract_02",
+                title="后置条件正确性",
+                description="后置条件是否准确描述了期望的输出行为？",
+                category="mandatory",
+                guideline_ref="DO-178C/SDP.01",
+            ),
+            ReviewTemplateItem(
+                id="contract_03",
+                title="契约可验证性",
+                description="契约是否可以通过形式化方法或测试进行验证？",
+                category="required",
+                guideline_ref="DO-178C/SVP.02",
+            ),
+        ],
+    ),
+    "code_review": ReviewTemplate(
+        checkpoint="code_review",
+        items=[
+            ReviewTemplateItem(
+                id="code_01",
+                title="编码标准合规",
+                description="代码是否符合 MISRA C/C++ 或指定编码标准？",
+                category="mandatory",
+                guideline_ref="DO-178C/SDP.02",
+            ),
+            ReviewTemplateItem(
+                id="code_02",
+                title="契约实现一致性",
+                description="代码实现是否与契约（前置/后置条件）一致？",
+                category="mandatory",
+                guideline_ref="DO-178C/SDP.01",
+            ),
+            ReviewTemplateItem(
+                id="code_03",
+                title="代码可读性",
+                description="代码是否结构清晰、命名规范、注释充分？",
+                category="required",
+                guideline_ref="DO-178C/SDP.02",
+            ),
+            ReviewTemplateItem(
+                id="code_04",
+                title="无未定义行为",
+                description="代码是否避免了未定义行为（如越界访问、空指针解引用）？",
+                category="mandatory",
+                guideline_ref="DO-178C/SDP.03",
+            ),
+        ],
+    ),
+    "final_review": ReviewTemplate(
+        checkpoint="final_review",
+        items=[
+            ReviewTemplateItem(
+                id="final_01",
+                title="验证覆盖完整性",
+                description="是否所有代码分支和需求都通过了验证？",
+                category="mandatory",
+                guideline_ref="DO-178C/SVP.01",
+            ),
+            ReviewTemplateItem(
+                id="final_02",
+                title="证据链完整性",
+                description="从需求到验证的追溯链路是否完整？",
+                category="mandatory",
+                guideline_ref="DO-178C/PSAC.03",
+            ),
+            ReviewTemplateItem(
+                id="final_03",
+                title="文档完备性",
+                description="所有必要的输出文档（报告、清单）是否已生成？",
+                category="required",
+                guideline_ref="DO-178C/PSAC.01",
+            ),
+        ],
+    ),
+}
+
+# 内存中的审查意见存储（Redis不可用时使用）
+_comments_store: dict[str, ReviewCommentsBundle] = {}
+
+
+def get_review_template(checkpoint: str) -> ReviewTemplate:
+    """获取指定检查点的审查模板。"""
+    return REVIEW_TEMPLATES.get(checkpoint, ReviewTemplate(checkpoint=checkpoint))
+
+
+def get_comments(request_id: str) -> ReviewCommentsBundle:
+    """获取指定审批请求的所有审查意见。"""
+    if request_id not in _comments_store:
+        _comments_store[request_id] = ReviewCommentsBundle(request_id=request_id)
+    return _comments_store[request_id]
+
+
+def add_comment(request_id: str, comment: ReviewComment) -> None:
+    """添加一条审查意见。"""
+    bundle = get_comments(request_id)
+    bundle.comments.append(comment)
+
+
+def update_comment_status(request_id: str, comment_id: str, status: str) -> bool:
+    """更新审查意见状态。"""
+    bundle = get_comments(request_id)
+    for c in bundle.comments:
+        if c.id == comment_id:
+            c.status = status
+            c.updated_at = datetime.now(timezone.utc).isoformat()
+            return True
+    return False
+
+
+def compute_stats() -> HITLStats:
+    """计算 HITL 审查统计指标。"""
+    # 从已有的 history 和 pending 中汇总
+    mgr = get_hil_manager()
+    history = mgr.get_history()
+    pending = mgr.get_pending_approvals()
+
+    total = len(history) + len(pending)
+    approved = sum(1 for h in history if h.get("status") == "approved")
+    rejected = sum(1 for h in history if h.get("status") == "rejected")
+    timeout = sum(1 for h in history if h.get("status") == "timeout")
+
+    by_checkpoint: dict[str, dict[str, int]] = {}
+    for h in history:
+        cp = h.get("checkpoint", "unknown")
+        if cp not in by_checkpoint:
+            by_checkpoint[cp] = {"total": 0, "approved": 0, "rejected": 0, "pending": 0}
+        by_checkpoint[cp]["total"] += 1
+        st = h.get("status", "")
+        if st in by_checkpoint[cp]:
+            by_checkpoint[cp][st] += 1
+
+    for p in pending:
+        cp = p.get("checkpoint", "unknown")
+        if cp not in by_checkpoint:
+            by_checkpoint[cp] = {"total": 0, "approved": 0, "rejected": 0, "pending": 0}
+        by_checkpoint[cp]["total"] += 1
+        by_checkpoint[cp]["pending"] += 1
+
+    approval_rate = round(approved / total * 100, 1) if total > 0 else 0.0
+
+    return HITLStats(
+        total_requests=total,
+        pending_count=len(pending),
+        approved_count=approved,
+        rejected_count=rejected,
+        timeout_count=timeout,
+        approval_rate=approval_rate,
+        avg_review_time_sec=0.0,  # 后续可扩展
+        by_checkpoint=by_checkpoint,
+    )

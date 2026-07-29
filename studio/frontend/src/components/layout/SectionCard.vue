@@ -27,6 +27,10 @@ defineProps<{
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   padding: 20px;
   transition: all 0.2s ease;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .section-card:hover {
@@ -58,5 +62,8 @@ defineProps<{
 
 .section-card-content {
   color: hsl(var(--foreground));
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
 }
 </style>

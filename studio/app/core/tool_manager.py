@@ -198,3 +198,155 @@ def add_tools_to_path() -> None:
             logger.info(f"已将本地工具目录加入 PATH: {local_bin}")
     else:
         logger.debug(f"本地工具目录不存在，跳过: {local_bin}")
+
+
+# ============================================================================
+# ToolExecutor: 工具标准化调用
+# ============================================================================
+
+from dataclasses import dataclass as _dc
+from subprocess import run as _run
+from typing import Any as _Any
+
+
+@_dc
+class ToolExecutionResult:
+    """工具执行的标准化结果。"""
+
+    tool_name: str
+    success: bool
+    exit_code: int
+    stdout: str
+    stderr: str
+    duration_ms: int
+    parsed_result: dict[str, _Any]
+    error_message: str = ""
+
+
+class ToolExecutor:
+    """工具标准化执行器。
+
+    提供统一的工具调用接口，确保所有外部工具的调用参数、
+    超时控制、结果解析遵循同一规范。
+    """
+
+    @staticmethod
+    def run(
+        tool_name: str,
+        args: list[str] | None = None,
+        timeout: int = 60,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> ToolExecutionResult:
+        """执行指定工具并返回标准化结果。
+
+        Args:
+            tool_name: 工具名称（必须已在 TOOLS_REQUIREMENTS 中注册）
+            args: 命令行参数列表
+            timeout: 超时时间（秒）
+            cwd: 工作目录
+            env: 环境变量覆盖
+
+        Returns:
+            ToolExecutionResult 标准化执行结果
+        """
+        import time as _time
+
+        start = _time.monotonic()
+        cmd_args = args or []
+
+        try:
+            result = _run(
+                [tool_name] + cmd_args,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=timeout,
+                cwd=cwd,
+                env=env,
+                shell=False,
+            )
+            duration_ms = int((_time.monotonic() - start) * 1000)
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=result.returncode == 0,
+                exit_code=result.returncode,
+                stdout=result.stdout.strip(),
+                stderr=result.stderr.strip(),
+                duration_ms=duration_ms,
+                parsed_result=ToolExecutor._parse_output(tool_name, result.stdout, result.stderr),
+            )
+        except Exception as e:
+            duration_ms = int((_time.monotonic() - start) * 1000)
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                exit_code=-1,
+                stdout="",
+                stderr="",
+                duration_ms=duration_ms,
+                parsed_result={},
+                error_message=str(e),
+            )
+
+    @staticmethod
+    def _parse_output(tool_name: str, stdout: str, stderr: str) -> dict[str, _Any]:
+        """解析工具输出为结构化数据。
+
+        每个工具可能有不同的输出格式，这里提供基础解析。
+        后续可扩展为每个工具独立的解析器。
+        """
+        lines = stdout.strip().splitlines() + stderr.strip().splitlines()
+        errors = [l for l in lines if "error" in l.lower()]
+        warnings = [l for l in lines if "warning" in l.lower()]
+        return {
+            "total_lines": len(lines),
+            "error_count": len(errors),
+            "warning_count": len(warnings),
+            "errors": errors[:10],
+            "warnings": warnings[:10],
+        }
+
+
+def get_install_hint(tool_name: str) -> dict[str, str]:
+    """返回指定工具在不同平台上的安装指引。
+
+    Args:
+        tool_name: 工具名称
+
+    Returns:
+        包含各平台安装命令的字典
+    """
+    hints: dict[str, dict[str, str]] = {
+        "cbmc": {
+            "windows": "choco install cbmc 或从 https://github.com/diffblue/cbmc/releases 下载",
+            "linux": "apt install cbmc 或 dnf install cbmc",
+            "macos": "brew install cbmc",
+        },
+        "z3": {
+            "windows": "pip install z3-solver 或从 https://github.com/Z3Prover/z3/releases 下载",
+            "linux": "pip install z3-solver 或 apt install z3",
+            "macos": "pip install z3-solver 或 brew install z3",
+        },
+        "semgrep": {
+            "windows": "pip install semgrep 或 choco install semgrep",
+            "linux": "pip install semgrep",
+            "macos": "pip install semgrep 或 brew install semgrep",
+        },
+        "gcc": {
+            "windows": "choco install mingw 或安装 MSYS2",
+            "linux": "apt install gcc 或 dnf install gcc",
+            "macos": "xcode-select --install",
+        },
+        "lcov": {
+            "windows": "choco install lcov 或使用 Git Bash 自带",
+            "linux": "apt install lcov 或 dnf install lcov",
+            "macos": "brew install lcov",
+        },
+    }
+    return hints.get(tool_name, {
+        "windows": f"请参考 {tool_name} 官方文档安装",
+        "linux": f"请参考 {tool_name} 官方文档安装",
+        "macos": f"请参考 {tool_name} 官方文档安装",
+    })

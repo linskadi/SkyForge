@@ -459,7 +459,11 @@ const onReset = () => {
 
 <style scoped>
 .fault-panel {
-  border-left: 3px solid #8B5CF6;
+  border-left: 3px solid hsl(var(--agent-con));
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-title {

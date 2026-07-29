@@ -63,7 +63,7 @@ const { toast } = useToast();
 
 // ---- 模式选项 ----
 const modes: { key: LLMMode; label: string }[] = [
-	{ key: "mock", label: "演示模式" },
+	{ key: "mock", label: "模拟模式" },
 	{ key: "api", label: "云 API" },
 	{ key: "local", label: "本地模型" },
 ];
@@ -135,9 +135,9 @@ async function loadConfig() {
 		localModel.value = local.model ?? "";
 	}
 
-	// 2. 演示 profile / Mock 模式必须保持离线：打开设置弹窗不主动访问后端。
+	// 2. Mock 模式必须保持离线：打开设置弹窗不主动访问后端。
 	// 用户切到云 API / 本地模型后，测试连接或保存才会访问服务端。
-	if (executionStore.profileId === "demo" || activeMode.value === "mock") {
+	if (activeMode.value === "mock") {
 		storedApiKeyMask.value = "";
 		return;
 	}
@@ -324,7 +324,7 @@ async function handleSave() {
     <DialogContent class="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto">
       <DialogHeader>
         <DialogTitle>LLM 设置</DialogTitle>
-        <DialogDescription>配置后端模型连接；比赛演示数据来源仍由顶部 Profile 独立控制</DialogDescription>
+        <DialogDescription>配置后端模型连接；模拟数据仅在无后端时使用</DialogDescription>
       </DialogHeader>
 
       <!-- 模式分段按钮（自定义 button，非 shadcn Tabs） -->
@@ -348,7 +348,7 @@ async function handleSave() {
       <!-- Mock 选项卡 -->
       <div v-if="activeMode === 'mock'" class="space-y-2 py-2">
         <p class="text-sm text-muted-foreground">
-          前端模拟数据，不调用任何 LLM 服务。适用于演示与开发调试。
+          前端模拟数据，不调用任何 LLM 服务。适用于开发调试。
         </p>
       </div>
 

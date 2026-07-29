@@ -19,7 +19,7 @@ router = APIRouter()
 
 # Session-scoped report cache: keyed by session ID,
 # auto-cleans entries older than 1 hour.
-# NOTE: 单实例内存缓存，适用于开发和演示。生产多实例部署应替换为 Redis。
+# NOTE: 单实例内存缓存，适用于开发。生产多实例部署应替换为 Redis。
 _report_cache: dict[str, dict[str, Any]] = {}
 _CACHE_TTL_SECONDS = 3600  # 1 hour
 _CACHE_MAX_ENTRIES = 50  # 防止内存无限增长

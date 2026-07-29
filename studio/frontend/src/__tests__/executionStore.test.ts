@@ -21,9 +21,9 @@ describe("executionStore - profileId default and setProfile", () => {
 		localStorage.clear();
 	});
 
-	it("defaults profileId to 'demo' when no localStorage entry exists", () => {
+	it("defaults profileId to 'cloud' when no localStorage entry exists", () => {
 		const execution = useExecutionStore();
-		expect(execution.profileId).toBe("demo");
+		expect(execution.profileId).toBe("cloud");
 	});
 
 	it("setProfile('cloud') updates profileId", () => {
@@ -44,13 +44,6 @@ describe("executionStore - profileId default and setProfile", () => {
 		expect(localStorage.getItem(EXECUTION_PROFILE_STORAGE_KEY)).toBe("local");
 	});
 
-	it("setProfile('demo') writes the new value to localStorage", () => {
-		const execution = useExecutionStore();
-		execution.setProfile("cloud");
-		execution.setProfile("demo");
-		expect(localStorage.getItem(EXECUTION_PROFILE_STORAGE_KEY)).toBe("demo");
-	});
-
 	it("profile computed reflects current profileId", () => {
 		const execution = useExecutionStore();
 		execution.setProfile("cloud");
@@ -61,16 +54,12 @@ describe("executionStore - profileId default and setProfile", () => {
 		execution.setProfile("local");
 		expect(execution.profile.id).toBe("local");
 		expect(execution.profile.source).toBe("live");
-
-		execution.setProfile("demo");
-		expect(execution.profile.id).toBe("demo");
-		expect(execution.profile.source).toBe("simulated");
 	});
 
-	it("profiles list contains all three profile ids", () => {
+	it("profiles list contains cloud and local profile ids", () => {
 		const execution = useExecutionStore();
 		const ids = execution.profiles.map((p) => p.id).sort();
-		expect(ids).toEqual(["cloud", "demo", "local"]);
+		expect(ids).toEqual(["cloud", "local"]);
 	});
 });
 
@@ -101,34 +90,23 @@ describe("executionStore - localStorage restore on page refresh", () => {
 		expect(second.profileId).toBe("local");
 	});
 
-	it("recovers profileId === 'demo' from localStorage on next Pinia init", () => {
-		const first = useExecutionStore();
-		// 默认值就是 demo，但显式写入
-		first.setProfile("cloud");
-		first.setProfile("demo");
-
-		setActivePinia(createPinia());
-		const second = useExecutionStore();
-		expect(second.profileId).toBe("demo");
-	});
-
-	it("falls back to 'demo' when localStorage has unknown value (data migration safety)", () => {
+	it("falls back to 'cloud' when localStorage has unknown value (data migration safety)", () => {
 		localStorage.setItem(EXECUTION_PROFILE_STORAGE_KEY, "garbage");
 
 		setActivePinia(createPinia());
 		const second = useExecutionStore();
-		expect(second.profileId).toBe("demo");
+		expect(second.profileId).toBe("cloud");
 	});
 
 	it("does not overwrite localStorage on init (avoid clobbering existing value)", () => {
-		localStorage.setItem(EXECUTION_PROFILE_STORAGE_KEY, "cloud");
+		localStorage.setItem(EXECUTION_PROFILE_STORAGE_KEY, "local");
 
 		setActivePinia(createPinia());
 		// 触发 store 初始化
 		useExecutionStore();
 
-		// localStorage 中的 'cloud' 仍应保留（不被动写入 'demo'）
-		expect(localStorage.getItem(EXECUTION_PROFILE_STORAGE_KEY)).toBe("cloud");
+		// localStorage 中的 'local' 仍应保留（不被动写入 'cloud'）
+		expect(localStorage.getItem(EXECUTION_PROFILE_STORAGE_KEY)).toBe("local");
 	});
 });
 
@@ -136,13 +114,6 @@ describe("executionStore - profileId → providerStore.derivedMode 派生", () =
 	beforeEach(() => {
 		setActivePinia(createPinia());
 		localStorage.clear();
-	});
-
-	it("profileId 'demo' 派生为 derivedMode 'mock'", () => {
-		const execution = useExecutionStore();
-		const provider = useProviderStore();
-		execution.setProfile("demo");
-		expect(provider.derivedMode).toBe("mock");
 	});
 
 	it("profileId 'cloud' 派生为 derivedMode 'api'", () => {
@@ -163,27 +134,24 @@ describe("executionStore - profileId → providerStore.derivedMode 派生", () =
 		const execution = useExecutionStore();
 		const provider = useProviderStore();
 
-		execution.setProfile("demo");
-		expect(provider.derivedMode).toBe("mock");
-
 		execution.setProfile("cloud");
 		expect(provider.derivedMode).toBe("api");
 
 		execution.setProfile("local");
 		expect(provider.derivedMode).toBe("local");
 
-		execution.setProfile("demo");
-		expect(provider.derivedMode).toBe("mock");
+		execution.setProfile("cloud");
+		expect(provider.derivedMode).toBe("api");
 	});
 
 	it("page refresh 后 derivedMode 仍能正确派生", () => {
 		const firstExecution = useExecutionStore();
-		firstExecution.setProfile("cloud");
+		firstExecution.setProfile("local");
 
 		setActivePinia(createPinia());
 		const secondExecution = useExecutionStore();
 		const secondProvider = useProviderStore();
-		expect(secondExecution.profileId).toBe("cloud");
-		expect(secondProvider.derivedMode).toBe("api");
+		expect(secondExecution.profileId).toBe("local");
+		expect(secondProvider.derivedMode).toBe("local");
 	});
 });

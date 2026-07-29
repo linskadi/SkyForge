@@ -1,6 +1,0 @@
-{
-  "backend_test_definitions": 287,
-  "frontend_test_definitions": 172,
-  "http_route_decorators": 48,
-  "websocket_route_decorators": 3
-}

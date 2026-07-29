@@ -3,16 +3,13 @@
 提供 Dashboard 页面所需的最近任务、系统状态、合规率趋势、统计指标数据。
 """
 
-import shutil
-import sys
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.llm.local_llm_client import get_local_llm_client
+from app.core.tool_manager import check_all_tools
 from app.db import get_db
 from app.models.task import Task
 from app.repositories import task_history_repo
@@ -79,26 +76,9 @@ async def get_system_status(db: Session = Depends(get_db)) -> dict:
     except Exception as e:
         logger.warning(f"Dashboard system-status: LLM 状态查询失败: {e}")
 
-    # 工具链可用性
-    # z3：优先检测 Python 包（z3-solver），其次检测命令行二进制
-    z3_available = False
-    try:
-        import z3 as _z3  # noqa: F401
-        z3_available = True
-    except ImportError:
-        z3_available = shutil.which("z3") is not None
-
-    # cbmc：检测命令行二进制 + Windows 默认安装路径
-    cbmc_available = shutil.which("cbmc") is not None
-    if not cbmc_available and sys.platform == "win32":
-        cbmc_default = Path(r"C:\Program Files\cbmc\bin\cbmc.exe")
-        cbmc_available = cbmc_default.exists()
-
-    tools = {
-        "gcc": shutil.which("gcc") is not None,
-        "z3": z3_available,
-        "cbmc": cbmc_available,
-    }
+    # 工具链可用性（统一调用工具链注册表）
+    tool_list = check_all_tools()
+    tools = {t.name: t.found for t in tool_list}
 
     # 持久化状态
     persistence: dict = {"db_rows": 0, "tables": {}, "last_write": None}
