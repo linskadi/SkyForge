@@ -41,8 +41,8 @@ async def get_tool_registry() -> JSONResponse:
 # 工具执行与安装指引端点
 # ============================================================================
 
-from app.core.tool_manager import ToolExecutor, get_install_hint
-from app.core.auth import require_write_access
+from app.core.tool_manager import ToolExecutor, get_install_hint  # noqa: E402
+from app.core.auth import require_write_access  # noqa: E402
 
 
 @router.get("/{tool_name}/install-hint")

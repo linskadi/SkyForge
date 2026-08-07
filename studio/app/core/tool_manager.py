@@ -43,7 +43,7 @@ TOOLS_REQUIREMENTS: list[ToolInfo] = [
     ToolInfo(name="z3", min_version="4.12", description="SMT约束求解", install_hint="→ pip install z3-solver"),
     ToolInfo(name="semgrep", min_version="1.60", description="静态分析", install_hint="→ pip install semgrep"),
     ToolInfo(name="gcc", min_version="14.0", description="代码编译", install_hint=""),
-    ToolInfo(name="lcov", min_version="2.0", description="覆盖率收集", install_hint="→ choco install lcov (Windows) / apt install lcov (Linux)"),
+    ToolInfo(name="lcov", min_version="2.0", description="覆盖率收集", install_hint="→ choco install lcov (Windows) / apt install lcov (Linux) / brew install lcov (macOS)"),
 ]
 
 
@@ -204,9 +204,9 @@ def add_tools_to_path() -> None:
 # ToolExecutor: 工具标准化调用
 # ============================================================================
 
-from dataclasses import dataclass as _dc
-from subprocess import run as _run
-from typing import Any as _Any
+from dataclasses import dataclass as _dc  # noqa: E402
+from subprocess import run as _run  # noqa: E402
+from typing import Any as _Any  # noqa: E402
 
 
 @_dc
@@ -298,8 +298,8 @@ class ToolExecutor:
         后续可扩展为每个工具独立的解析器。
         """
         lines = stdout.strip().splitlines() + stderr.strip().splitlines()
-        errors = [l for l in lines if "error" in l.lower()]
-        warnings = [l for l in lines if "warning" in l.lower()]
+        errors = [line for line in lines if "error" in line.lower()]
+        warnings = [line for line in lines if "warning" in line.lower()]
         return {
             "total_lines": len(lines),
             "error_count": len(errors),
