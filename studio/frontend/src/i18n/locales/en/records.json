@@ -1,0 +1,58 @@
+{
+	"records": {
+		"title": "Task Management",
+		"subtitle": "Manage all run records in one place; search, filter, and replay with ease.",
+		"btn": {
+			"refresh": "Refresh",
+			"viewDetail": "View Details",
+			"delete": "Delete Task",
+			"deleteTaskTitle": "Delete task {id}"
+		},
+		"loading": "Loading records…",
+		"error": {
+			"hint": "Run the model connection precheck in System Settings first.",
+			"notFound": "Task does not exist or has been deleted (ID: {id})",
+			"deleteFailed": "Delete failed: {msg}",
+			"unauthorized": "Deletion rejected: the backend requires authentication. Go to Settings → Model Connection and set the backend API Token, then retry."
+		},
+		"empty": {
+			"title": "No run records for the current source",
+			"desc": "Run records will appear here after a code generation task completes.",
+			"noMatch": "No matching tasks"
+		},
+		"placeholder": {
+			"search": "Search by requirement text…"
+		},
+		"filter": {
+			"statusPlaceholder": "Status filter",
+			"statusAll": "All statuses",
+			"languagePlaceholder": "Language filter",
+			"languageAll": "All languages"
+		},
+		"status": {
+			"running": "Running",
+			"completed": "Completed",
+			"failed": "Failed",
+			"unknown": "Unknown"
+		},
+		"source": {
+			"simulated": "Simulated",
+			"replay": "Replay",
+			"live": "Live"
+		},
+		"time": {
+			"justNow": "just now",
+			"minutesAgo": "{n} min ago",
+			"hoursAgo": "{n} hr ago",
+			"daysAgo": "{n} days ago"
+		},
+		"requirementIdPending": "Requirement ID pending",
+		"noRequirement": "No requirement description",
+		"violations": "{n} violations",
+		"confirm": {
+			"title": "Confirm Delete Task",
+			"taskId": "Task ID:",
+			"irreversible": "This action cannot be undone. The task record will be permanently removed from the database."
+		}
+	}
+}

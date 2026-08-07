@@ -1,0 +1,91 @@
+{
+	"data": {
+		"provider": {
+			"deepseek": {
+				"name": "DeepSeek",
+				"desc": "Cost-effective, Chinese-optimized, strong coding ability"
+			},
+			"qwen": {
+				"name": "Qwen",
+				"desc": "Top domestic choice — Qwen series, powered by Alibaba Cloud"
+			},
+			"openai": {
+				"name": "OpenAI",
+				"desc": "Highest precision, world-leading LLM"
+			},
+			"anthropic": {
+				"name": "Anthropic",
+				"desc": "Anthropic Claude series, safe and reliable"
+			},
+			"ollama": {
+				"name": "Ollama (Local)",
+				"desc": "Local inference, data stays on-premise"
+			},
+			"local": {
+				"name": "Local LLM",
+				"desc": "Local inference (Ollama / LM Studio and other OpenAI-compatible endpoints)"
+			}
+		},
+		"checkpoint": {
+			"requirement_review": "Requirement Review",
+			"contract_review": "Contract Review",
+			"code_review": "Code Review",
+			"final_review": "Final Review"
+		},
+		"report": {
+			"title": "DO-178C Report - {component}",
+			"titlePlain": "DO-178C Report",
+			"pass": "Pass",
+			"fail": "Violation",
+			"itemFail": "Fail",
+			"simulationPass": "Digital twin simulation passed, no contract violations detected",
+			"simulationFail": "Contract violations detected during simulation — see the simulation section of the report",
+			"simResultPass": "✅ All contract assertions passed",
+			"simResultFail": "❌ Contract violations detected",
+			"summarySeeReport": "See the report for details",
+			"generatedAt": "Generated: {time} | Report ID: {id}",
+			"statObjectives": "DO-178C Objectives Pass Rate",
+			"statTraceability": "Traceability Matrix Entries",
+			"statMisra": "MISRA-C Violations",
+			"statPassRate": "Overall Pass Rate",
+			"sectionSummary": "1. Executive Summary",
+			"sectionTraceability": "2. Requirements Traceability Matrix",
+			"sectionContract": "3. Contract Verification Results",
+			"sectionMisra": "4. MISRA-C Compliance",
+			"sectionRepair": "5. Repair History",
+			"sectionSimulation": "6. Digital Twin Simulation",
+			"sectionObjectives": "7. DO-178C Objectives Coverage"
+		},
+		"contract": {
+			"preconditions": "Preconditions",
+			"postconditions": "Postconditions",
+			"invariants": "Invariants",
+			"faultHandling": "Fault Handling"
+		},
+		"compat": {
+			"defaultCheck": "Compatibility check",
+			"checkATypeMatch": "Component A output type matches component B input type",
+			"checkARange": "Component A output range is within component B input allowed range",
+			"checkConditionConflict": "Component A postconditions do not conflict with component B preconditions",
+			"checkSignature": "Connection mode matches the component interface signatures",
+			"checkNoCycle": "No circular dependency or type cycle",
+			"checkInvariants": "Combined invariants are satisfiable",
+			"feedbackReason": "Feedback connection requires additional stability analysis — consider adding a convergence check (mock warning)"
+		},
+		"error": {
+			"httpTitle": "[Error] {status}",
+			"httpStatus": "HTTP {status} {statusText}",
+			"unknown": "Unknown error",
+			"taskEventsFailed": "Failed to connect to task event stream"
+		},
+		"status": {
+			"executionProfile": {
+				"cloud": "Cloud API · Live/Replay",
+				"local": "Local Model · Live/Replay"
+			}
+		},
+		"anchor": {
+			"hashError": "Anchor hash must be 64 hex characters"
+		}
+	}
+}

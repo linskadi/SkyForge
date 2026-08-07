@@ -1,0 +1,86 @@
+{
+	"lab": {
+		"eyebrow": "SIMULATION LAB",
+		"title": "Simulation Lab",
+		"subtitle": "Digital twin simulation workbench: code modeling, contract binding, fault injection, waveform analysis",
+		"quickLinks": {
+			"composeTitle": "Component Composition",
+			"composeText": "Combine two verified components and check interface compatibility",
+			"misraTitle": "Rule Lab",
+			"misraText": "Search coding standard rules for C/C++/Python",
+			"hitlTitle": "HITL Review",
+			"hitlText": "Approve, reject, or request changes to generated artifacts",
+			"hilTitle": "Hardware-in-the-Loop",
+			"hilText": "Reserved real hardware-in-the-loop interface, semantically separated from human review"
+		},
+		"workspace": {
+			"title": "Simulation Workbench",
+			"desc": "Configure code and contracts, inject faults, observe waveform changes"
+		},
+		"multiCompare": "Multi-round Compare",
+		"btn": {
+			"reset": "Reset",
+			"export": "Export Result",
+			"simulating": "Simulating...",
+			"start": "Start Simulation"
+		},
+		"config": {
+			"title": "Configuration",
+			"desc": "Three configuration sections: code, contract, fault injection"
+		},
+		"tab": {
+			"code": "Code",
+			"contract": "Contract",
+			"fault": "Fault Injection"
+		},
+		"code": {
+			"langC": "C Code",
+			"inputPorts": "Input Ports",
+			"outputPorts": "Output Ports"
+		},
+		"contract": {
+			"preconditions": "Preconditions",
+			"postconditions": "Postconditions",
+			"invariants": "Invariants",
+			"conditionPlaceholder": "One condition expression per line",
+			"invariantPlaceholder": "One invariant per line"
+		},
+		"waveform": {
+			"title": "Waveform Comparison",
+			"desc": "Input/output waveform overlay · fault-range highlight · zoom and pan",
+			"violation": "Contract Violation",
+			"violationDetail": "Step {step}: {message}",
+			"emptyHint": "Click \"Start Simulation\" to generate a waveform"
+		},
+		"stats": {
+			"title": "Statistics",
+			"desc": "Simulation run statistics and contract verification results",
+			"labelSteps": "Simulation Steps",
+			"labelRange": "Output Range",
+			"labelMean": "Output Mean",
+			"labelVariance": "Output Variance",
+			"labelViolations": "Contract Violations",
+			"unitSteps": "steps",
+			"unitRange": "uint16",
+			"unitMean": "mean",
+			"unitVariance": "σ²",
+			"unitViolations": "times",
+			"empty": "No simulation data yet"
+		},
+		"history": {
+			"title": "Simulation History Comparison",
+			"rounds": "Total {count} rounds",
+			"desc": "Multi-round simulation results overlaid, differences highlighted",
+			"round": "Round {n}",
+			"passed": "Passed",
+			"violated": "Violated",
+			"fault": "Fault: {type}",
+			"noFault": "None",
+			"stepRange": "Steps: {steps} · Output range: {min} ~ {max}"
+		},
+		"detail": {
+			"title": "Simulation Details",
+			"desc": "Full simulation result and terminal log"
+		}
+	}
+}

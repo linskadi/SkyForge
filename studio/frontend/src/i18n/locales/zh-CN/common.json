@@ -1,0 +1,394 @@
+{
+	"appTitle": "SkyForge 天锻",
+	"brand": {
+		"tagline": "可信机载软件智能工坊"
+	},
+	"nav": {
+		"main": "主导航",
+		"home": "SkyForge 首页",
+		"dashboard": "仪表板",
+		"generate": "代码生成",
+		"records": "任务管理",
+		"misra": "合规审计",
+		"lab": "仿真实验室",
+		"compose": "组合验证",
+		"hitl": "HITL审查",
+		"anchor": "链上锚定",
+		"architecture": "文档中心",
+		"settings": "系统设置"
+	},
+	"routes": {
+		"dashboard": "仪表板",
+		"generate": "代码生成",
+		"records": "任务管理",
+		"lab": "仿真实验室",
+		"compose": "组合验证",
+		"misra": "合规审计",
+		"hitl": "HITL审查",
+		"anchor": "链上锚定",
+		"architecture": "六层架构",
+		"compliance": "合规审计",
+		"settings": "系统设置"
+	},
+	"confirm": {
+		"defaultTitle": "确认操作",
+		"confirm": "确定",
+		"cancel": "取消",
+		"alertTitle": "提示",
+		"ok": "知道了"
+	},
+	"backend": {
+		"cloud": "云模型",
+		"local": "本地模型",
+		"sourceTitle": "当前执行来源：{label}",
+		"mock": "模拟"
+	},
+	"common": {
+		"loading": "加载中...",
+		"empty": "暂无数据",
+		"save": "保存",
+		"saveSuccess": "配置已保存",
+		"success": "成功",
+		"failed": "失败",
+		"running": "运行中",
+		"pending": "等待中",
+		"cancelled": "已取消",
+		"timeout": "超时",
+		"skipped": "跳过",
+		"observed": "观测",
+		"simulated": "模拟",
+		"unavailable": "不可用",
+		"close": "关闭",
+		"language": "语言",
+		"languageSwitch": "切换语言"
+	},
+	"agentTerminal": {
+		"title": "SkyForge Agent Console",
+		"clearTitle": "清空日志",
+		"clear": "清空",
+		"empty": "等待 Agent 思考日志流入..."
+	},
+	"codeViewer": {
+		"empty": "暂无代码",
+		"highlightClickTip": "点击高亮 {tag} 关联代码行（双向追溯）",
+		"reqTip": "需求标签 {tag}（开启高亮追溯可启用联动）",
+		"conTip": "契约条件 {tag}",
+		"tstTip": "测试标签 {tag}",
+		"legendReq": "REQ 需求标签",
+		"legendMisra": "MISRA 规则（hover 查看说明）",
+		"legendCon": "CON 契约条件",
+		"legendTst": "TST 测试标签",
+		"highlightLines": "当前高亮：{tag}（{count} 行）"
+	},
+	"contractViewer": {
+		"empty": "暂无契约",
+		"preconditions": "前置条件 Preconditions",
+		"postconditions": "后置条件 Postconditions",
+		"invariants": "不变式 Invariants",
+		"faultHandling": "故障处理 Fault Handling",
+		"emptySection": "（无）",
+		"badgeTitle": "点击高亮代码中 {tag} 关联行（双向追溯）",
+		"yamlView": "📄 查看原始 YAML"
+	},
+	"sourceBadge": {
+		"observed": "实测",
+		"simulated": "模拟",
+		"unavailable": "暂无",
+		"failed": "失败"
+	},
+	"waveform": {
+		"legendInput": "输入波形",
+		"legendOutput": "输出波形",
+		"legendBaseline": "正常基线",
+		"legendFault": "故障区间",
+		"xAxisName": "时间步 (step)",
+		"zoomIn": "放大",
+		"zoomOut": "缩小",
+		"resetView": "重置视图",
+		"exportPng": "导出 PNG",
+		"hint": "鼠标滚轮缩放 · 拖拽平移 · 悬浮查看数据 · 工具栏可导出 PNG"
+	},
+	"hitlPanel": {
+		"title": "HITL 人工审查",
+		"manualReview": "人工审查",
+		"pending": "待审批",
+		"refresh": "刷新",
+		"retry": "重试",
+		"loadingPending": "正在加载待审批列表...",
+		"emptyPending": "暂无待审批项",
+		"submittedAt": "提交时间：{time}",
+		"deadline": "截止时间：{time}",
+		"reviewTemplate": "审查模板",
+		"commentPlaceholder": "请输入审批评论（拒绝时必填）...",
+		"approveBtn": "批准",
+		"rejectBtn": "拒绝",
+		"history": "审批历史",
+		"emptyHistory": "暂无审批历史",
+		"status": {
+			"approved": "✅ 已批准",
+			"rejected": "❌ 已拒绝"
+		},
+		"comment": "评论：{comment}",
+		"expired": "已超时",
+		"loadFailed": "加载失败",
+		"approveFailed": "批准失败",
+		"rejectFailed": "拒绝失败",
+		"rejectRequiresReason": "拒绝时必须填写理由"
+	},
+	"contractTemplate": {
+		"category": {
+			"lowpassFilter": "滤波器",
+			"pidController": "控制器",
+			"sensorSampler": "采样器",
+			"limiter": "限幅器",
+			"hmiOverlay": "人机界面",
+			"sensorFusionKalman": "传感器融合",
+			"missionPlanner": "任务规划",
+			"arinc653Partition": "航空分区",
+			"freertosScheduler": "实时调度",
+			"cppSmartPointer": "C++ RAII",
+			"cppExceptionHierarchy": "C++ 异常",
+			"cppPolymorphicHandler": "C++ 多态",
+			"rustOwnershipManager": "Rust 所有权",
+			"rustResultHandler": "Rust Result",
+			"rustAsyncPipeline": "Rust async",
+			"arinc653PartitionScheduler": "ARINC653 调度配置",
+			"freertosTaskScheduler": "FreeRTOS 调度配置"
+		}
+	},
+	"liveMetrics": {
+		"ariaLabel": "LiveMetrics 实时指标",
+		"pollError": "轮询异常",
+		"loading": "加载中…",
+		"refreshInterval": "每 {seconds}s 刷新",
+		"tasks": "任务",
+		"taskDistribution": "任务分布",
+		"runningCount": "运行中 {count}",
+		"doneCount": "完成 {count}",
+		"failedCount": "失败 {count}",
+		"runningShort": "运行",
+		"doneShort": "完成",
+		"failedShort": "失败",
+		"avgResponse": "平均响应",
+		"toolchain": "工具链",
+		"toolAvailable": "可用",
+		"toolDown": "不可用",
+		"toolUnknown": "未上报",
+		"llmUnknown": "未知",
+		"llmMock": "Mock",
+		"llmLocal": "Local",
+		"llmApi": "API",
+		"database": "数据库",
+		"tasksCount": "Tasks:",
+		"historyCount": "History:",
+		"rows": "行",
+		"modeSwitch": "模式切换",
+		"times": "次",
+		"backend": "后端",
+		"online": "在线",
+		"offline": "离线",
+		"disconnected": "未连接"
+	},
+	"faultInject": {
+		"title": "🎛️ 故障注入面板",
+		"group": {
+			"sensor": "传感器",
+			"signalQuality": "信号质量",
+			"commTiming": "通信时序",
+			"degradation": "退化"
+		},
+		"type": {
+			"bias": {
+				"name": "传感器偏置",
+				"enName": "Bias",
+				"desc": "输入叠加固定偏置值，模拟传感器零点漂移"
+			},
+			"signal_loss": {
+				"name": "信号丢失",
+				"enName": "Signal Loss",
+				"desc": "指定区间内输入强制为 0，模拟断线/开路"
+			},
+			"noise": {
+				"name": "高频噪声",
+				"enName": "Noise",
+				"desc": "输入叠加随机噪声，模拟电磁干扰 (EMI)"
+			},
+			"stuck": {
+				"name": "卡死故障",
+				"enName": "Stuck-at",
+				"desc": "输入卡在固定值，模拟传感器机械卡死"
+			},
+			"step": {
+				"name": "阶跃突变",
+				"enName": "Step Change",
+				"desc": "指定时间步输入突变，模拟工况快速切换"
+			},
+			"saturation": {
+				"name": "饱和截断",
+				"enName": "Saturation",
+				"desc": "超出上下限的值被截断，模拟 ADC 量程限幅"
+			},
+			"glitch": {
+				"name": "跳变毛刺",
+				"enName": "Glitch",
+				"desc": "随机时刻出现瞬时尖峰脉冲，模拟闩锁效应"
+			},
+			"intermittent": {
+				"name": "间歇性故障",
+				"enName": "Intermittent",
+				"desc": "周期性输出正常/异常值，模拟接触不良"
+			},
+			"timeout": {
+				"name": "丢帧 / 延迟",
+				"enName": "Timeout",
+				"desc": "指定时间点后信号冻结，模拟总线超时丢帧"
+			},
+			"drift": {
+				"name": "渐变漂移",
+				"enName": "Drift",
+				"desc": "信号随时间线性偏移，模拟元器件老化退化"
+			},
+			"stuck_zero": {
+				"name": "零输出",
+				"enName": "Stuck-at-Zero",
+				"desc": "指定时间点后输出恒为 0，模拟传感器完全失效"
+			},
+			"polarity": {
+				"name": "符号反转",
+				"enName": "Polarity Reversal",
+				"desc": "信号取反，模拟线缆接反或极性错误"
+			}
+		},
+		"param": {
+			"biasValue": "偏置值",
+			"duration": "持续时间",
+			"noiseAmplitude": "噪声幅度",
+			"stuckValue": "卡死值",
+			"stepTime": "突变时间步",
+			"stepValue": "突变值",
+			"upperLimit": "上限",
+			"lowerLimit": "下限",
+			"interval": "故障周期",
+			"faultDuration": "故障持续",
+			"driftRate": "漂移速率",
+			"freezeStart": "冻结起始步",
+			"glitchMagnitude": "毛刺幅度",
+			"glitchCount": "毛刺次数",
+			"failureStart": "失效起始步"
+		},
+		"unit": {
+			"steps": "{count} 步",
+			"step": "step {step}",
+			"perStep": "+{count}/步"
+		},
+		"noParams": "启用后信号自动取反（× -1）",
+		"inject": "注入故障",
+		"reset": "重置参数",
+		"selectedCount": "已选择 {count} 种故障",
+		"multiHint": "可同时选择多种故障类型"
+	},
+	"contractCheck": {
+		"overviewPassed": "✅ 契约校验通过",
+		"overviewFailed": "❌ 契约校验未通过",
+		"componentLabel": "组件：{component}",
+		"passRate": "通过率",
+		"failureReason": "❌ 失败原因：",
+		"generatedCode": "自动生成的 assert 代码（注入 test_harness.c）"
+	},
+	"formalVerify": {
+		"loadingTitle": "🔬 形式化验证进行中",
+		"title": "🔬 形式化验证",
+		"resultTitle": "🔬 形式化验证结果",
+		"titleHint": "（Z3 SMT Solver + CBMC 有界模型检查）",
+		"emptyText": "点击上方按钮开始验证",
+		"emptyHint": "将契约的前置/后置/不变式转换为 Z3 SMT 约束，验证逻辑一致性，并（可选）调用 CBMC 对生成的 C 代码进行有界模型检查。",
+		"startBtn": "开始形式化验证",
+		"statusPassed": "✅ 形式化验证通过",
+		"statusFailed": "❌ 形式化验证失败",
+		"statusSkipped": "⏸ 形式化验证已跳过",
+		"metaTool": "Tool:",
+		"metaDuration": "总耗时: {seconds}s",
+		"badgePassed": "✓ Passed × {count}",
+		"badgeFailed": "✗ Failed × {count}",
+		"badgeSkipped": "- Skipped × {count}",
+		"badgeTotal": "Total × {count}",
+		"ceFailedLabel": "❌ 反例 (Counter-example):",
+		"ceSkippedLabel": "ℹ 说明:",
+		"toolDesc": "Z3 SMT Solver 验证约束一致性 · CBMC 执行有界模型检查 · 工具不可用时自动降级为 SKIPPED"
+	},
+	"simulationResult": {
+		"loadingTitle": "⏳ 仿真运行中...",
+		"passedTitle": "✅ 仿真通过",
+		"failedTitle": "❌ 契约违约（core dump）",
+		"loadingSub": "正在执行数字孪生仿真...",
+		"stepsSub": "{count} 步仿真",
+		"faultSub": " · 故障：{name}",
+		"contractsPassed": "6/6 契约通过",
+		"coreDump": "CORE DUMP",
+		"violationTitle": "契约违约详情",
+		"violationTimestep": "违约时间步：",
+		"violationAssertion": "触发断言：",
+		"violationActual": "实际值：",
+		"statSteps": "仿真步数",
+		"statInputRange": "输入范围",
+		"statOutputRange": "输出范围",
+		"statOutputMax": "输出最大值",
+		"statOutputMin": "输出最小值",
+		"statOutputMean": "输出均值",
+		"faultCompareTitle": "故障注入对比",
+		"faultChartLabel": "故障波形",
+		"baselineChartLabel": "正常基线",
+		"noBaseline": "无基线数据",
+		"terminalTitle": "🖥️ 仿真终端输出",
+		"waitingLogs": "等待仿真日志..."
+	},
+	"reportDownload": {
+		"title": "📄 DO-178C 报告生成",
+		"titleHint": "（适航合规报告，可下载 / 打印）",
+		"generateBtn": "生成 DO-178C 报告",
+		"downloadBtn": "下载 HTML",
+		"printBtn": "打印",
+		"generating": "正在生成报告...",
+		"done": "✅ 报告已生成",
+		"needResult": "请先生成代码后再生成报告",
+		"summaryTraceability": "追溯矩阵条目",
+		"summaryObjectives": "DO-178C 目标",
+		"summarySimulation": "仿真结果摘要",
+		"summaryMisra": "MISRA 违规数",
+		"preview": "报告预览",
+		"emptyTip": "点击“生成 DO-178C 报告”按钮开始"
+	},
+	"repairTimeline": {
+		"empty": "暂无修复历史",
+		"overviewLabel": "🔧 MISRA 修复闭环",
+		"totalRounds": "共 {count} 轮修复",
+		"initialViolations": "初始 {count} 个违规",
+		"finalViolations": "→ 最终 {count} 个违规",
+		"roundName": "第 {round} 轮修复",
+		"finalBadge": "最终轮",
+		"violations": "{count} 违规",
+		"fixedRules": "修复规则：",
+		"remainingRules": "剩余：",
+		"finalPassed": "✅ 全部违规已修复，MISRA-C 合规检查通过",
+		"finalRemaining": "⚠️ 仍有 {count} 个违规未修复",
+		"diffTitle": "📝 代码对比（修复前 → 修复后）"
+	},
+	"reviewConfirm": {
+		"title": "人工审核确认",
+		"commentLabel": "审核意见（可选）",
+		"commentPlaceholder": "请输入审核意见...",
+		"reject": "拒绝",
+		"approve": "通过",
+		"approvedStatus": "✅ 已通过审核",
+		"rejectedStatus": "❌ 已拒绝"
+	},
+	"decisionTrace": {
+		"title": "决策追溯",
+		"empty": "暂无决策记录",
+		"expand": "展开",
+		"collapse": "收起",
+		"prompt": "输入提示词",
+		"reasoning": "思考过程",
+		"output": "输出结果"
+	}
+}

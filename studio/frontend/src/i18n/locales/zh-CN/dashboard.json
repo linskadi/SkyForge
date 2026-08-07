@@ -1,0 +1,53 @@
+{
+	"dashboard": {
+		"status": {
+			"sectionTitle": "系统状态",
+			"backend": "后端服务",
+			"llm": "LLM 引擎",
+			"tools": "工具链",
+			"online": "在线",
+			"offline": "离线",
+			"available": "可用",
+			"mode": "模式:"
+		},
+		"action": {
+			"newTask": "新建代码生成任务",
+			"newTaskDesc": "从自然语言需求开始，生成符合 DO-178C 的可信代码",
+			"continue": "继续上次任务",
+			"continueDesc": "回到最近一次运行的任务上下文",
+			"continueFallback": "查看历史运行记录",
+			"importScade": "从 SCADE 导入",
+			"importScadeDesc": "导入 SCADE G-Lustre 模型，转换为需求与契约"
+		},
+		"recent": {
+			"title": "最近任务",
+			"viewAll": "查看全部",
+			"liveSource": "实时数据",
+			"emptyTitle": "暂无任务记录",
+			"emptyDesc": "点击上方按钮创建您的第一个代码生成任务",
+			"violations": "{n} 违规"
+		},
+		"time": {
+			"justNow": "刚刚",
+			"minutesAgo": "{n} 分钟前",
+			"hoursAgo": "{n} 小时前",
+			"daysAgo": "{n} 天前"
+		},
+		"statusLabel": {
+			"done": "已完成",
+			"running": "运行中",
+			"error": "失败"
+		},
+		"compliance": {
+			"title": "DO-178C 合规率",
+			"statsSource": "统计数据",
+			"avgRate": "平均合规率",
+			"todayCount": "今日任务",
+			"todayDone": "已完成",
+			"totalCount": "总任务数",
+			"trendTitle": "违规数趋势",
+			"noTrend": "暂无趋势数据",
+			"violationAxis": "违规数"
+		}
+	}
+}

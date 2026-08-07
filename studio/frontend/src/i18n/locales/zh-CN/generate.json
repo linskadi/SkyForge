@@ -1,0 +1,112 @@
+{
+	"generate": {
+		"pageTitle": "代码生成",
+		"backHome": "返回首页",
+		"pipelineFlow": "需求解析 → 契约生成 → 代码生成 → 修复 → 仿真 → HITL 人工审查 → 报告",
+		"requirement": {
+			"title": "需求输入"
+		},
+		"placeholder": {
+			"req": "例如：实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声...",
+			"example": "示例:"
+		},
+		"example": {
+			"req1": "实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声",
+			"req2": "实现一个 PID 控制器，Kp=2.0, Ki=0.5, Kd=0.1，控制无人机俯仰角",
+			"req3": "实现一个 ARINC 429 字解析函数，将 32 位字解码为标签、SDI、数据",
+			"req4": "实现一个余度管理器，双通道输入取均值，偏差 > 5% 时报警"
+		},
+		"hitl": {
+			"enabledTitle": "HITL 已开启：pipeline 将在评审检查点暂停等待人工审查",
+			"disabledTitle": "HITL 已关闭：pipeline 直接跑完全流程",
+			"on": "开",
+			"off": "关"
+		},
+		"btn": {
+			"generate": "开始生成",
+			"generating": "生成中...",
+			"download": "下载",
+			"copy": "复制",
+			"copied": "已复制",
+			"retry": "重试",
+			"startVerify": "开始验证",
+			"verifyAgain": "重新验证"
+		},
+		"agent": {
+			"title": "Agent 执行",
+			"statusRunning": "执行中",
+			"statusDone": "完成",
+			"statusFailed": "失败",
+			"statusIdle": "等待启动"
+		},
+		"empty": {
+			"pipelineIdle": "Pipeline 待命",
+			"hint": "在左侧输入需求并点击「开始生成」",
+			"noResult": "暂无结果",
+			"resultHint": "Pipeline 完成后将在此展示生成结果"
+		},
+		"result": {
+			"title": "生成结果",
+			"charCount": "{n} 字符",
+			"repairCount": "{n} 次修复"
+		},
+		"degraded": {
+			"title": "⚠ 降级模式",
+			"desc": "LLM 不可用，Agent 已走降级（mock）路径。代码由模板生成，可能不反映真实需求。请检查 LLM 设置。"
+		},
+		"tab": {
+			"code": "代码",
+			"repair": "修复",
+			"contract": "契约",
+			"simulation": "仿真",
+			"verify": "验证",
+			"report": "报告",
+			"trace": "追溯"
+		},
+		"code": {
+			"withTrace": "（含追溯徽章）"
+		},
+		"source": {
+			"live": "实时生成",
+			"contract": "契约生成",
+			"staticAnalysis": "静态分析",
+			"digitalTwin": "数字孪生"
+		},
+		"misra": {
+			"title": "MISRA 校验",
+			"noViolations": "无 MISRA 违规"
+		},
+		"simulation": {
+			"title": "仿真结果"
+		},
+		"verify": {
+			"title": "形式化验证",
+			"subtitle": "Z3 SMT + CBMC 有界模型检查"
+		},
+		"toast": {
+			"generated": "生成完成",
+			"degradedDone": "部分降级完成",
+			"fullDone": "全流程完成",
+			"generateFailed": "生成失败",
+			"hitlToggleFailed": "HITL 切换失败",
+			"backendServiceHint": "请检查后端服务"
+		},
+		"error": {
+			"parseResultFailed": "结果解析失败",
+			"generateFailed": "生成失败，请检查后端服务是否运行",
+			"unknown": "未知错误"
+		},
+		"decision": {
+			"unnamed": "(未命名)",
+			"parsePrompt": "请解析以下需求：\n{req}",
+			"parseReasoning": "已解析需求文本，长度 {len} 字符；输出结构化需求对象。",
+			"contractPrompt": "基于需求生成DO-178C契约：\n{req}",
+			"contractReasoning": "生成契约 {component}：{count} 个条件子句（前置/后置/不变式/异常处理）。",
+			"codePrompt": "依据需求和契约生成MISRA-C代码",
+			"codeReasoning": "生成代码共 {lines} 行；契约追溯注释按 [REQ-xxx] 标注。",
+			"repairPrompt": "修复MISRA-C违规：{count}条违规",
+			"repairReasoning": "检测到 {violations} 条违规，已完成 {repairs} 轮修复迭代。",
+			"repairOutput": "修复了 {count} 处违规"
+		}
+	}
+}

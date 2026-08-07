@@ -1,0 +1,42 @@
+{
+	"misra": {
+		"backHome": "Back to Home",
+		"title": "Rule Lab",
+		"subtitle": "Search and browse coding standard rules for multiple programming languages",
+		"lang": {
+			"c": "C language",
+			"cpp": "C++ language",
+			"python": "Python language"
+		},
+		"standardFormat": "{name} ({lang})",
+		"search": {
+			"placeholderC": "Search MISRA-C rule ID, title, or description...",
+			"placeholderCpp": "Search MISRA-C++ / JSF AV C++ rules...",
+			"placeholderPython": "Search Python defense-standard rules...",
+			"emptyC": "Enter a keyword to search MISRA-C:2012 rules",
+			"emptyCpp": "Enter a keyword to search C++ coding standard rules",
+			"emptyPython": "Enter a keyword to search Python defense software programming rules",
+			"search": "Search",
+			"searching": "Searching...",
+			"loading": "Searching...",
+			"noResults": "No matching rules found",
+			"tagRule81": "Rule 8.1",
+			"tagInit": "initialization",
+			"tagPointer": "pointer",
+			"tagRequired": "Required",
+			"tagNewDelete": "new/delete",
+			"tagException": "exceptions",
+			"tagRaii": "RAII",
+			"tagMandatory": "Mandatory",
+			"tagEval": "eval",
+			"tagExec": "exec",
+			"tagGlobal": "global",
+			"tagForce": "mandatory"
+		},
+		"results": {
+			"count": "Found {count} rules",
+			"badExample": "Non-compliant Example",
+			"goodExample": "Compliant Example"
+		}
+	}
+}

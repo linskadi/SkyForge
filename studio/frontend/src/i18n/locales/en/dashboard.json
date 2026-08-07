@@ -1,0 +1,53 @@
+{
+	"dashboard": {
+		"status": {
+			"sectionTitle": "System Status",
+			"backend": "Backend Service",
+			"llm": "LLM Engine",
+			"tools": "Toolchain",
+			"online": "Online",
+			"offline": "Offline",
+			"available": "Available",
+			"mode": "Mode:"
+		},
+		"action": {
+			"newTask": "Create New Code Generation Task",
+			"newTaskDesc": "Start from a natural-language requirement and generate DO-178C compliant trusted code",
+			"continue": "Continue Last Task",
+			"continueDesc": "Return to the most recent running task context",
+			"continueFallback": "View historical run records",
+			"importScade": "Import from SCADE",
+			"importScadeDesc": "Import SCADE G-Lustre models and convert them into requirements and contracts"
+		},
+		"recent": {
+			"title": "Recent Tasks",
+			"viewAll": "View All",
+			"liveSource": "Live Data",
+			"emptyTitle": "No Task Records",
+			"emptyDesc": "Click an action above to create your first code generation task",
+			"violations": "{n} violations"
+		},
+		"time": {
+			"justNow": "just now",
+			"minutesAgo": "{n} min ago",
+			"hoursAgo": "{n} hr ago",
+			"daysAgo": "{n} days ago"
+		},
+		"statusLabel": {
+			"done": "Completed",
+			"running": "Running",
+			"error": "Failed"
+		},
+		"compliance": {
+			"title": "DO-178C Compliance Rate",
+			"statsSource": "Statistics",
+			"avgRate": "Average Compliance Rate",
+			"todayCount": "Today's Tasks",
+			"todayDone": "Completed",
+			"totalCount": "Total Tasks",
+			"trendTitle": "Violation Trend",
+			"noTrend": "No trend data",
+			"violationAxis": "Violations"
+		}
+	}
+}

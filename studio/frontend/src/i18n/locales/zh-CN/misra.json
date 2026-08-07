@@ -1,0 +1,42 @@
+{
+	"misra": {
+		"backHome": "返回首页",
+		"title": "规则实验室",
+		"subtitle": "搜索和浏览多种编程语言的编码标准规则",
+		"lang": {
+			"c": "C 语言",
+			"cpp": "C++ 语言",
+			"python": "Python 语言"
+		},
+		"standardFormat": "{name} ({lang})",
+		"search": {
+			"placeholderC": "搜索 MISRA-C 规则 ID、标题或描述...",
+			"placeholderCpp": "搜索 MISRA-C++ / JSF AV C++ 规则...",
+			"placeholderPython": "搜索 Python 军工规范规则...",
+			"emptyC": "输入关键词搜索 MISRA-C:2012 规则",
+			"emptyCpp": "输入关键词搜索 C++ 编码标准规则",
+			"emptyPython": "输入关键词搜索 Python 军工软件编程规范",
+			"search": "搜索",
+			"searching": "搜索中...",
+			"loading": "正在搜索...",
+			"noResults": "未找到匹配的规则",
+			"tagRule81": "Rule 8.1",
+			"tagInit": "初始化",
+			"tagPointer": "指针",
+			"tagRequired": "Required",
+			"tagNewDelete": "new/delete",
+			"tagException": "异常",
+			"tagRaii": "RAII",
+			"tagMandatory": "Mandatory",
+			"tagEval": "eval",
+			"tagExec": "exec",
+			"tagGlobal": "global",
+			"tagForce": "强制"
+		},
+		"results": {
+			"count": "找到 {count} 条规则",
+			"badExample": "违规示例",
+			"goodExample": "合规示例"
+		}
+	}
+}

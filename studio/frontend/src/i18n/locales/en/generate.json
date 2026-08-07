@@ -1,0 +1,112 @@
+{
+	"generate": {
+		"pageTitle": "Code Generation",
+		"backHome": "Back to Home",
+		"pipelineFlow": "Requirement Parsing → Contract Generation → Code Generation → Repair → Simulation → HITL Human Review → Report",
+		"requirement": {
+			"title": "Requirement Input"
+		},
+		"placeholder": {
+			"req": "e.g. Implement a low-pass filter with a 10 Hz cutoff to remove high-frequency sensor noise...",
+			"example": "Examples:"
+		},
+		"example": {
+			"req1": "Implement a low-pass filter with a 10 Hz cutoff to remove high-frequency sensor noise",
+			"req2": "Implement a PID controller (Kp=2.0, Ki=0.5, Kd=0.1) to control the UAV pitch angle",
+			"req3": "Implement an ARINC 429 word parsing function that decodes a 32-bit word into label, SDI, and data",
+			"req4": "Implement a redundancy manager that averages two redundant channels and raises an alarm when deviation exceeds 5%"
+		},
+		"hitl": {
+			"enabledTitle": "HITL enabled: the pipeline pauses at review checkpoints awaiting human approval",
+			"disabledTitle": "HITL disabled: the pipeline runs the full flow without pausing",
+			"on": "ON",
+			"off": "OFF"
+		},
+		"btn": {
+			"generate": "Generate",
+			"generating": "Generating...",
+			"download": "Download",
+			"copy": "Copy",
+			"copied": "Copied",
+			"retry": "Retry",
+			"startVerify": "Start Verification",
+			"verifyAgain": "Re-verify"
+		},
+		"agent": {
+			"title": "Agent Execution",
+			"statusRunning": "Running",
+			"statusDone": "Done",
+			"statusFailed": "Failed",
+			"statusIdle": "Waiting to start"
+		},
+		"empty": {
+			"pipelineIdle": "Pipeline Standby",
+			"hint": "Enter a requirement on the left and click Generate",
+			"noResult": "No Results",
+			"resultHint": "Generated results will be shown here once the pipeline completes"
+		},
+		"result": {
+			"title": "Generated Result",
+			"charCount": "{n} chars",
+			"repairCount": "{n} repairs"
+		},
+		"degraded": {
+			"title": "⚠ Degraded Mode",
+			"desc": "LLM unavailable; the Agent followed the degraded (mock) path. Code was generated from templates and may not reflect the actual requirement. Check the LLM settings."
+		},
+		"tab": {
+			"code": "Code",
+			"repair": "Repair",
+			"contract": "Contract",
+			"simulation": "Simulation",
+			"verify": "Verification",
+			"report": "Report",
+			"trace": "Traceability"
+		},
+		"code": {
+			"withTrace": "(with traceability badges)"
+		},
+		"source": {
+			"live": "Live Generated",
+			"contract": "Contract Generated",
+			"staticAnalysis": "Static Analysis",
+			"digitalTwin": "Digital Twin"
+		},
+		"misra": {
+			"title": "MISRA Check",
+			"noViolations": "No MISRA violations"
+		},
+		"simulation": {
+			"title": "Simulation Result"
+		},
+		"verify": {
+			"title": "Formal Verification",
+			"subtitle": "Z3 SMT + CBMC bounded model check"
+		},
+		"toast": {
+			"generated": "Generation complete",
+			"degradedDone": "Partially degraded",
+			"fullDone": "Full pipeline complete",
+			"generateFailed": "Generation failed",
+			"hitlToggleFailed": "Failed to toggle HITL",
+			"backendServiceHint": "Please check the backend service"
+		},
+		"error": {
+			"parseResultFailed": "Failed to parse result",
+			"generateFailed": "Generation failed. Please check whether the backend service is running.",
+			"unknown": "Unknown error"
+		},
+		"decision": {
+			"unnamed": "(unnamed)",
+			"parsePrompt": "Parse the following requirement:\n{req}",
+			"parseReasoning": "Parsed the requirement text: {len} characters; produced a structured requirement object.",
+			"contractPrompt": "Generate a DO-178C contract from the requirement:\n{req}",
+			"contractReasoning": "Generated contract {component}: {count} condition clauses (pre/post/invariant/exception handling).",
+			"codePrompt": "Generate MISRA-C code from the requirement and contract",
+			"codeReasoning": "Generated {lines} lines of code; contract traceability comments annotated as [REQ-xxx].",
+			"repairPrompt": "Fix MISRA-C violations: {count} violations",
+			"repairReasoning": "Detected {violations} violations; completed {repairs} repair iterations.",
+			"repairOutput": "Fixed {count} violations"
+		}
+	}
+}

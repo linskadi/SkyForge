@@ -1,0 +1,240 @@
+{
+	"compliance": {
+		"title": "Compliance Audit Center",
+		"description": "Integrates MISRA rules, contract verification, formal verification, and DO-178C compliance into four audit views for full-lifecycle compliance traceability of aviation software",
+		"tabs": {
+			"misra": "MISRA Rule Lab",
+			"contract": "Contract Verification",
+			"formal": "Formal Verification",
+			"do178c": "DO-178C Compliance"
+		},
+		"lang": {
+			"c": "C language",
+			"cpp": "C++ language",
+			"python": "Python language"
+		},
+		"standardFormat": "{name} ({lang})",
+		"sourceBadges": {
+			"ruleLibrary": "Rule library",
+			"formalVerification": "Formal verification",
+			"smtSolving": "SMT solving",
+			"complianceAssessment": "Compliance assessment"
+		},
+		"search": {
+			"placeholderC": "Search MISRA-C rule ID, title, or description...",
+			"placeholderCpp": "Search MISRA-C++ / JSF AV C++ rules...",
+			"placeholderPython": "Search Python defense-standard rules...",
+			"emptyC": "Enter a keyword to search MISRA-C:2012 rules",
+			"emptyCpp": "Enter a keyword to search C++ coding standard rules",
+			"emptyPython": "Enter a keyword to search Python defense software programming rules",
+			"search": "Search",
+			"searching": "Searching...",
+			"loading": "Searching...",
+			"noResults": "No matching rules found",
+			"count": "Found {count} rules",
+			"tagRule81": "Rule 8.1",
+			"tagInit": "initialization",
+			"tagPointer": "pointer",
+			"tagRequired": "Required",
+			"tagNewDelete": "new/delete",
+			"tagException": "exceptions",
+			"tagRaii": "RAII",
+			"tagMandatory": "Mandatory",
+			"tagEval": "eval",
+			"tagExec": "exec",
+			"tagGlobal": "global",
+			"tagForce": "mandatory"
+		},
+		"rules": {
+			"badExample": "Non-compliant Example",
+			"goodExample": "Compliant Example"
+		},
+		"contract": {
+			"title": "Contract Verification Results",
+			"stats": {
+				"passed": "Passed",
+				"pending": "Pending",
+				"failed": "Failed"
+			},
+			"status": {
+				"passed": "Passed",
+				"failed": "Failed"
+			},
+			"failureReason": "❌ Failure reason:",
+			"assertLabel": "assert:",
+			"sections": {
+				"preconditions": "Preconditions",
+				"postconditions": "Postconditions",
+				"invariants": "Invariants",
+				"faultHandling": "Fault Handling"
+			},
+			"items": {
+				"preSampleRate": {
+					"description": "The sample rate must be greater than 0"
+				},
+				"preRawRange": {
+					"description": "The raw value must not exceed the uint16 range"
+				},
+				"preFilterPtr": {
+					"description": "The filter struct pointer must not be null",
+					"failureReason": "Counter-example: f=NULL, calling filter_apply(NULL, 1000) causes a null pointer dereference"
+				},
+				"postOutputRange": {
+					"description": "The output value is within the valid range"
+				},
+				"postIIR": {
+					"description": "Matches the first-order IIR filter formula"
+				},
+				"invAlpha": {
+					"description": "The filter coefficient alpha always stays within [0,1]"
+				},
+				"fltHoldPrev": {
+					"description": "Hold the previous output when the sample rate is abnormal"
+				},
+				"fltClamp": {
+					"description": "Clamp to the valid range when the input is out of bounds",
+					"failureReason": "Counter-example: raw_value=70000 (no input clamping performed when exceeding the uint16 limit"
+				}
+			}
+		},
+		"formal": {
+			"status": {
+				"passed": "Passed",
+				"failed": "Failed",
+				"timeout": "Timeout"
+			},
+			"counterExample": "Counter-example: {value}",
+			"z3": {
+				"title": "Z3 Constraint Consistency Check",
+				"description": "Constraint satisfiability verification based on an SMT solver"
+			},
+			"boundary": {
+				"title": "Boundary Test Case Generation",
+				"description": "Automatically generated boundary condition test cases"
+			},
+			"cbmc": {
+				"title": "CBMC Bounded Model Checking",
+				"description": "Exhaustive path verification based on a bounded model checker"
+			},
+			"columns": {
+				"checkpoint": "Checkpoint",
+				"status": "Status",
+				"tool": "Tool",
+				"duration": "Duration",
+				"detail": "Detail",
+				"caseId": "Case ID",
+				"description": "Description",
+				"input": "Input",
+				"expected": "Expected Output",
+				"check": "Check",
+				"unwind": "Unwind Depth"
+			},
+			"checks": {
+				"z3TypeRange": {
+					"name": "Type range constraint consistency",
+					"detail": "All integer type range constraints are consistent with no contradictions"
+				},
+				"z3Boundary": {
+					"name": "Boundary condition check",
+					"detail": "All upper and lower bound conditions are satisfied"
+				},
+				"z3NullPointer": {
+					"name": "Null pointer safety",
+					"detail": "Null pointer dereference risk detected",
+					"counterExample": "f=NULL, calling filter_apply(NULL, 1000)"
+				},
+				"z3ArrayBounds": {
+					"name": "Array bounds check",
+					"detail": "All array accesses are within valid bounds"
+				},
+				"z3Overflow": {
+					"name": "Arithmetic overflow check",
+					"detail": "Timed out (consider CBMC bounded model checking)"
+				},
+				"boundaryMinInput": {
+					"description": "Minimum input boundary"
+				},
+				"boundaryMaxInput": {
+					"description": "Maximum input boundary"
+				},
+				"boundarySampleRate": {
+					"description": "Sample rate of 0 fault mode"
+				},
+				"boundaryAlphaLow": {
+					"description": "Alpha coefficient lower bound"
+				},
+				"boundaryAlphaHigh": {
+					"description": "Alpha coefficient upper bound"
+				},
+				"boundarySampleRateExpected": "Hold the previous output",
+				"boundaryAlphaLowExpected": "Output = input",
+				"boundaryAlphaHighExpected": "Output = previous value",
+				"cbmcUnwind10": {
+					"name": "Bounded loop unwinding depth 10",
+					"detail": "All paths are safe within an unwinding depth of 10"
+				},
+				"cbmcUnwind50": {
+					"name": "Bounded loop unwinding depth 50",
+					"detail": "All paths are safe within an unwinding depth of 50"
+				},
+				"cbmcOverflow": {
+					"name": "Bounded integer overflow check",
+					"detail": "Integer overflow found at step 87"
+				}
+			}
+		},
+		"do178c": {
+			"title": "DO-178C Objective Coverage Matrix",
+			"description": "19 software-level objectives × 5 process areas",
+			"generateReport": "Generate Compliance Report",
+			"colObjective": "Objective",
+			"colLevel": "Level",
+			"level": "Level {level}",
+			"areas": {
+				"planning": "Planning",
+				"requirements": "Requirements",
+				"design": "Design",
+				"coding": "Coding",
+				"verification": "Verification"
+			},
+			"coverage": {
+				"covered": "Covered",
+				"partial": "Partially covered",
+				"uncovered": "Uncovered",
+				"na": "Not applicable"
+			},
+			"objectives": {
+				"obj1": "Software planning",
+				"obj2": "Development environment establishment",
+				"obj3": "Software requirements analysis",
+				"obj4": "Software requirements review",
+				"obj5": "Software architecture design",
+				"obj6": "Software detailed design",
+				"obj7": "Software coding",
+				"obj8": "Code review",
+				"obj9": "Unit testing",
+				"obj10": "Integration testing",
+				"obj11": "Software configuration management",
+				"obj12": "Problem reporting and resolution",
+				"obj13": "Quality assurance",
+				"obj14": "Verification and validation",
+				"obj15": "Requirements traceability analysis",
+				"obj16": "Software development standards",
+				"obj17": "Tool qualification",
+				"obj18": "Risk analysis",
+				"obj19": "Airworthiness certification support"
+			},
+			"evidence": {
+				"title": "Evidence Chain Traceability",
+				"description": "Bidirectional traceability: requirements → contracts → code → tests",
+				"types": {
+					"reqContract": "Requirement → Contract",
+					"reqCode": "Requirement → Code",
+					"contractAssert": "Contract → Assert",
+					"contractTest": "Contract → Test",
+					"testBoundary": "Test → Boundary case"
+				}
+			}
+		}
+	}
+}

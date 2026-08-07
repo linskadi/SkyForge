@@ -1,0 +1,86 @@
+{
+	"lab": {
+		"eyebrow": "SIMULATION LAB",
+		"title": "仿真实验室",
+		"subtitle": "数字孪生仿真工作台：代码建模、契约绑定、故障注入、波形分析",
+		"quickLinks": {
+			"composeTitle": "组件组合",
+			"composeText": "组合两个已验证组件并检查接口兼容性",
+			"misraTitle": "规则实验室",
+			"misraText": "搜索 C/C++/Python 三种语言的编码标准规则",
+			"hitlTitle": "HITL 人工审查",
+			"hitlText": "由审查人批准、驳回或要求修改生成产物",
+			"hilTitle": "Hardware-in-the-Loop",
+			"hilText": "真实硬件在环接口预留，与人工审查语义分离"
+		},
+		"workspace": {
+			"title": "仿真工作台",
+			"desc": "配置代码与契约，注入故障，观察波形变化"
+		},
+		"multiCompare": "多轮对比",
+		"btn": {
+			"reset": "重置",
+			"export": "导出结果",
+			"simulating": "仿真中...",
+			"start": "启动仿真"
+		},
+		"config": {
+			"title": "配置区",
+			"desc": "代码、契约、故障注入三项配置"
+		},
+		"tab": {
+			"code": "代码",
+			"contract": "契约",
+			"fault": "故障注入"
+		},
+		"code": {
+			"langC": "C 语言代码",
+			"inputPorts": "输入端口",
+			"outputPorts": "输出端口"
+		},
+		"contract": {
+			"preconditions": "前置条件 Preconditions",
+			"postconditions": "后置条件 Postconditions",
+			"invariants": "不变式 Invariants",
+			"conditionPlaceholder": "每行一个条件表达式",
+			"invariantPlaceholder": "每行一个不变式"
+		},
+		"waveform": {
+			"title": "波形对比",
+			"desc": "输入/输出波形叠加 · 故障区间高亮 · 支持缩放拖动",
+			"violation": "契约违约",
+			"violationDetail": "第 {step} 步：{message}",
+			"emptyHint": "点击“启动仿真”生成波形"
+		},
+		"stats": {
+			"title": "统计信息",
+			"desc": "仿真运行统计与契约验证结果",
+			"labelSteps": "仿真步数",
+			"labelRange": "输出范围",
+			"labelMean": "输出均值",
+			"labelVariance": "输出方差",
+			"labelViolations": "契约违反",
+			"unitSteps": "steps",
+			"unitRange": "uint16",
+			"unitMean": "mean",
+			"unitVariance": "σ²",
+			"unitViolations": "次",
+			"empty": "暂无仿真数据"
+		},
+		"history": {
+			"title": "仿真历史对比",
+			"rounds": "共 {count} 轮",
+			"desc": "多轮仿真结果叠加展示，差异高亮",
+			"round": "第 {n} 轮",
+			"passed": "通过",
+			"violated": "违约",
+			"fault": "故障：{type}",
+			"noFault": "无",
+			"stepRange": "步数：{steps} · 输出范围：{min} ~ {max}"
+		},
+		"detail": {
+			"title": "仿真详情",
+			"desc": "完整仿真结果与终端日志"
+		}
+	}
+}

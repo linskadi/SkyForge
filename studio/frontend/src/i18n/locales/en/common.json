@@ -1,0 +1,394 @@
+{
+	"appTitle": "SkyForge",
+	"brand": {
+		"tagline": "Trusted Airborne Software Forge"
+	},
+	"nav": {
+		"main": "Main navigation",
+		"home": "SkyForge Home",
+		"dashboard": "Dashboard",
+		"generate": "Code Generation",
+		"records": "Tasks",
+		"misra": "Compliance",
+		"lab": "Simulation Lab",
+		"compose": "Composition",
+		"hitl": "HITL Review",
+		"anchor": "Chain Anchor",
+		"architecture": "Docs",
+		"settings": "Settings"
+	},
+	"routes": {
+		"dashboard": "Dashboard",
+		"generate": "Code Generation",
+		"records": "Tasks",
+		"lab": "Simulation Lab",
+		"compose": "Composition",
+		"misra": "Compliance",
+		"hitl": "HITL Review",
+		"anchor": "Chain Anchor",
+		"architecture": "Six-Layer Architecture",
+		"compliance": "Compliance Audit",
+		"settings": "Settings"
+	},
+	"confirm": {
+		"defaultTitle": "Confirm Action",
+		"confirm": "Confirm",
+		"cancel": "Cancel",
+		"alertTitle": "Notice",
+		"ok": "OK"
+	},
+	"backend": {
+		"cloud": "Cloud",
+		"local": "Local",
+		"sourceTitle": "Current execution source: {label}",
+		"mock": "Mock"
+	},
+	"common": {
+		"loading": "Loading...",
+		"empty": "No data",
+		"save": "Save",
+		"saveSuccess": "Settings saved",
+		"success": "Success",
+		"failed": "Failed",
+		"running": "Running",
+		"pending": "Pending",
+		"cancelled": "Cancelled",
+		"timeout": "Timeout",
+		"skipped": "Skipped",
+		"observed": "Observed",
+		"simulated": "Simulated",
+		"unavailable": "Unavailable",
+		"close": "Close",
+		"language": "Language",
+		"languageSwitch": "Switch language"
+	},
+	"agentTerminal": {
+		"title": "SkyForge Agent Console",
+		"clearTitle": "Clear logs",
+		"clear": "Clear",
+		"empty": "Waiting for agent thinking logs..."
+	},
+	"codeViewer": {
+		"empty": "No code",
+		"highlightClickTip": "Click to highlight code lines for {tag} (bidirectional tracing)",
+		"reqTip": "Requirement tag {tag} (enable highlight tracing for linkage)",
+		"conTip": "Contract condition {tag}",
+		"tstTip": "Test tag {tag}",
+		"legendReq": "REQ Requirement tags",
+		"legendMisra": "MISRA rules (hover for details)",
+		"legendCon": "CON Contract conditions",
+		"legendTst": "TST Test tags",
+		"highlightLines": "Highlighted: {tag} ({count} lines)"
+	},
+	"contractViewer": {
+		"empty": "No contract",
+		"preconditions": "Preconditions",
+		"postconditions": "Postconditions",
+		"invariants": "Invariants",
+		"faultHandling": "Fault Handling",
+		"emptySection": "(none)",
+		"badgeTitle": "Click to highlight code lines for {tag} (bidirectional tracing)",
+		"yamlView": "📄 View raw YAML"
+	},
+	"sourceBadge": {
+		"observed": "Observed",
+		"simulated": "Simulated",
+		"unavailable": "Unavailable",
+		"failed": "Failed"
+	},
+	"waveform": {
+		"legendInput": "Input Waveform",
+		"legendOutput": "Output Waveform",
+		"legendBaseline": "Normal Baseline",
+		"legendFault": "Fault Range",
+		"xAxisName": "Time step (step)",
+		"zoomIn": "Zoom in",
+		"zoomOut": "Zoom out",
+		"resetView": "Reset view",
+		"exportPng": "Export PNG",
+		"hint": "Scroll to zoom · Drag to pan · Hover for data · Export PNG from toolbar"
+	},
+	"hitlPanel": {
+		"title": "HITL Manual Review",
+		"manualReview": "Manual Review",
+		"pending": "Pending Approval",
+		"refresh": "Refresh",
+		"retry": "Retry",
+		"loadingPending": "Loading pending approvals...",
+		"emptyPending": "No pending approvals",
+		"submittedAt": "Submitted: {time}",
+		"deadline": "Deadline: {time}",
+		"reviewTemplate": "Review Template",
+		"commentPlaceholder": "Enter review comment (required for rejection)...",
+		"approveBtn": "Approve",
+		"rejectBtn": "Reject",
+		"history": "Approval History",
+		"emptyHistory": "No approval history",
+		"status": {
+			"approved": "✅ Approved",
+			"rejected": "❌ Rejected"
+		},
+		"comment": "Comment: {comment}",
+		"expired": "Expired",
+		"loadFailed": "Failed to load",
+		"approveFailed": "Failed to approve",
+		"rejectFailed": "Failed to reject",
+		"rejectRequiresReason": "A reason is required for rejection"
+	},
+	"contractTemplate": {
+		"category": {
+			"lowpassFilter": "Filter",
+			"pidController": "Controller",
+			"sensorSampler": "Sampler",
+			"limiter": "Limiter",
+			"hmiOverlay": "HMI",
+			"sensorFusionKalman": "Sensor Fusion",
+			"missionPlanner": "Mission Planning",
+			"arinc653Partition": "Avionics Partition",
+			"freertosScheduler": "Real-Time Scheduling",
+			"cppSmartPointer": "C++ RAII",
+			"cppExceptionHierarchy": "C++ Exceptions",
+			"cppPolymorphicHandler": "C++ Polymorphism",
+			"rustOwnershipManager": "Rust Ownership",
+			"rustResultHandler": "Rust Result",
+			"rustAsyncPipeline": "Rust Async",
+			"arinc653PartitionScheduler": "ARINC653 Schedule Config",
+			"freertosTaskScheduler": "FreeRTOS Schedule Config"
+		}
+	},
+	"liveMetrics": {
+		"ariaLabel": "LiveMetrics real-time metrics",
+		"pollError": "Poll error",
+		"loading": "Loading...",
+		"refreshInterval": "Refreshes every {seconds}s",
+		"tasks": "Tasks",
+		"taskDistribution": "Task Distribution",
+		"runningCount": "{count} running",
+		"doneCount": "{count} done",
+		"failedCount": "{count} failed",
+		"runningShort": "Run",
+		"doneShort": "Done",
+		"failedShort": "Failed",
+		"avgResponse": "Avg Response",
+		"toolchain": "Toolchain",
+		"toolAvailable": "Available",
+		"toolDown": "Down",
+		"toolUnknown": "Unknown",
+		"llmUnknown": "Unknown",
+		"llmMock": "Mock",
+		"llmLocal": "Local",
+		"llmApi": "API",
+		"database": "Database",
+		"tasksCount": "Tasks:",
+		"historyCount": "History:",
+		"rows": "rows",
+		"modeSwitch": "mode switches",
+		"times": "times",
+		"backend": "Backend",
+		"online": "Online",
+		"offline": "Offline",
+		"disconnected": "Disconnected"
+	},
+	"faultInject": {
+		"title": "🎛️ Fault Injection Panel",
+		"group": {
+			"sensor": "Sensor",
+			"signalQuality": "Signal Quality",
+			"commTiming": "Comm & Timing",
+			"degradation": "Degradation"
+		},
+		"type": {
+			"bias": {
+				"name": "Sensor Bias",
+				"enName": "Bias",
+				"desc": "Adds a fixed bias to the input to simulate zero-point drift"
+			},
+			"signal_loss": {
+				"name": "Signal Loss",
+				"enName": "Signal Loss",
+				"desc": "Forces input to 0 over an interval to simulate an open circuit"
+			},
+			"noise": {
+				"name": "High-Frequency Noise",
+				"enName": "Noise",
+				"desc": "Adds random noise to simulate electromagnetic interference (EMI)"
+			},
+			"stuck": {
+				"name": "Stuck-at Fault",
+				"enName": "Stuck-at",
+				"desc": "Freezes input at a fixed value to simulate mechanical jamming"
+			},
+			"step": {
+				"name": "Step Change",
+				"enName": "Step Change",
+				"desc": "Input jumps at a given step to simulate rapid operating mode switch"
+			},
+			"saturation": {
+				"name": "Saturation Clipping",
+				"enName": "Saturation",
+				"desc": "Values beyond limits are clipped, simulating ADC range limiting"
+			},
+			"glitch": {
+				"name": "Glitch Spike",
+				"enName": "Glitch",
+				"desc": "Occasional instantaneous spikes to simulate latch-up effects"
+			},
+			"intermittent": {
+				"name": "Intermittent Fault",
+				"enName": "Intermittent",
+				"desc": "Periodically alternates normal/abnormal values, simulating poor contact"
+			},
+			"timeout": {
+				"name": "Frame Loss / Delay",
+				"enName": "Timeout",
+				"desc": "Signal freezes after a given point, simulating bus timeout frame loss"
+			},
+			"drift": {
+				"name": "Gradual Drift",
+				"enName": "Drift",
+				"desc": "Linear offset over time, simulating component aging"
+			},
+			"stuck_zero": {
+				"name": "Zero Output",
+				"enName": "Stuck-at-Zero",
+				"desc": "Output constant 0 after a given step, simulating sensor total failure"
+			},
+			"polarity": {
+				"name": "Polarity Reversal",
+				"enName": "Polarity Reversal",
+				"desc": "Signal inverted, simulating reversed cabling or polarity error"
+			}
+		},
+		"param": {
+			"biasValue": "Bias value",
+			"duration": "Duration",
+			"noiseAmplitude": "Noise amplitude",
+			"stuckValue": "Stuck value",
+			"stepTime": "Step time",
+			"stepValue": "Step value",
+			"upperLimit": "Upper limit",
+			"lowerLimit": "Lower limit",
+			"interval": "Fault period",
+			"faultDuration": "Fault duration",
+			"driftRate": "Drift rate",
+			"freezeStart": "Freeze start step",
+			"glitchMagnitude": "Glitch magnitude",
+			"glitchCount": "Glitch count",
+			"failureStart": "Failure start step"
+		},
+		"unit": {
+			"steps": "{count} steps",
+			"step": "step {step}",
+			"perStep": "+{count}/step"
+		},
+		"noParams": "Signal is automatically inverted (× -1)",
+		"inject": "Inject Fault",
+		"reset": "Reset Parameters",
+		"selectedCount": "{count} fault types selected",
+		"multiHint": "Multiple fault types can be selected at once"
+	},
+	"contractCheck": {
+		"overviewPassed": "✅ Contract verification passed",
+		"overviewFailed": "❌ Contract verification failed",
+		"componentLabel": "Component: {component}",
+		"passRate": "Pass rate",
+		"failureReason": "❌ Failure reason:",
+		"generatedCode": "Auto-generated assert code (injected into test_harness.c)"
+	},
+	"formalVerify": {
+		"loadingTitle": "🔬 Formal verification in progress",
+		"title": "🔬 Formal verification",
+		"resultTitle": "🔬 Formal verification results",
+		"titleHint": "(Z3 SMT Solver + CBMC bounded model checking)",
+		"emptyText": "Click the button above to start verification",
+		"emptyHint": "Translates the contract's pre/post/invariant conditions into Z3 SMT constraints to verify logical consistency, and optionally invokes CBMC to run bounded model checking on the generated C code.",
+		"startBtn": "Start Formal Verification",
+		"statusPassed": "✅ Formal verification passed",
+		"statusFailed": "❌ Formal verification failed",
+		"statusSkipped": "⏸ Formal verification skipped",
+		"metaTool": "Tool:",
+		"metaDuration": "Total time: {seconds}s",
+		"badgePassed": "✓ Passed × {count}",
+		"badgeFailed": "✗ Failed × {count}",
+		"badgeSkipped": "- Skipped × {count}",
+		"badgeTotal": "Total × {count}",
+		"ceFailedLabel": "❌ Counter-example:",
+		"ceSkippedLabel": "ℹ Note:",
+		"toolDesc": "Z3 SMT Solver verifies constraint consistency · CBMC performs bounded model checking · Automatically degrades to SKIPPED when tools are unavailable"
+	},
+	"simulationResult": {
+		"loadingTitle": "⏳ Simulation running...",
+		"passedTitle": "✅ Simulation passed",
+		"failedTitle": "❌ Contract violated (core dump)",
+		"loadingSub": "Running digital twin simulation...",
+		"stepsSub": "{count} steps simulated",
+		"faultSub": " · Fault: {name}",
+		"contractsPassed": "6/6 contracts passed",
+		"coreDump": "CORE DUMP",
+		"violationTitle": "Contract violation details",
+		"violationTimestep": "Violation at step:",
+		"violationAssertion": "Triggered assertion:",
+		"violationActual": "Actual value:",
+		"statSteps": "Simulation steps",
+		"statInputRange": "Input range",
+		"statOutputRange": "Output range",
+		"statOutputMax": "Output max",
+		"statOutputMin": "Output min",
+		"statOutputMean": "Output mean",
+		"faultCompareTitle": "Fault injection comparison",
+		"faultChartLabel": "Fault waveform",
+		"baselineChartLabel": "Normal baseline",
+		"noBaseline": "No baseline data",
+		"terminalTitle": "🖥️ Simulation terminal output",
+		"waitingLogs": "Waiting for simulation logs..."
+	},
+	"reportDownload": {
+		"title": "📄 DO-178C Report Generation",
+		"titleHint": "(airworthiness compliance report, downloadable / printable)",
+		"generateBtn": "Generate DO-178C Report",
+		"downloadBtn": "Download HTML",
+		"printBtn": "Print",
+		"generating": "Generating report...",
+		"done": "✅ Report generated",
+		"needResult": "Generate code first before creating a report",
+		"summaryTraceability": "Traceability entries",
+		"summaryObjectives": "DO-178C objectives",
+		"summarySimulation": "Simulation summary",
+		"summaryMisra": "MISRA violations",
+		"preview": "Report preview",
+		"emptyTip": "Click the \"Generate DO-178C Report\" button to start"
+	},
+	"repairTimeline": {
+		"empty": "No repair history",
+		"overviewLabel": "🔧 MISRA Repair Loop",
+		"totalRounds": "{count} rounds total",
+		"initialViolations": "{count} initial violations",
+		"finalViolations": "→ {count} final violations",
+		"roundName": "Round {round} repair",
+		"finalBadge": "Final round",
+		"violations": "{count} violations",
+		"fixedRules": "Fixed rules:",
+		"remainingRules": "Remaining:",
+		"finalPassed": "✅ All violations fixed, MISRA-C compliance check passed",
+		"finalRemaining": "⚠️ {count} violations still unfixed",
+		"diffTitle": "📝 Code diff (before → after)"
+	},
+	"reviewConfirm": {
+		"title": "Manual Review Confirmation",
+		"commentLabel": "Review comment (optional)",
+		"commentPlaceholder": "Enter review comment...",
+		"reject": "Reject",
+		"approve": "Approve",
+		"approvedStatus": "✅ Approved",
+		"rejectedStatus": "❌ Rejected"
+	},
+	"decisionTrace": {
+		"title": "Decision Trace",
+		"empty": "No decisions recorded",
+		"expand": "Expand",
+		"collapse": "Collapse",
+		"prompt": "Input prompt",
+		"reasoning": "Reasoning",
+		"output": "Output"
+	}
+}

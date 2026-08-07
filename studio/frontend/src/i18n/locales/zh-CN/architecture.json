@@ -1,0 +1,322 @@
+{
+	"architecture": {
+		"title": "架构与文档中心",
+		"subtitle": "深入了解 SkyForge 六层引擎架构、12 阶段 Pipeline 与完整文档",
+		"backHome": "返回主页",
+		"tabs": {
+			"layers": "六层架构",
+			"pipeline": "Pipeline",
+			"quickstart": "快速上手",
+			"standards": "编码标准"
+		},
+		"layerLabels": {
+			"mainEntry": "主入口",
+			"keyFiles": "关键文件"
+		},
+		"layers": {
+			"orchestration": {
+				"title": "编排层",
+				"responsibility": "串联各层职责，调度 pipeline 全流程并生成可信证据包。"
+			},
+			"agentStrategy": {
+				"title": "Agent 策略层",
+				"responsibility": "多 Agent 负责需求解析、LLR / 契约 / 代码生成、修复与 MISRA 适配。"
+			},
+			"verifierChain": {
+				"title": "验证工具链层",
+				"responsibility": "Z3 / CBMC / Cppcheck / GCC 等形式化与静态分析工具的可插拔链。"
+			},
+			"simulation": {
+				"title": "仿真验证层（SIL/PIL/HIL）",
+				"responsibility": "覆盖纯软件仿真（SIL）、QEMU 处理器仿真（PIL）与真实硬件在环（HIL），支持故障注入与 ARINC 653 分区调度。"
+			},
+			"llmClient": {
+				"title": "LLM 客户端层",
+				"responsibility": "统一 LLM 接口：Mock / 云 API / 本地 OpenAI 兼容客户端与路由。"
+			},
+			"protocols": {
+				"title": "基础设施协议层",
+				"responsibility": "协议 / 抽象基类 / 模式守卫与执行契约，定义上层交互面。"
+			}
+		},
+		"pipeline": {
+			"title": "12 阶段 Pipeline 流程",
+			"description": "从需求接收至证据包生成的完整流水线，串联六层架构能力",
+			"stage": "Stage {id}/12",
+			"input": "输入",
+			"output": "输出",
+			"toolsLabel": "工具:",
+			"stages": {
+				"reception": {
+					"name": "需求接收",
+					"input": "用户自然语言需求 / SCADE Lustre 模型",
+					"output": "标准化需求文档"
+				},
+				"parsing": {
+					"name": "需求解析",
+					"input": "标准化需求文档",
+					"output": "结构化 HLR / LLR 需求"
+				},
+				"design": {
+					"name": "架构设计",
+					"input": "结构化需求",
+					"output": "模块架构图与接口定义"
+				},
+				"contracts": {
+					"name": "契约生成",
+					"input": "架构设计 + 需求",
+					"output": "YAML 契约文件（前置/后置/不变式）"
+				},
+				"codegen": {
+					"name": "代码生成",
+					"input": "契约 + 架构",
+					"output": "C/C++/Python 源代码"
+				},
+				"misra": {
+					"name": "MISRA 适配",
+					"input": "生成的源代码",
+					"output": "符合编码标准的代码"
+				},
+				"static": {
+					"name": "静态分析",
+					"input": "适配后的代码",
+					"output": "静态分析报告"
+				},
+				"contractCheck": {
+					"name": "契约检查",
+					"input": "代码 + 契约文件",
+					"output": "契约验证报告"
+				},
+				"simulation": {
+					"name": "仿真验证",
+					"input": "验证通过的代码",
+					"output": "数字孪生仿真结果 + 覆盖率数据"
+				},
+				"formal": {
+					"name": "形式化验证",
+					"input": "代码 + 契约",
+					"output": "形式化验证证明"
+				},
+				"hitl": {
+					"name": "HITL 审查",
+					"input": "验证产物 + 风险评估",
+					"output": "人工审批结论"
+				},
+				"evidence": {
+					"name": "证据包生成",
+					"input": "所有阶段产物",
+					"output": "DO-178C 合规证据包（PDF/HTML）"
+				}
+			},
+			"tools": {
+				"scadeParser": "SCADE 解析器",
+				"ragKnowledge": "RAG 知识库",
+				"comboVerifier": "组合验证器",
+				"misraRuleLibrary": "MISRA 规则库",
+				"hitlWorkbench": "HITL 工作台",
+				"psacGenerator": "PSAC 生成器"
+			}
+		},
+		"quickstart": {
+			"title": "分步骤指南",
+			"description": "跟随以下 5 个步骤，快速上手 SkyForge 全流程",
+			"quickStartTitle": "一键启动命令",
+			"faqTitle": "常见问题 FAQ",
+			"steps": {
+				"source": {
+					"title": "选择运行来源",
+					"description": "从 cloud（云模型）或 local（本地模型）中选择适合的执行模式。",
+					"action": "前往系统设置"
+				},
+				"model": {
+					"title": "配置模型连接",
+					"description": "配置云 API 地址、密钥或本地 Ollama/LM Studio 端点，确保 LLM 服务可用。",
+					"action": "配置模型"
+				},
+				"firstTask": {
+					"title": "创建第一个代码生成任务",
+					"description": "在代码生成页面输入自然语言需求，选择编程语言，启动全流水线任务。",
+					"action": "开始生成"
+				},
+				"results": {
+					"title": "查看运行结果",
+					"description": "在运行记录中查看任务状态、生成的代码、验证报告与覆盖率数据。",
+					"action": "查看记录"
+				},
+				"evidence": {
+					"title": "理解验证证据",
+					"description": "学习如何阅读 DO-178C 合规报告、追溯矩阵、MISRA 检查结果与形式化验证证明。",
+					"action": "了解更多"
+				}
+			}
+		},
+		"faq": {
+			"item1": {
+				"q": "SkyForge 支持哪些编程语言？",
+				"a": "当前支持 C（MISRA-C:2012）、C++（MISRA C++ / JSF AV C++）和 Python（军工安全标准）三种语言的代码生成与验证。"
+			},
+			"item2": {
+				"q": "什么是两种执行模式 Profile？",
+				"a": "cloud 模式连接云 LLM 服务，执行真实推理；local 模式使用本地部署的 Ollama/LM Studio，数据不出内网。mock 模式仅在无后端时用于开发调试。"
+			},
+			"item3": {
+				"q": "MISRA 违规会自动修复吗？",
+				"a": "会。SkyForge 内置 57 条 MISRA-C 自动修复规则，Cppcheck 扫描发现的违规会由 code_repairer Agent 自动修复并重新验证。"
+			},
+			"item4": {
+				"q": "形式化验证使用哪些工具？",
+				"a": "使用 Z3 SMT 求解器进行契约验证，CBMC 进行有界模型检查。两者构成 VerifierChain 可插拔验证链。"
+			},
+			"item5": {
+				"q": "HITL 人工审查如何工作？",
+				"a": "在需求、契约和代码三个关键检查点，系统会根据风险评估决定是否需要人工审批。可在系统设置中启用或禁用 HITL。"
+			}
+		},
+		"standards": {
+			"version": "版本: {version}",
+			"scenarios": "适用场景",
+			"references": "参考链接",
+			"misraC": {
+				"name": "MISRA-C",
+				"description": "MISRA C 是由汽车工业软件可靠性协会（MISRA）发布的 C 语言编码规范，旨在提高嵌入式系统的安全性和可靠性。SkyForge 实现了 10 条红线规则和 56 个修复器。",
+				"categories": {
+					"environment": {
+						"name": "环境与编译",
+						"r1": "Rule 1.1: 不使用未定义/未指定/实现定义的行为",
+						"r2": "Rule 1.2: 不得出现违反标准 C 的代码",
+						"r3": "Rule 2.1: 项目不得包含无法到达的代码"
+					},
+					"typeSafety": {
+						"name": "类型安全",
+						"r1": "Rule 8.13: 指针参数应声明为指向 const 的指针",
+						"r2": "Rule 10.1: 运算符的操作数值不得有不适当的底层类型",
+						"r3": "Rule 11.1: 不得进行指针和整数类型之间的转换"
+					},
+					"memory": {
+						"name": "内存与资源",
+						"r1": "Rule 17.6: 不得使用 malloc 族的动态内存分配",
+						"r2": "Rule 21.3: 不得使用标准库的内存管理函数"
+					},
+					"controlFlow": {
+						"name": "控制流",
+						"r1": "Rule 14.4: if/else if/else 后必须有 else 分支",
+						"r2": "Rule 15.1: goto 语句不得使用",
+						"r3": "Rule 16.3: switch 语句必须有 default 分支"
+					}
+				},
+				"scenarios": {
+					"s1": "航空电子",
+					"s2": "汽车电子",
+					"s3": "医疗设备",
+					"s4": "工业控制"
+				},
+				"references": {
+					"r1": "MISRA-C:2012 官方规范",
+					"r2": "Cppcheck MISRA addon",
+					"r3": "ISO 26262 (ASIL D)"
+				}
+			},
+			"misraCpp": {
+				"name": "MISRA C++ / JSF AV C++",
+				"description": "MISRA C++ 是 C++ 语言的安全编码规范，JSF AV C++ 是联合攻击战斗机项目的 C++ 编码标准。SkyForge 实现了 5 条 JSF AV C++ 红线规则。",
+				"categories": {
+					"typeSafety": {
+						"name": "类型安全",
+						"r1": "AV Rule 4: 所有变量在声明时必须初始化",
+						"r2": "AV Rule 8: 不使用原生数组，使用 std::array 或 std::vector"
+					},
+					"memory": {
+						"name": "内存管理",
+						"r1": "AV Rule 15: 使用 RAII 管理资源",
+						"r2": "AV Rule 16: 不使用裸 new/delete，使用智能指针"
+					},
+					"exceptions": {
+						"name": "异常安全",
+						"r1": "AV Rule 39: 析构函数不得抛出异常",
+						"r2": "AV Rule 42: 提供强异常安全保证"
+					}
+				},
+				"scenarios": {
+					"s1": "航空航天",
+					"s2": "国防军工",
+					"s3": "高可靠性嵌入式系统"
+				},
+				"references": {
+					"r1": "MISRA C++:2023",
+					"r2": "JSF AV C++ Coding Standards",
+					"r3": "AUTOSAR C++14"
+				}
+			},
+			"pythonSafety": {
+				"name": "Python 军工安全标准",
+				"description": "面向军工和航空领域的 Python 安全编码标准，确保 Python 代码在安全关键环境中的可靠性。SkyForge 实现了 3 条红线规则和 4 个修复器。",
+				"categories": {
+					"typeSafety": {
+						"name": "类型安全",
+						"r1": "Rule 1: 所有函数必须添加类型注解",
+						"r2": "Rule 2: 不使用 eval() 和 exec()"
+					},
+					"security": {
+						"name": "安全",
+						"r1": "Rule 3: 不使用 pickle 进行数据序列化",
+						"r2": "Rule 4: 所有输入必须经过验证和清理"
+					},
+					"reliability": {
+						"name": "可靠性",
+						"r1": "Rule 5: 使用 logging 替代 print 输出",
+						"r2": "Rule 6: 所有资源使用上下文管理器 (with 语句)"
+					}
+				},
+				"scenarios": {
+					"s1": "军工数据分析",
+					"s2": "航空地面系统",
+					"s3": "仿真测试脚本"
+				},
+				"references": {
+					"r1": "Python PEP 484 (类型提示)",
+					"r2": "OWASP Python 安全指南"
+				}
+			},
+			"do178c": {
+				"name": "DO-178C 合规指南",
+				"description": "DO-178C 是航空机载软件的适航审定标准，定义了软件从计划到生产的完整生命周期过程要求。SkyForge 提供工程辅助证据，不替代适航鉴定。",
+				"categories": {
+					"objectives": {
+						"name": "核心目标 (19 项可判定目标)",
+						"r1": "OBJ-1 ~ OBJ-5: 需求过程（问题报告、追溯、HLR/LLR）",
+						"r2": "OBJ-6 ~ OBJ-9: 设计与编码（架构、源代码、低级需求）",
+						"r3": "OBJ-10 ~ OBJ-14: 验证过程（独立验证、覆盖分析）",
+						"r4": "OBJ-15 ~ OBJ-19: 配置与质量（配置管理、质量保证、工具鉴定）"
+					},
+					"dalLevels": {
+						"name": "DAL 等级覆盖要求",
+						"r1": "DAL A (灾难性): MC/DC 覆盖 + 全部 19 项目标",
+						"r2": "DAL B (危险): 判定覆盖 + 19 项目标",
+						"r3": "DAL C (重大): 语句覆盖 + 17 项目标",
+						"r4": "DAL D (轻微): 基础验证 + 11 项目标"
+					},
+					"evidence": {
+						"name": "证据包内容",
+						"r1": "PSAC (软件适航计划)",
+						"r2": "SDP (软件开发计划)",
+						"r3": "SVP (软件验证计划)",
+						"r4": "需求追溯矩阵",
+						"r5": "覆盖率分析报告",
+						"r6": "MISRA 合规报告",
+						"r7": "形式化验证证明"
+					}
+				},
+				"scenarios": {
+					"s1": "机载软件 DAL A/B/C/D",
+					"s2": "民用航空适航审定",
+					"s3": "军用航空软件合规"
+				},
+				"references": {
+					"r1": "RTCA DO-178C / EUROCAE ED-12C",
+					"r2": "DO-330 (工具鉴定)",
+					"r3": "AC 20-115D (COTS 指南)"
+				}
+			}
+		}
+	}
+}

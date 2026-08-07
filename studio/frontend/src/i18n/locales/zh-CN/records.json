@@ -1,0 +1,58 @@
+{
+	"records": {
+		"title": "任务管理",
+		"subtitle": "所有运行记录统一管理；支持搜索、筛选与快速回放。",
+		"btn": {
+			"refresh": "刷新",
+			"viewDetail": "查看详情",
+			"delete": "删除任务",
+			"deleteTaskTitle": "删除任务 {id}"
+		},
+		"loading": "正在读取记录…",
+		"error": {
+			"hint": "请先完成系统设置中的模型连接预检。",
+			"notFound": "任务不存在或已被删除（ID: {id}）",
+			"deleteFailed": "删除失败：{msg}",
+			"unauthorized": "删除被拒绝：后端已开启访问鉴权。请到「系统设置 → 模型连接」填写后端 API Token 后重试。"
+		},
+		"empty": {
+			"title": "当前来源尚无运行记录",
+			"desc": "完成一次代码生成任务后，运行记录会显示在这里。",
+			"noMatch": "没有匹配的任务"
+		},
+		"placeholder": {
+			"search": "按需求文本搜索…"
+		},
+		"filter": {
+			"statusPlaceholder": "状态筛选",
+			"statusAll": "全部状态",
+			"languagePlaceholder": "语言筛选",
+			"languageAll": "全部语言"
+		},
+		"status": {
+			"running": "运行中",
+			"completed": "已完成",
+			"failed": "失败",
+			"unknown": "未知"
+		},
+		"source": {
+			"simulated": "模拟",
+			"replay": "回放",
+			"live": "实时"
+		},
+		"time": {
+			"justNow": "刚刚",
+			"minutesAgo": "{n} 分钟前",
+			"hoursAgo": "{n} 小时前",
+			"daysAgo": "{n} 天前"
+		},
+		"requirementIdPending": "需求编号待解析",
+		"noRequirement": "无需求描述",
+		"violations": "违规 {n}",
+		"confirm": {
+			"title": "确认删除任务",
+			"taskId": "任务 ID:",
+			"irreversible": "此操作不可撤销，任务记录将从数据库中永久删除。"
+		}
+	}
+}

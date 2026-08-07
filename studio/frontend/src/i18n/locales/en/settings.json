@@ -1,0 +1,137 @@
+{
+	"settings": {
+		"title": "System Settings",
+		"subtitle": "Configure the execution source, model connections, toolchain, and interface preferences. All settings are saved locally; sensitive information is managed securely by the backend.",
+		"tabProfile": "Execution Source",
+		"tabModel": "Model Connection",
+		"tabToolchain": "Toolchain",
+		"tabPreferences": "Interface Preferences",
+		"dialogTitle": "LLM Settings",
+		"dialogDesc": "Configure backend model connections; mock data is only used when no backend is available",
+		"mode": {
+			"mock": "Mock Mode",
+			"api": "Cloud API",
+			"local": "Local Model"
+		},
+		"modeBtn": {
+			"mock": "Mock",
+			"local": "Local"
+		},
+		"mockDesc": "Frontend mock data; no LLM service is invoked. Suitable for development and debugging.",
+		"mockDescPage": "Frontend mock data; no LLM service is invoked. Suitable for development and debugging without a backend.",
+		"profile": {
+			"title": "Execution Source",
+			"description": "Choose the data source for the current page and new tasks. Takes effect immediately.",
+			"sourceSimulated": "Simulated",
+			"sourceReplay": "Live/Replay",
+			"limitationLabel": "Limitation: {limitation}",
+			"cloud": {
+				"title": "Cloud API",
+				"description": "DeepSeek, Qwen, OpenAI, Anthropic, or a custom compatible API.",
+				"limitation": "Requires a valid API Key and network connection"
+			},
+			"local": {
+				"title": "Local Model",
+				"description": "Connects to local OpenAI-compatible services such as Ollama or LM Studio.",
+				"limitation": "Requires a local LLM service; performance depends on hardware"
+			}
+		},
+		"model": {
+			"title": "Model Connection",
+			"description": "Configure the backend LLM connection. API keys are managed securely by the backend and are not written to browser storage.",
+			"modeLabel": "Mode",
+			"providerLabel": "Provider",
+			"providerPlaceholder": "Select Provider",
+			"apiKeyLabel": "API Key",
+			"apiKeyPlaceholder": "Enter an API Key; leave blank to keep the existing key",
+			"apiKeyPlaceholderSet": "Configured: {mask}; leave blank to keep the existing key",
+			"apiKeyHint": "The key is sent to the backend over HTTPS/local HTTP and is not written to localStorage; leaving it blank reuses the configured key.",
+			"apiKeyHintPage": "The key is sent to the backend over HTTPS and is not written to localStorage; leaving it blank reuses the configured key.",
+			"showApiKey": "Show API Key",
+			"hideApiKey": "Hide API Key",
+			"baseUrlLabel": "Base URL",
+			"baseUrlHint": "Leave blank to use the provider's default address automatically.",
+			"modelLabel": "Model",
+			"selectModelPlaceholder": "Select Model",
+			"modelsDetected": "{count} available models detected",
+			"apiModelHint": "Specify a model ID or click \"Test Connection\" to fetch the list automatically",
+			"localBaseUrlHint": "Local OpenAI-compatible endpoint (e.g. Ollama). Default: http://localhost:11434/v1",
+			"localModelHint": "Optional; click \"Test Connection\" to fetch the model list automatically",
+			"testConnection": "Test Connection",
+			"testing": "Testing...",
+			"rememberLabel": "Remember configuration on this device",
+			"rememberHint": "Written to the Git-ignored config/.env; unchecking clears the LLM configuration and keys from disk.",
+			"saveButton": "Save Settings",
+			"saving": "Saving..."
+		},
+		"backend": {
+			"tokenTitle": "Backend Access Token",
+			"tokenLabel": "API Token",
+			"tokenPlaceholder": "Paste the SkyForge backend API Token issued at deploy time",
+			"tokenHint": "Required when the backend authentication is enabled in production; leave blank to use the build-time VITE_API_TOKEN. The token is stored only in this browser's localStorage.",
+			"tokenClear": "Clear token"
+		},
+		"provider": {
+			"deepseek": {
+				"label": "DeepSeek",
+				"desc": "DeepSeek official API service"
+			},
+			"qwen": {
+				"label": "Qwen (compatible API)",
+				"desc": "Alibaba Cloud Qwen DashScope compatible API"
+			},
+			"openai": {
+				"label": "OpenAI",
+				"desc": "OpenAI official API service"
+			},
+			"anthropic": {
+				"label": "Anthropic",
+				"desc": "Anthropic Claude API service"
+			},
+			"custom": {
+				"label": "Custom OpenAI-compatible service",
+				"desc": "Custom OpenAI-compatible endpoint (e.g. vLLM / local proxy)"
+			}
+		},
+		"toolchain": {
+			"title": "Toolchain Configuration",
+			"description": "Detect and configure the code analysis and verification toolchain.",
+			"error": "Failed to fetch toolchain status: {error}",
+			"detected": "Detected",
+			"notInstalled": "Not installed",
+			"requiresVersion": "requires >= v{version}",
+			"installHintLabel": "Install hint: {hint}",
+			"installGuide": "Install Guide",
+			"installGuideTitle": "{tool} Install Guide",
+			"installHintFallback": "Please refer to the official documentation to install"
+		},
+		"preferences": {
+			"appearanceTitle": "Appearance",
+			"appearanceDesc": "Configure the theme and visual effects.",
+			"themeLabel": "Theme",
+			"themeLight": "Light",
+			"themeDark": "Dark",
+			"themeSystem": "System",
+			"reduceMotion": "Reduce motion",
+			"reduceMotionDesc": "Disable unnecessary animations and transitions",
+			"languageTitle": "Language & Notifications",
+			"languageDesc": "Set the default target language and notification preferences.",
+			"defaultTargetLang": "Default target language",
+			"desktopNotif": "Desktop notifications",
+			"desktopNotifDesc": "Send desktop notifications when tasks complete",
+			"browserNotif": "Browser notifications",
+			"browserNotifDesc": "Show in-browser notifications while tasks are running"
+		},
+		"language": "Interface Language",
+		"languageDesc": "Switch the display language",
+		"langZh": "中文",
+		"langEn": "English",
+		"cancel": "Cancel",
+		"save": "Save",
+		"saveSuccess": "Configuration saved",
+		"llmSavedDesc": "LLM settings updated successfully",
+		"saveFailed": "Save failed",
+		"unknownError": "Unknown error",
+		"testFailed": "Test failed"
+	}
+}

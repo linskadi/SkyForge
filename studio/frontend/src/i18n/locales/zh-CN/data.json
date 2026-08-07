@@ -1,0 +1,91 @@
+{
+	"data": {
+		"provider": {
+			"deepseek": {
+				"name": "DeepSeek",
+				"desc": "高性价比，中文优化，代码能力强"
+			},
+			"qwen": {
+				"name": "通义千问",
+				"desc": "国产首选，通义千问系列，阿里云提供"
+			},
+			"openai": {
+				"name": "OpenAI",
+				"desc": "最高精度，全球领先的LLM"
+			},
+			"anthropic": {
+				"name": "Anthropic",
+				"desc": "Anthropic Claude 系列，安全可靠"
+			},
+			"ollama": {
+				"name": "Ollama (本地)",
+				"desc": "本地推理，数据不出内网"
+			},
+			"local": {
+				"name": "本地 LLM",
+				"desc": "本地推理（Ollama / LM Studio 等 OpenAI 兼容端点）"
+			}
+		},
+		"checkpoint": {
+			"requirement_review": "需求审查",
+			"contract_review": "契约审查",
+			"code_review": "代码审查",
+			"final_review": "最终审查"
+		},
+		"report": {
+			"title": "DO-178C 报告 - {component}",
+			"titlePlain": "DO-178C 报告",
+			"pass": "通过",
+			"fail": "违约",
+			"itemFail": "失败",
+			"simulationPass": "数字孪生仿真通过，全部契约断言无违约",
+			"simulationFail": "仿真中发现契约违约，详见仿真报告章节",
+			"simResultPass": "✅ 全部契约断言通过",
+			"simResultFail": "❌ 存在契约违约",
+			"summarySeeReport": "详见报告内容",
+			"generatedAt": "生成时间：{time} ｜ 报告 ID：{id}",
+			"statObjectives": "DO-178C 目标通过率",
+			"statTraceability": "追溯矩阵条目数",
+			"statMisra": "MISRA-C 违规数",
+			"statPassRate": "总通过率",
+			"sectionSummary": "1. 执行摘要",
+			"sectionTraceability": "2. 需求追溯矩阵",
+			"sectionContract": "3. 契约校验结果",
+			"sectionMisra": "4. MISRA-C 合规性",
+			"sectionRepair": "5. 修复历史",
+			"sectionSimulation": "6. 数字孪生仿真",
+			"sectionObjectives": "7. DO-178C 目标达成情况"
+		},
+		"contract": {
+			"preconditions": "前置条件",
+			"postconditions": "后置条件",
+			"invariants": "不变式",
+			"faultHandling": "故障处理"
+		},
+		"compat": {
+			"defaultCheck": "兼容性检查",
+			"checkATypeMatch": "组件 A 输出类型与组件 B 输入类型匹配",
+			"checkARange": "组件 A 输出范围在组件 B 输入允许范围内",
+			"checkConditionConflict": "组件 A 后置条件与组件 B 前置条件无冲突",
+			"checkSignature": "连接方式与组件接口签名一致",
+			"checkNoCycle": "无循环依赖或类型循环",
+			"checkInvariants": "组合后不变式集合可满足",
+			"feedbackReason": "反馈连接需要额外的稳定性分析，建议增加收敛性检查（mock 警告）"
+		},
+		"error": {
+			"httpTitle": "[错误] {status}",
+			"httpStatus": "HTTP {status} {statusText}",
+			"unknown": "未知错误",
+			"taskEventsFailed": "任务事件连接失败"
+		},
+		"status": {
+			"executionProfile": {
+				"cloud": "云 API · 实时/回放",
+				"local": "本地模型 · 实时/回放"
+			}
+		},
+		"anchor": {
+			"hashError": "锚定哈希必须是 64 位十六进制"
+		}
+	}
+}

@@ -1,0 +1,240 @@
+{
+	"compliance": {
+		"title": "合规审计中心",
+		"description": "整合 MISRA 规则、契约验证、形式化验证与 DO-178C 合规四大审计视图，实现航空软件全流程合规追溯",
+		"tabs": {
+			"misra": "MISRA 规则实验室",
+			"contract": "契约验证",
+			"formal": "形式化验证",
+			"do178c": "DO-178C 合规"
+		},
+		"lang": {
+			"c": "C 语言",
+			"cpp": "C++ 语言",
+			"python": "Python 语言"
+		},
+		"standardFormat": "{name} ({lang})",
+		"sourceBadges": {
+			"ruleLibrary": "规则库",
+			"formalVerification": "形式化验证",
+			"smtSolving": "SMT求解",
+			"complianceAssessment": "合规评估"
+		},
+		"search": {
+			"placeholderC": "搜索 MISRA-C 规则 ID、标题或描述...",
+			"placeholderCpp": "搜索 MISRA-C++ / JSF AV C++ 规则...",
+			"placeholderPython": "搜索 Python 军工规范规则...",
+			"emptyC": "输入关键词搜索 MISRA-C:2012 规则",
+			"emptyCpp": "输入关键词搜索 C++ 编码标准规则",
+			"emptyPython": "输入关键词搜索 Python 军工软件编程规范",
+			"search": "搜索",
+			"searching": "搜索中...",
+			"loading": "正在搜索...",
+			"noResults": "未找到匹配的规则",
+			"count": "找到 {count} 条规则",
+			"tagRule81": "Rule 8.1",
+			"tagInit": "初始化",
+			"tagPointer": "指针",
+			"tagRequired": "Required",
+			"tagNewDelete": "new/delete",
+			"tagException": "异常",
+			"tagRaii": "RAII",
+			"tagMandatory": "Mandatory",
+			"tagEval": "eval",
+			"tagExec": "exec",
+			"tagGlobal": "global",
+			"tagForce": "强制"
+		},
+		"rules": {
+			"badExample": "违规示例",
+			"goodExample": "合规示例"
+		},
+		"contract": {
+			"title": "契约验证结果",
+			"stats": {
+				"passed": "通过",
+				"pending": "待审",
+				"failed": "失败"
+			},
+			"status": {
+				"passed": "通过",
+				"failed": "失败"
+			},
+			"failureReason": "❌ 失败原因：",
+			"assertLabel": "assert:",
+			"sections": {
+				"preconditions": "前置条件 Preconditions",
+				"postconditions": "后置条件 Postconditions",
+				"invariants": "不变式 Invariants",
+				"faultHandling": "故障处理 Fault Handling"
+			},
+			"items": {
+				"preSampleRate": {
+					"description": "采样率必须大于 0"
+				},
+				"preRawRange": {
+					"description": "原始值不超过 uint16 范围"
+				},
+				"preFilterPtr": {
+					"description": "滤波器结构体指针非空",
+					"failureReason": "反例: f=NULL, 调用 filter_apply(NULL, 1000) 导致空指针解引用"
+				},
+				"postOutputRange": {
+					"description": "输出值在合法范围内"
+				},
+				"postIIR": {
+					"description": "符合一阶 IIR 滤波公式"
+				},
+				"invAlpha": {
+					"description": "滤波系数 alpha 始终在 [0,1] 范围"
+				},
+				"fltHoldPrev": {
+					"description": "采样率异常时保持上一拍输出"
+				},
+				"fltClamp": {
+					"description": "输入越界时钳位到合法范围",
+					"failureReason": "反例: raw_value=70000（超出 uint16 上限时未做输入钳位"
+				}
+			}
+		},
+		"formal": {
+			"status": {
+				"passed": "通过",
+				"failed": "失败",
+				"timeout": "超时"
+			},
+			"counterExample": "反例: {value}",
+			"z3": {
+				"title": "Z3 约束一致性检查",
+				"description": "基于 SMT 求解器的约束满足性验证"
+			},
+			"boundary": {
+				"title": "边界测试用例生成",
+				"description": "自动生成的边界条件测试用例"
+			},
+			"cbmc": {
+				"title": "CBMC 有界模型检查",
+				"description": "基于有界模型检查器的路径穷尽验证"
+			},
+			"columns": {
+				"checkpoint": "检查点",
+				"status": "状态",
+				"tool": "工具",
+				"duration": "耗时",
+				"detail": "详情",
+				"caseId": "用例 ID",
+				"description": "描述",
+				"input": "输入",
+				"expected": "期望输出",
+				"check": "检查项",
+				"unwind": "展开深度"
+			},
+			"checks": {
+				"z3TypeRange": {
+					"name": "类型范围约束一致性",
+					"detail": "所有整数类型范围约束一致，无矛盾"
+				},
+				"z3Boundary": {
+					"name": "边界条件检查",
+					"detail": "上下界边界条件全部满足"
+				},
+				"z3NullPointer": {
+					"name": "空指针安全性",
+					"detail": "发现空指针解引用风险",
+					"counterExample": "f=NULL, 调用 filter_apply(NULL, 1000)"
+				},
+				"z3ArrayBounds": {
+					"name": "数组越界检查",
+					"detail": "所有数组访问均在合法范围内"
+				},
+				"z3Overflow": {
+					"name": "算术溢出检查",
+					"detail": "超时（建议使用 CBMC 进行有界模型检查）"
+				},
+				"boundaryMinInput": {
+					"description": "输入最小值边界"
+				},
+				"boundaryMaxInput": {
+					"description": "输入最大值边界"
+				},
+				"boundarySampleRate": {
+					"description": "采样率为 0 故障模式"
+				},
+				"boundaryAlphaLow": {
+					"description": "Alpha 系数下限边界"
+				},
+				"boundaryAlphaHigh": {
+					"description": "Alpha 系数上限边界"
+				},
+				"boundarySampleRateExpected": "保持上一拍输出",
+				"boundaryAlphaLowExpected": "输出 = 输入",
+				"boundaryAlphaHighExpected": "输出 = 前值",
+				"cbmcUnwind10": {
+					"name": "有界循环展开深度 10",
+					"detail": "所有路径在展开深度 10 内安全"
+				},
+				"cbmcUnwind50": {
+					"name": "有界循环展开深度 50",
+					"detail": "所有路径在展开深度 50 内安全"
+				},
+				"cbmcOverflow": {
+					"name": "整数溢出有界检查",
+					"detail": "在第 87 步发现整数溢出"
+				}
+			}
+		},
+		"do178c": {
+			"title": "DO-178C 目标覆盖矩阵",
+			"description": "19 个软件级目标 × 5 个过程域",
+			"generateReport": "生成合规报告",
+			"colObjective": "目标",
+			"colLevel": "级别",
+			"level": "Level {level}",
+			"areas": {
+				"planning": "规划",
+				"requirements": "需求",
+				"design": "设计",
+				"coding": "编码",
+				"verification": "验证"
+			},
+			"coverage": {
+				"covered": "已覆盖",
+				"partial": "部分覆盖",
+				"uncovered": "未覆盖",
+				"na": "不适用"
+			},
+			"objectives": {
+				"obj1": "软件计划制定",
+				"obj2": "开发环境建立",
+				"obj3": "软件需求分析",
+				"obj4": "软件需求评审",
+				"obj5": "软件架构设计",
+				"obj6": "软件详细设计",
+				"obj7": "软件编码",
+				"obj8": "代码评审",
+				"obj9": "单元测试",
+				"obj10": "集成测试",
+				"obj11": "软件配置管理",
+				"obj12": "问题报告与解决",
+				"obj13": "质量保证",
+				"obj14": "验证与确认",
+				"obj15": "需求追溯性分析",
+				"obj16": "软件开发标准",
+				"obj17": "工具鉴定",
+				"obj18": "风险分析",
+				"obj19": "适航认证支持"
+			},
+			"evidence": {
+				"title": "证据链追溯",
+				"description": "需求 → 契约 → 代码 → 测试的双向追溯",
+				"types": {
+					"reqContract": "需求→契约",
+					"reqCode": "需求→代码",
+					"contractAssert": "契约→断言",
+					"contractTest": "契约→测试",
+					"testBoundary": "测试→边界用例"
+				}
+			}
+		}
+	}
+}

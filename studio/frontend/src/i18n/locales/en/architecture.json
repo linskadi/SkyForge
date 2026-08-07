@@ -1,0 +1,322 @@
+{
+	"architecture": {
+		"title": "Architecture & Documentation Center",
+		"subtitle": "Explore SkyForge's six-layer engine architecture, 12-stage pipeline, and complete documentation",
+		"backHome": "Back to Home",
+		"tabs": {
+			"layers": "Six-Layer Architecture",
+			"pipeline": "Pipeline",
+			"quickstart": "Quick Start",
+			"standards": "Coding Standards"
+		},
+		"layerLabels": {
+			"mainEntry": "Main Entry",
+			"keyFiles": "Key Files"
+		},
+		"layers": {
+			"orchestration": {
+				"title": "Orchestration Layer",
+				"responsibility": "Chains layer responsibilities together, schedules the full pipeline, and generates a trusted evidence package."
+			},
+			"agentStrategy": {
+				"title": "Agent Strategy Layer",
+				"responsibility": "Multiple agents handle requirement parsing, LLR / contract / code generation, repair, and MISRA adaptation."
+			},
+			"verifierChain": {
+				"title": "Verifier Toolchain Layer",
+				"responsibility": "A pluggable chain of formal and static analysis tools: Z3 / CBMC / Cppcheck / GCC."
+			},
+			"simulation": {
+				"title": "Simulation & Verification Layer (SIL/PIL/HIL)",
+				"responsibility": "Covers pure software simulation (SIL), QEMU processor simulation (PIL), and real hardware-in-the-loop (HIL), with fault injection and ARINC 653 partition scheduling."
+			},
+			"llmClient": {
+				"title": "LLM Client Layer",
+				"responsibility": "A unified LLM interface: Mock / cloud API / local OpenAI-compatible clients and routing."
+			},
+			"protocols": {
+				"title": "Infrastructure Protocol Layer",
+				"responsibility": "Protocols / abstract base classes / mode guards and execution contracts that define the interaction surface for upper layers."
+			}
+		},
+		"pipeline": {
+			"title": "12-Stage Pipeline",
+			"description": "The complete pipeline from requirement reception to evidence package generation, powered by the six-layer architecture",
+			"stage": "Stage {id}/12",
+			"input": "Input",
+			"output": "Output",
+			"toolsLabel": "Tools:",
+			"stages": {
+				"reception": {
+					"name": "Requirement Reception",
+					"input": "User natural-language requirements / SCADE Lustre models",
+					"output": "Standardized requirements document"
+				},
+				"parsing": {
+					"name": "Requirement Parsing",
+					"input": "Standardized requirements document",
+					"output": "Structured HLR / LLR requirements"
+				},
+				"design": {
+					"name": "Architecture Design",
+					"input": "Structured requirements",
+					"output": "Module architecture diagram and interface definitions"
+				},
+				"contracts": {
+					"name": "Contract Generation",
+					"input": "Architecture design + requirements",
+					"output": "YAML contract files (pre/post/invariant)"
+				},
+				"codegen": {
+					"name": "Code Generation",
+					"input": "Contracts + architecture",
+					"output": "C/C++/Python source code"
+				},
+				"misra": {
+					"name": "MISRA Adaptation",
+					"input": "Generated source code",
+					"output": "Code compliant with coding standards"
+				},
+				"static": {
+					"name": "Static Analysis",
+					"input": "Adapted code",
+					"output": "Static analysis report"
+				},
+				"contractCheck": {
+					"name": "Contract Checking",
+					"input": "Code + contract files",
+					"output": "Contract verification report"
+				},
+				"simulation": {
+					"name": "Simulation",
+					"input": "Verified code",
+					"output": "Digital twin simulation results + coverage data"
+				},
+				"formal": {
+					"name": "Formal Verification",
+					"input": "Code + contracts",
+					"output": "Formal verification proof"
+				},
+				"hitl": {
+					"name": "HITL Review",
+					"input": "Verification artifacts + risk assessment",
+					"output": "Human approval decision"
+				},
+				"evidence": {
+					"name": "Evidence Package Generation",
+					"input": "All stage artifacts",
+					"output": "DO-178C compliant evidence package (PDF/HTML)"
+				}
+			},
+			"tools": {
+				"scadeParser": "SCADE parser",
+				"ragKnowledge": "RAG knowledge base",
+				"comboVerifier": "Composition verifier",
+				"misraRuleLibrary": "MISRA rule library",
+				"hitlWorkbench": "HITL workbench",
+				"psacGenerator": "PSAC generator"
+			}
+		},
+		"quickstart": {
+			"title": "Step-by-Step Guide",
+			"description": "Follow these 5 steps to get up and running with the SkyForge workflow",
+			"quickStartTitle": "One-Click Startup Command",
+			"faqTitle": "FAQ",
+			"steps": {
+				"source": {
+					"title": "Choose a runtime source",
+					"description": "Pick the execution mode that fits your needs: cloud (cloud models) or local (local models).",
+					"action": "Go to Settings"
+				},
+				"model": {
+					"title": "Configure model connection",
+					"description": "Configure the cloud API endpoint and key, or a local Ollama/LM Studio endpoint, to make the LLM service available.",
+					"action": "Configure Model"
+				},
+				"firstTask": {
+					"title": "Create your first code generation task",
+					"description": "Enter natural-language requirements on the code generation page, choose a programming language, and launch a full pipeline task.",
+					"action": "Start Generating"
+				},
+				"results": {
+					"title": "Review run results",
+					"description": "Check task status, generated code, verification reports, and coverage data in the run history.",
+					"action": "View Records"
+				},
+				"evidence": {
+					"title": "Understand verification evidence",
+					"description": "Learn how to read DO-178C compliance reports, traceability matrices, MISRA check results, and formal verification proofs.",
+					"action": "Learn More"
+				}
+			}
+		},
+		"faq": {
+			"item1": {
+				"q": "Which programming languages does SkyForge support?",
+				"a": "It currently supports code generation and verification for C (MISRA-C:2012), C++ (MISRA C++ / JSF AV C++), and Python (defense safety standards)."
+			},
+			"item2": {
+				"q": "What are the two execution mode profiles?",
+				"a": "cloud mode connects to a cloud LLM service for real inference; local mode uses a locally deployed Ollama/LM Studio so data never leaves your intranet. mock mode is only used for development and debugging when there is no backend."
+			},
+			"item3": {
+				"q": "Are MISRA violations fixed automatically?",
+				"a": "Yes. SkyForge ships 57 built-in MISRA-C auto-fix rules. Violations found by Cppcheck scans are automatically repaired by the code_repairer agent and re-verified."
+			},
+			"item4": {
+				"q": "Which tools are used for formal verification?",
+				"a": "The Z3 SMT solver performs contract verification and CBMC performs bounded model checking. Together they form the pluggable VerifierChain."
+			},
+			"item5": {
+				"q": "How does HITL human review work?",
+				"a": "At the three key checkpoints — requirements, contracts, and code — the system decides whether human approval is needed based on a risk assessment. HITL can be enabled or disabled in system settings."
+			}
+		},
+		"standards": {
+			"version": "Version: {version}",
+			"scenarios": "Applicable Scenarios",
+			"references": "References",
+			"misraC": {
+				"name": "MISRA-C",
+				"description": "MISRA C is the C language coding standard published by the Motor Industry Software Reliability Association (MISRA), aimed at improving the safety and reliability of embedded systems. SkyForge implements 10 red-line rules and 56 fixers.",
+				"categories": {
+					"environment": {
+						"name": "Environment & Compilation",
+						"r1": "Rule 1.1: Do not use undefined, unspecified, or implementation-defined behavior",
+						"r2": "Rule 1.2: No code that violates standard C",
+						"r3": "Rule 2.1: A project shall not contain unreachable code"
+					},
+					"typeSafety": {
+						"name": "Type Safety",
+						"r1": "Rule 8.13: Pointer parameters shall be declared as pointers to const",
+						"r2": "Rule 10.1: Operands of operators shall not have inappropriate essential types",
+						"r3": "Rule 11.1: Conversions shall not be performed between pointer and integer types"
+					},
+					"memory": {
+						"name": "Memory & Resources",
+						"r1": "Rule 17.6: Dynamic memory allocation from the malloc family shall not be used",
+						"r2": "Rule 21.3: Standard library memory management functions shall not be used"
+					},
+					"controlFlow": {
+						"name": "Control Flow",
+						"r1": "Rule 14.4: An else branch must follow if/else if/else chains",
+						"r2": "Rule 15.1: The goto statement shall not be used",
+						"r3": "Rule 16.3: A switch statement must have a default branch"
+					}
+				},
+				"scenarios": {
+					"s1": "Avionics",
+					"s2": "Automotive electronics",
+					"s3": "Medical devices",
+					"s4": "Industrial control"
+				},
+				"references": {
+					"r1": "MISRA-C:2012 official specification",
+					"r2": "Cppcheck MISRA addon",
+					"r3": "ISO 26262 (ASIL D)"
+				}
+			},
+			"misraCpp": {
+				"name": "MISRA C++ / JSF AV C++",
+				"description": "MISRA C++ is the safety coding standard for C++, while JSF AV C++ is the C++ coding standard of the Joint Strike Fighter project. SkyForge implements 5 JSF AV C++ red-line rules.",
+				"categories": {
+					"typeSafety": {
+						"name": "Type Safety",
+						"r1": "AV Rule 4: All variables must be initialized at declaration",
+						"r2": "AV Rule 8: Do not use raw arrays; use std::array or std::vector"
+					},
+					"memory": {
+						"name": "Memory Management",
+						"r1": "AV Rule 15: Manage resources with RAII",
+						"r2": "AV Rule 16: Do not use bare new/delete; use smart pointers"
+					},
+					"exceptions": {
+						"name": "Exception Safety",
+						"r1": "AV Rule 39: Destructors must not throw exceptions",
+						"r2": "AV Rule 42: Provide the strong exception safety guarantee"
+					}
+				},
+				"scenarios": {
+					"s1": "Aerospace",
+					"s2": "Defense",
+					"s3": "High-reliability embedded systems"
+				},
+				"references": {
+					"r1": "MISRA C++:2023",
+					"r2": "JSF AV C++ Coding Standards",
+					"r3": "AUTOSAR C++14"
+				}
+			},
+			"pythonSafety": {
+				"name": "Python Defense Safety Standard",
+				"description": "A Python safety coding standard for defense and aerospace, ensuring the reliability of Python code in safety-critical environments. SkyForge implements 3 red-line rules and 4 fixers.",
+				"categories": {
+					"typeSafety": {
+						"name": "Type Safety",
+						"r1": "Rule 1: All functions must have type annotations",
+						"r2": "Rule 2: Do not use eval() and exec()"
+					},
+					"security": {
+						"name": "Security",
+						"r1": "Rule 3: Do not use pickle for data serialization",
+						"r2": "Rule 4: All inputs must be validated and sanitized"
+					},
+					"reliability": {
+						"name": "Reliability",
+						"r1": "Rule 5: Use logging instead of print output",
+						"r2": "Rule 6: All resources must use context managers (with statements)"
+					}
+				},
+				"scenarios": {
+					"s1": "Defense data analysis",
+					"s2": "Aviation ground systems",
+					"s3": "Simulation and test scripts"
+				},
+				"references": {
+					"r1": "Python PEP 484 (type hints)",
+					"r2": "OWASP Python Security Guide"
+				}
+			},
+			"do178c": {
+				"name": "DO-178C Compliance Guide",
+				"description": "DO-178C is the airworthiness certification standard for aviation onboard software, defining the complete software lifecycle process requirements from planning to production. SkyForge provides engineering supporting evidence and does not replace airworthiness certification.",
+				"categories": {
+					"objectives": {
+						"name": "Core Objectives (19 Assessable Objectives)",
+						"r1": "OBJ-1 ~ OBJ-5: Requirements process (problem reports, traceability, HLR/LLR)",
+						"r2": "OBJ-6 ~ OBJ-9: Design and coding (architecture, source code, low-level requirements)",
+						"r3": "OBJ-10 ~ OBJ-14: Verification process (independence, coverage analysis)",
+						"r4": "OBJ-15 ~ OBJ-19: Configuration and quality (configuration management, quality assurance, tool qualification)"
+					},
+					"dalLevels": {
+						"name": "DAL Coverage Requirements",
+						"r1": "DAL A (Catastrophic): MC/DC coverage + all 19 objectives",
+						"r2": "DAL B (Hazardous): decision coverage + 19 objectives",
+						"r3": "DAL C (Major): statement coverage + 17 objectives",
+						"r4": "DAL D (Minor): basic verification + 11 objectives"
+					},
+					"evidence": {
+						"name": "Evidence Package Contents",
+						"r1": "PSAC (Plan for Software Aspects of Certification)",
+						"r2": "SDP (Software Development Plan)",
+						"r3": "SVP (Software Verification Plan)",
+						"r4": "Requirements traceability matrix",
+						"r5": "Coverage analysis report",
+						"r6": "MISRA compliance report",
+						"r7": "Formal verification proofs"
+					}
+				},
+				"scenarios": {
+					"s1": "Onboard software DAL A/B/C/D",
+					"s2": "Civil aviation airworthiness certification",
+					"s3": "Military aviation software compliance"
+				},
+				"references": {
+					"r1": "RTCA DO-178C / EUROCAE ED-12C",
+					"r2": "DO-330 (Tool Qualification)",
+					"r3": "AC 20-115D (COTS guidance)"
+				}
+			}
+		}
+	}
+}

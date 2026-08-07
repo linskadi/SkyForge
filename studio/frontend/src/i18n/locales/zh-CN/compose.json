@@ -1,0 +1,60 @@
+{
+	"compose": {
+		"backHome": "返回首页",
+		"title": "组件组合验证",
+		"subtitle": "验证两个组件的契约兼容性，生成组合后的 C 代码和仿真结果",
+		"templateLibrary": "模板库",
+		"templateLibraryTitle": "契约模板库",
+		"template": {
+			"safetyLevel": "安全等级 {level}",
+			"input": "输入",
+			"output": "输出",
+			"range": "范围",
+			"constraint": "约束",
+			"fillA": "填入 A",
+			"fillB": "填入 B"
+		},
+		"connection": {
+			"sequential": "顺序组合",
+			"sequentialDesc": "A → B（A 的输出作为 B 的输入）",
+			"parallel": "并行组合",
+			"parallelDesc": "A ∥ B（同时运行，输出合并）",
+			"feedback": "反馈组合",
+			"feedbackDesc": "A → B → A（B 的输出反馈到 A）"
+		},
+		"loadPreset": "加载预设",
+		"btn": {
+			"compose": "组合验证",
+			"checkOnly": "仅检查兼容性",
+			"reset": "重置"
+		},
+		"error": {
+			"composeFailed": "组合失败",
+			"checkFailed": "兼容性检查失败"
+		},
+		"placeholder": {
+			"compAName": "组件 A 名称",
+			"compBName": "组件 B 名称"
+		},
+		"section": {
+			"cCode": "C 代码",
+			"contractYaml": "契约 YAML"
+		},
+		"compat": {
+			"title": "兼容性检查结果",
+			"compatible": "兼容",
+			"partialIncompatible": "部分不兼容",
+			"passCount": "通过 {count}",
+			"failCount": "失败 {count}",
+			"interfaceMatch": "接口契约匹配",
+			"subtitle": "组件 A 输出 → 组件 B 输入",
+			"type": "类型",
+			"range": "范围"
+		},
+		"result": {
+			"codeTitle": "组合后代码",
+			"simTitle": "组合仿真结果"
+		},
+		"emptyTip": "选择连接方式，点击“组合验证”开始"
+	}
+}

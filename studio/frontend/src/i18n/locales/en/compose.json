@@ -1,0 +1,60 @@
+{
+	"compose": {
+		"backHome": "Back to Home",
+		"title": "Component Composition Verification",
+		"subtitle": "Verify contract compatibility between two components, generating combined C code and simulation results",
+		"templateLibrary": "Template Library",
+		"templateLibraryTitle": "Contract Template Library",
+		"template": {
+			"safetyLevel": "Safety level {level}",
+			"input": "Input",
+			"output": "Output",
+			"range": "Range",
+			"constraint": "Constraint",
+			"fillA": "Fill A",
+			"fillB": "Fill B"
+		},
+		"connection": {
+			"sequential": "Sequential",
+			"sequentialDesc": "A → B (A's output feeds B's input)",
+			"parallel": "Parallel",
+			"parallelDesc": "A ∥ B (run concurrently, outputs merged)",
+			"feedback": "Feedback",
+			"feedbackDesc": "A → B → A (B's output fed back to A)"
+		},
+		"loadPreset": "Load Preset",
+		"btn": {
+			"compose": "Compose & Verify",
+			"checkOnly": "Check Compatibility Only",
+			"reset": "Reset"
+		},
+		"error": {
+			"composeFailed": "Composition failed",
+			"checkFailed": "Compatibility check failed"
+		},
+		"placeholder": {
+			"compAName": "Component A name",
+			"compBName": "Component B name"
+		},
+		"section": {
+			"cCode": "C Code",
+			"contractYaml": "Contract YAML"
+		},
+		"compat": {
+			"title": "Compatibility Check Result",
+			"compatible": "Compatible",
+			"partialIncompatible": "Partially Incompatible",
+			"passCount": "Passed {count}",
+			"failCount": "Failed {count}",
+			"interfaceMatch": "Interface Contract Matching",
+			"subtitle": "Component A output → Component B input",
+			"type": "Type",
+			"range": "Range"
+		},
+		"result": {
+			"codeTitle": "Composed Code",
+			"simTitle": "Composed Simulation Result"
+		},
+		"emptyTip": "Select a connection mode and click \"Compose & Verify\" to start"
+	}
+}

@@ -1,0 +1,137 @@
+{
+	"settings": {
+		"title": "系统设置",
+		"subtitle": "配置运行来源、模型连接、工具链与界面偏好。所有设置均在本地保存，敏感信息由后端安全管理。",
+		"tabProfile": "运行来源",
+		"tabModel": "模型连接",
+		"tabToolchain": "工具链配置",
+		"tabPreferences": "界面偏好",
+		"dialogTitle": "LLM 设置",
+		"dialogDesc": "配置后端模型连接；模拟数据仅在无后端时使用",
+		"mode": {
+			"mock": "模拟模式",
+			"api": "云 API",
+			"local": "本地模型"
+		},
+		"modeBtn": {
+			"mock": "模拟",
+			"local": "本地"
+		},
+		"mockDesc": "前端模拟数据，不调用任何 LLM 服务。适用于开发调试。",
+		"mockDescPage": "前端模拟数据，不调用任何 LLM 服务。适用于无后端时的开发调试。",
+		"profile": {
+			"title": "运行来源",
+			"description": "选择当前页面和新任务的数据来源。切换后立即生效。",
+			"sourceSimulated": "模拟",
+			"sourceReplay": "实时/回放",
+			"limitationLabel": "限制：{limitation}",
+			"cloud": {
+				"title": "云 API",
+				"description": "DeepSeek、Qwen、OpenAI、Anthropic 或自定义兼容 API。",
+				"limitation": "需要有效的 API Key 与网络连接"
+			},
+			"local": {
+				"title": "本地模型",
+				"description": "连接 Ollama、LM Studio 等本机 OpenAI-compatible 服务。",
+				"limitation": "需要本机运行 LLM 服务，性能取决于硬件"
+			}
+		},
+		"model": {
+			"title": "模型连接",
+			"description": "配置后端 LLM 连接。API Key 由后端安全管理，不写入浏览器存储。",
+			"modeLabel": "运行模式",
+			"providerLabel": "Provider",
+			"providerPlaceholder": "选择 Provider",
+			"apiKeyLabel": "API Key",
+			"apiKeyPlaceholder": "输入 API Key；留空表示不修改",
+			"apiKeyPlaceholderSet": "已配置 {mask}；留空表示不修改",
+			"apiKeyHint": "密钥通过 HTTPS/本机 HTTP 提交给后端，不写入 localStorage；留空会沿用已配置密钥。",
+			"apiKeyHintPage": "密钥通过 HTTPS 提交给后端，不写入 localStorage；留空会沿用已配置密钥。",
+			"showApiKey": "显示 API Key",
+			"hideApiKey": "隐藏 API Key",
+			"baseUrlLabel": "Base URL",
+			"baseUrlHint": "留空将自动使用 Provider 默认地址。",
+			"modelLabel": "Model",
+			"selectModelPlaceholder": "选择模型",
+			"modelsDetected": "已检测到 {count} 个可用模型",
+			"apiModelHint": "指定模型 ID 或点击「测试连接」自动获取列表",
+			"localBaseUrlHint": "本地 OpenAI 兼容端点（如 Ollama）。默认 http://localhost:11434/v1",
+			"localModelHint": "可选；点击「测试连接」自动获取模型列表",
+			"testConnection": "测试连接",
+			"testing": "测试中...",
+			"rememberLabel": "在此设备上记住配置",
+			"rememberHint": "写入已被 Git 忽略的 config/.env；取消勾选会清除磁盘上的 LLM 配置和密钥。",
+			"saveButton": "保存设置",
+			"saving": "保存中..."
+		},
+		"backend": {
+			"tokenTitle": "后端访问令牌",
+			"tokenLabel": "API Token",
+			"tokenPlaceholder": "粘贴部署生成的 SkyForge 后端 API Token",
+			"tokenHint": "正式部署开启鉴权时需要；留空则使用构建时注入的 VITE_API_TOKEN。令牌仅保存在本机浏览器 localStorage。",
+			"tokenClear": "清除令牌"
+		},
+		"provider": {
+			"deepseek": {
+				"label": "DeepSeek",
+				"desc": "DeepSeek 官方 API 服务"
+			},
+			"qwen": {
+				"label": "通义千问（兼容 API）",
+				"desc": "阿里云通义千问 DashScope 兼容 API"
+			},
+			"openai": {
+				"label": "OpenAI",
+				"desc": "OpenAI 官方 API 服务"
+			},
+			"anthropic": {
+				"label": "Anthropic",
+				"desc": "Anthropic Claude API 服务"
+			},
+			"custom": {
+				"label": "自定义 OpenAI 兼容服务",
+				"desc": "自定义 OpenAI 兼容端点（如 vLLM / 本地代理）"
+			}
+		},
+		"toolchain": {
+			"title": "工具链配置",
+			"description": "检测并配置代码分析与验证工具链。",
+			"error": "工具链状态获取失败：{error}",
+			"detected": "已检测",
+			"notInstalled": "未安装",
+			"requiresVersion": "需要 >= v{version}",
+			"installHintLabel": "安装提示: {hint}",
+			"installGuide": "安装指引",
+			"installGuideTitle": "{tool} 安装指引",
+			"installHintFallback": "请参考官方文档安装"
+		},
+		"preferences": {
+			"appearanceTitle": "外观",
+			"appearanceDesc": "设置主题与视觉效果。",
+			"themeLabel": "主题",
+			"themeLight": "浅色",
+			"themeDark": "深色",
+			"themeSystem": "跟随系统",
+			"reduceMotion": "减少动画",
+			"reduceMotionDesc": "关闭非必要动画与过渡效果",
+			"languageTitle": "语言与通知",
+			"languageDesc": "设置默认目标语言与通知偏好。",
+			"defaultTargetLang": "默认目标语言",
+			"desktopNotif": "桌面通知",
+			"desktopNotifDesc": "任务完成时发送桌面通知",
+			"browserNotif": "浏览器通知",
+			"browserNotifDesc": "任务进行中显示浏览器内通知"
+		},
+		"language": "界面语言",
+		"languageDesc": "切换界面显示语言",
+		"langZh": "中文",
+		"langEn": "English",
+		"cancel": "取消",
+		"save": "保存",
+		"saveSuccess": "配置已保存",
+		"llmSavedDesc": "LLM 设置已成功更新",
+		"saveFailed": "保存失败",
+		"unknownError": "未知错误",
+		"testFailed": "测试失败"
+	}
+}
