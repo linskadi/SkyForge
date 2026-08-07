@@ -6,7 +6,12 @@
     python tools/run_api_pipeline.py cpp  # C++ (ADS-B Processor)
     python tools/run_api_pipeline.py all  # 全部
 """
-import asyncio, json, os, sys, time
+import asyncio
+import json
+import os
+import platform
+import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -281,7 +286,7 @@ pre {{ background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; o
 <h1>SkyForge (天锻)</h1>
 <div class="meta">
   DO-178C DAL-A 航空机载软件工程平台 &mdash; AI 多智能体驱动<br>
-  版本: v0.5.1 | 日期: {now} | 环境: Windows + GCC 16.1.0 + DeepSeek API
+  版本: v0.5.1 | 日期: {now} | 环境: {platform.system()} + GCC 16.1.0 + DeepSeek API
 </div>
 
 <h2>1. 全 Pipeline 运行状态</h2>
@@ -326,7 +331,7 @@ pre {{ background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; o
   <span class="toolchip ok">DeepSeek API ✓</span>
 </div>
 <p style="color:var(--muted); font-size:0.85rem; margin-top:10px;">
-  覆盖率收集：gcov JSON + gcov-dump -l 解析 MC/DC 条件覆盖率（Windows 原生，无需 lcov/Perl）
+  覆盖率收集：gcov JSON + gcov-dump -l 解析 MC/DC 条件覆盖率（{platform.system()} 原生，无需 lcov/Perl）
 </p>
 
 <h2>6. 核心创新点</h2>
@@ -335,7 +340,7 @@ pre {{ background: #1e293b; color: #e2e8f0; padding: 15px; border-radius: 8px; o
   <tr><td>AI 多智能体驱动</td><td>8+ Agent 协同：需求解析、架构设计、契约生成、代码生成、代码修复、LLR生成</td></tr>
   <tr><td>真实 LLM 代码生成</td><td>DeepSeek API 纯 API 模式，非 Mock，生成 C/Python/C++ 三语言航空代码</td></tr>
   <tr><td>修复闭环 + 退步检测</td><td>扫描→修复→验证循环，检测到代码退化（含新规则引入）自动回退</td></tr>
-  <tr><td>MC/DC 覆盖率</td><td>Windows 上通过 gcov-dump -l 解析 COUNTERS conditions 实现真实 MC/DC 数据</td></tr>
+   <tr><td>MC/DC 覆盖率</td><td>{platform.system()} 上通过 gcov-dump -l 解析 COUNTERS conditions 实现真实 MC/DC 数据</td></tr>
   <tr><td>DO-178C DAL-A 21 项目标</td><td>自适应 DAL-A/B/C/D/E 目标检查，自动从 requirement.safety_level 推断</td></tr>
   <tr><td>数字孪生仿真</td><td>虚拟 MCU + 通用 harness + 故障注入（12 种故障类型）</td></tr>
   <tr><td>HITL 人工审查</td><td>需求/契约/代码三检查点，支持 auto-approve 和 WebSocket 实时推送</td></tr>

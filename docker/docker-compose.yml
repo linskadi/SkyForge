@@ -53,7 +53,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./studio/frontend
       dockerfile: Dockerfile
     container_name: skyforge_frontend
     restart: unless-stopped

@@ -18,7 +18,7 @@ DO-178C 机载软件代码生成模板
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import List
 from dataclasses import dataclass
 from enum import Enum
 
@@ -65,7 +65,7 @@ class SignalProcessor:
             ValueError: 缓冲区大小超出范围
         """
         if buffer_size <= 0 or buffer_size > 1024:
-            raise ValueError(f"buffer_size must be in [1, 1024]")
+            raise ValueError("buffer_size must be in [1, 1024]")
         self._buffer: List[float] = []
         self._buffer_size: int = buffer_size
         self._initialized: bool = True

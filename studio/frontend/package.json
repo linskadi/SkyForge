@@ -19,6 +19,7 @@
 		"@vueuse/core": "^14.3.0",
 		"dompurify": "^3.4.12",
 		"echarts": "^6.1.0",
+		"ethers": "^6.13.4",
 		"katex": "^0.17.0",
 		"marked": "^18.0.6",
 		"marked-katex-extension": "^5.1.10",
@@ -28,6 +29,7 @@
 		"reka-ui": "^2.10.1",
 		"vue": "^3.5.40",
 		"vue-echarts": "^8.0.1",
+		"vue-i18n": "^11",
 		"vue-router": "^5.2.0"
 	},
 	"devDependencies": {

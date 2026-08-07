@@ -1,33 +1,70 @@
-#!/bin/sh
+﻿#!/bin/sh
 # SkyForge (天锻) 一键启动脚本
 # 自动检测环境、安装依赖、启动服务
+# 支持 macOS / Linux / Windows(Git Bash / MSYS2 / WSL)
 
 set -e
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
+# ====================== 跨平台 OS 检测 ======================
+OS_TYPE="unknown"
+case "$(uname -s)" in
+    Darwin)  OS_TYPE="macOS" ;;
+    Linux)   OS_TYPE="linux" ;;
+    MINGW*|MSYS*|CYGWIN*) OS_TYPE="windows" ;;
+    *)       OS_TYPE="unknown" ;;
+esac
+
+# Windows 下 HOME 回退（MSYS2 可能未设 HOME）
+if [ -z "${HOME:-}" ] && [ -n "${USERPROFILE:-}" ]; then
+    HOME="$(cygpath "$USERPROFILE" 2>/dev/null || echo "$USERPROFILE")"
+    export HOME
+fi
+
 echo "=============================================="
 echo " SkyForge (天锻) 一键启动脚本"
+echo " 操作系统: $OS_TYPE"
 echo "=============================================="
 echo ""
 
 # ====================== 检查服务端口 ======================
 echo "[1/6] 检查服务端口..."
 
+# 跨平台端口占用 PID 获取
 list_port_pids() {
-    netstat -ano 2>/dev/null | grep ":$1 " | grep LISTENING | awk '{print $5}' | sort -u || true
+    port="$1"
+    if [ "$OS_TYPE" = "macOS" ]; then
+        # macOS: lsof 获取监听端口 PID
+        lsof -ti ":$port" -sTCP:LISTEN 2>/dev/null | sort -u || true
+    elif [ "$OS_TYPE" = "windows" ]; then
+        # Windows (Git Bash / MSYS2)
+        netstat -ano 2>/dev/null | grep ":$port " | grep LISTENING | awk '{print $5}' | sort -u || true
+    else
+        # Linux: ss 优先，回退到 netstat
+        if command -v ss >/dev/null 2>&1; then
+            ss -tlnp 2>/dev/null | grep ":$port " | grep -oP 'pid=\K[0-9]+' | sort -u || true
+        else
+            netstat -tlnp 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d'/' -f1 | sort -u || true
+        fi
+    fi
 }
 
+# 跨平台进程终止
 kill_process_tree() {
     target_pid="$1"
-    if command -v powershell.exe >/dev/null 2>&1; then
-        powershell.exe -NoProfile -NonInteractive -Command \
-            "Stop-Process -Id $target_pid -Force -ErrorAction SilentlyContinue" >/dev/null 2>&1 || true
-    elif command -v taskkill.exe >/dev/null 2>&1; then
-        MSYS_NO_PATHCONV=1 taskkill.exe /F /T /PID "$target_pid" >/dev/null 2>&1 || true
-    else
-        kill "$target_pid" 2>/dev/null || true
+    if [ "$OS_TYPE" = "windows" ]; then
+        if command -v powershell.exe >/dev/null 2>&1; then
+            powershell.exe -NoProfile -NonInteractive -Command \
+                "Stop-Process -Id $target_pid -Force -ErrorAction SilentlyContinue" >/dev/null 2>&1 || true
+            return
+        elif command -v taskkill.exe >/dev/null 2>&1; then
+            MSYS_NO_PATHCONV=1 taskkill.exe /F /T /PID "$target_pid" >/dev/null 2>&1 || true
+            return
+        fi
     fi
+    # macOS / Linux / 兜底
+    kill "$target_pid" 2>/dev/null || true
 }
 
 # 自动清理占用的端口
@@ -70,13 +107,23 @@ echo "[2/6] 检测环境..."
 if ! command -v uv >/dev/null 2>&1; then
     echo "  安装 uv..."
     curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$USERPROFILE/.local/bin:$HOME/.local/bin:$PATH"
+    # 跨平台 uv 安装路径
+    if [ "$OS_TYPE" = "windows" ]; then
+        export PATH="$HOME/.local/bin:$HOME/AppData/Local/uv:$PATH"
+    elif [ "$OS_TYPE" = "macOS" ]; then
+        export PATH="$HOME/.local/bin:$HOME/Library/Application Support/uv:$PATH"
+    else
+        export PATH="$HOME/.local/bin:$PATH"
+    fi
 fi
 echo "  uv: $(uv --version)"
 
+# 跨平台 venv Python 路径检测
 if [ -f "$ROOT/.venv/Scripts/python.exe" ]; then
+    # Windows venv
     DETECTED_PYTHON="$ROOT/.venv/Scripts/python.exe"
 elif [ -f "$ROOT/.venv/bin/python" ]; then
+    # macOS / Linux venv
     DETECTED_PYTHON="$ROOT/.venv/bin/python"
 else
     DETECTED_PYTHON="$(uv python find 3.12 2>/dev/null || true)"
@@ -121,6 +168,11 @@ else
     exit 1
 fi
 
+# 跨平台辅助函数：尝试多种方式执行 Python（避免 Windows 上路径探测失败）
+_run_python() {
+    "$VENV_PYTHON" "$@"
+}
+
 # 安装依赖
 echo "  同步 Python 依赖..."
 cd "$ROOT"
@@ -132,21 +184,28 @@ echo ""
 echo "  检测形式化验证工具链..."
 
 # z3（Python 包，已随上面安装）
-if "$ROOT/.venv/Scripts/python.exe" -c "import z3" 2>/dev/null || "$ROOT/.venv/bin/python" -c "import z3" 2>/dev/null; then
+if _run_python -c "import z3" 2>/dev/null; then
     echo "  ✅ z3: 已安装（Python 包）"
 else
     echo "  ⚠️  z3: 未安装（契约形式化验证将降级为 SKIPPED）"
 fi
 
 # cbmc（外部二进制，可选）
-CBMC_WINDOWS_EXE='C:\Program Files\cbmc\bin\cbmc.exe'
+_cbmc_found=false
 if command -v cbmc >/dev/null 2>&1; then
     echo "  ✅ cbmc: $(cbmc --version 2>&1 | head -n1)"
-elif [ -f "$CBMC_WINDOWS_EXE" ]; then
-    echo "  ✅ cbmc: $("$CBMC_WINDOWS_EXE" --version 2>&1 | head -n1)（C:\\Program Files\\cbmc\\bin）"
-elif [ -f "/c/Program Files/cbmc/bin/cbmc.exe" ]; then
-    echo "  ✅ cbmc: 已安装（C:\\Program Files\\cbmc\\bin）"
-else
+    _cbmc_found=true
+elif [ "$OS_TYPE" = "windows" ] && [ -f "C:/Program Files/cbmc/bin/cbmc.exe" ]; then
+    echo "  ✅ cbmc: $(cygpath -u "C:/Program Files/cbmc/bin/cbmc.exe" 2>/dev/null || echo "C:/Program Files/cbmc/bin/cbmc.exe")（Windows 安装）"
+    _cbmc_found=true
+elif [ "$OS_TYPE" = "macOS" ] && [ -f "/opt/homebrew/bin/cbmc" ]; then
+    echo "  ✅ cbmc: $(/opt/homebrew/bin/cbmc --version 2>&1 | head -n1)（Homebrew）"
+    _cbmc_found=true
+elif [ "$OS_TYPE" = "macOS" ] && [ -f "/usr/local/bin/cbmc" ]; then
+    echo "  ✅ cbmc: $(/usr/local/bin/cbmc --version 2>&1 | head -n1)（Homebrew Intel）"
+    _cbmc_found=true
+fi
+if [ "$_cbmc_found" = "false" ]; then
     echo "  ⚠️  cbmc: 未安装（C 代码有界模型检查将降级为 SKIPPED）"
     echo "     安装方式："
     echo "       Windows: 下载 https://github.com/diffblue/cbmc/releases 最新 win64.msi 双击安装"
@@ -215,8 +274,9 @@ wait_for_service() {
     return 1
 }
 
-# 启动后端。--app-dir 由 Uvicorn 负责加入模块搜索路径，避免 Windows
-# Python 与 POSIX shell 对 PYTHONPATH 分隔符（; / :）的解释差异。
+# 启动后端。--app-dir 由 Uvicorn 负责加入模块搜索路径，避免
+# Windows Python 与 POSIX shell 对 PYTHONPATH 分隔符的解释差异。
+# 注：Windows 用 ';'，macOS/Linux 用 ':'。--app-dir 由 uvicorn 统一处理。
 export PYTHONUTF8=1
 export PYTHONIOENCODING=utf-8
 # HIL 仅指硬件在环；HITL 才是人工审查。

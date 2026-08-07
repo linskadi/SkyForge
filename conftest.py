@@ -12,6 +12,7 @@ def _force_mock_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SKYFORGE_LLM_MODE", "mock")
     monkeypatch.setenv("USE_LLM", "false")
     monkeypatch.setenv("HIL_ENABLED", "false")
+    monkeypatch.setenv("USE_REAL_GCC", "false")
     monkeypatch.delenv("HITL_ENABLED", raising=False)
     monkeypatch.delenv("LLM_API_KEY", raising=False)
 
@@ -24,6 +25,7 @@ def _force_mock_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "USE_LLM", False)
     monkeypatch.setattr(settings, "HIL_ENABLED", False)
     monkeypatch.setattr(settings, "HITL_ENABLED", False)
+    monkeypatch.setattr(settings, "USE_REAL_GCC", False)
 
     client = get_lmstudio_client()
     client.apply_config("mock", None, None, os.environ.get("LOCAL_LLM_BASE_URL"), None)

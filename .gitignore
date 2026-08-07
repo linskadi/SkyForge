@@ -74,3 +74,8 @@ studio/evidence_package/
 
 # === Docker ===
 docker-compose.override.yml
+
+# === Chain scripts ===
+scripts/node_modules/
+scripts/.env
+
