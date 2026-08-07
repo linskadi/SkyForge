@@ -29,7 +29,7 @@ class CppcheckStage:
     async def execute(
         self, artifact: dict[str, Any], context: dict[str, Any] | None = None
     ) -> StageResult:
-        from skyforge_engine.tools.cppcheck_scanner import scan_multi
+        from skyforge_engine.tools.base_scanner import MultiLanguageScanner
 
         context = context or {}
         hook = _normalize_hook(context.get("log_hook"))
@@ -37,7 +37,8 @@ class CppcheckStage:
 
         await hook("SYSTEM", "info", "启动 Cppcheck MISRA-C 扫描")
         sync_cb, pending_logs = _make_sync_log_collector()
-        cppcheck_result = scan_multi(code, language=self._language, log_callback=sync_cb)
+        scanner = MultiLanguageScanner()
+        cppcheck_result = scanner.scan(code, language=self._language)
         await _flush_collected_logs(hook, pending_logs)
         level = "success" if not cppcheck_result else "warn"
         await hook(

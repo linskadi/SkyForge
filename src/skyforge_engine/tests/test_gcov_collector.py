@@ -155,13 +155,17 @@ def test_collect_coverage_raises_when_gcc_missing():
             collect_coverage("int main() { return 0; }")
 
 
-def test_collect_coverage_raises_when_lcov_missing():
+def test_collect_coverage_when_lcov_missing_proceeds():
+    """lcov 现在是可选的；缺失时应继续执行（不报错），而非 raise。"""
     with patch.dict("os.environ", {"USE_REAL_COVERAGE": "true"}, clear=True), patch(
         "skyforge_engine.dal.gcov_collector._find_gcc", return_value="/usr/bin/gcc"
     ), patch(
         "skyforge_engine.dal.gcov_collector._find_lcov", return_value=None
-    ):
-        with pytest.raises(ToolNotFoundError, match="lcov"):
+    ), patch(
+        "skyforge_engine.dal.gcov_collector.subprocess.run"
+    ) as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stderr="gcc not found", stdout="")
+        with pytest.raises(RuntimeError, match="GCC 编译失败"):
             collect_coverage("int main() { return 0; }")
 
 

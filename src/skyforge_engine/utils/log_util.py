@@ -20,11 +20,8 @@ class LoggerInitializer:
         )
 
     def __ensure_log_directory_exists(self):
-        """
-        确保日志目录存在，如果不存在则创建
-        """
-        if not os.path.exists(self.log_path):
-            os.mkdir(self.log_path)
+        """确保日志目录存在，如果不存在则创建。"""
+        os.makedirs(self.log_path, exist_ok=True)
 
     def init_log(self):
         """

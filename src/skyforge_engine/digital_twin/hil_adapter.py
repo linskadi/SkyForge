@@ -53,7 +53,7 @@ class HilConfig:
     interface: str = "serial"  # "serial" | "jtag_swd" | "mock"
 
     # 串口配置
-    serial_port: str = "COM3"
+    serial_port: str = ""  # 空值，由 create_hil_adapter() 根据平台填充默认值
     baud_rate: int = 115200
     serial_timeout: int = 5
     data_bits: int = 8
@@ -864,7 +864,7 @@ class MockHilAdapter(HilAdapter):
 
 def create_hil_adapter(
     interface: str = "serial",
-    port: str = "COM3",
+    port: str = "",
     baud_rate: int = 115200,
     jtag_device: str = "STLINK",
     jtag_target: str = "STM32F407",
@@ -889,6 +889,15 @@ def create_hil_adapter(
     Returns:
         HilAdapter 实例
     """
+    # 跨平台默认串口：Windows → COM3, macOS → /dev/tty.usbserial, Linux → /dev/ttyUSB0
+    if not port:
+        import sys
+        if sys.platform == "win32":
+            port = "COM3"
+        elif sys.platform == "darwin":
+            port = "/dev/tty.usbserial"
+        else:
+            port = "/dev/ttyUSB0"
     config = HilConfig(
         interface=interface,
         serial_port=port,

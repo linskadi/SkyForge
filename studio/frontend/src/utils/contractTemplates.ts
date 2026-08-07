@@ -4,6 +4,13 @@
  * 为 Compose.vue 组件组合验证页面提供预置契约模板，支持从模板快速创建组件
  * 并填充到组合验证区域（A / B 槽位）。
  *
+ * 语言说明：categoryLabel 通过 `contractTemplate.*` i18n 命名空间动态翻译；
+ * description / code / contractYaml 为内容数据，保持中文原文。
+ */
+
+import { i18n } from "@/i18n";
+
+/**
  * 设计参考：
  * - 后端 `backend/app/core/composable/compatibility_checker.py` 兼容两种 YAML 布局：
  *   1) 顶层布局（postconditions / preconditions / invariants 在顶层）
@@ -60,7 +67,7 @@ export interface ContractTemplate {
 	name: string;
 	/** 分类 */
 	category: ContractTemplateCategory;
-	/** 分类显示名（中文） */
+	/** 分类显示名（通过 contractTemplate 命名空间 i18n 翻译） */
 	categoryLabel: string;
 	/** 模板描述 */
 	description: string;
@@ -91,7 +98,9 @@ const LOWPASS_FILTER_TEMPLATE: ContractTemplate = {
 	id: "lowpass-filter",
 	name: "LowPassFilter",
 	category: "filter",
-	categoryLabel: "滤波器",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.lowpassFilter");
+	},
 	description: "一阶 IIR 低通滤波器，可配置截止频率，用于滤除传感器高频噪声",
 	safetyLevel: "DAL-B",
 	inputs: [
@@ -202,7 +211,9 @@ const PID_CONTROLLER_TEMPLATE: ContractTemplate = {
 	id: "pid-controller",
 	name: "PIDController",
 	category: "controller",
-	categoryLabel: "控制器",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.pidController");
+	},
 	description: "增量式 PID 控制器，含积分抗饱和与输出限幅，适用于俯仰角控制",
 	safetyLevel: "DAL-A",
 	inputs: [
@@ -340,7 +351,9 @@ const SENSOR_SAMPLER_TEMPLATE: ContractTemplate = {
 	id: "sensor-sampler",
 	name: "SensorSampler",
 	category: "sampler",
-	categoryLabel: "采样器",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.sensorSampler");
+	},
 	description: "模拟传感器周期采样与 12-bit ADC 量化，含采样率约束",
 	safetyLevel: "DAL-B",
 	inputs: [
@@ -453,7 +466,9 @@ const LIMITER_TEMPLATE: ContractTemplate = {
 	id: "limiter",
 	name: "Limiter",
 	category: "limiter",
-	categoryLabel: "限幅器",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.limiter");
+	},
 	description: "上下限限幅器，将输入值钳位到 [lower_limit, upper_limit] 区间",
 	safetyLevel: "DAL-A",
 	inputs: [
@@ -563,7 +578,9 @@ const HMI_OVERLAY_TEMPLATE: ContractTemplate = {
 	id: "hmi-overlay",
 	name: "HmiOverlay",
 	category: "hmi",
-	categoryLabel: "人机界面",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.hmiOverlay");
+	},
 	description: "HUD 显示叠加组件，管理多个显示项的注册、值更新与告警等级计算",
 	safetyLevel: "DAL-B",
 	inputs: [
@@ -726,7 +743,9 @@ const SENSOR_FUSION_TEMPLATE: ContractTemplate = {
 	id: "sensor-fusion-kalman",
 	name: "SensorFusionKalman",
 	category: "sensor_fusion",
-	categoryLabel: "传感器融合",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.sensorFusionKalman");
+	},
 	description:
 		"扩展卡尔曼滤波器，融合 IMU 加速度计与 GPS 位置数据，输出最优状态估计",
 	safetyLevel: "DAL-A",
@@ -892,7 +911,9 @@ const MISSION_PLANNER_TEMPLATE: ContractTemplate = {
 	id: "mission-planner",
 	name: "MissionPlanner",
 	category: "mission_planning",
-	categoryLabel: "任务规划",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.missionPlanner");
+	},
 	description:
 		"航点列表管理与任务状态机，支持 Haversine 距离判定与任务暂停/恢复/中止",
 	safetyLevel: "DAL-B",
@@ -1092,7 +1113,9 @@ const ARINC653_PARTITION_TEMPLATE: ContractTemplate = {
 	id: "arinc653-partition",
 	name: "Arinc653Partition",
 	category: "arinc653",
-	categoryLabel: "航空分区",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.arinc653Partition");
+	},
 	description:
 		"ARINC 653 分区操作系统，支持空间/时间隔离、分区间通信与健康监控",
 	safetyLevel: "DAL-A",
@@ -1274,7 +1297,9 @@ const FREERTOS_SCHEDULER_TEMPLATE: ContractTemplate = {
 	id: "freertos-scheduler",
 	name: "FreeRTOSScheduler",
 	category: "freertos",
-	categoryLabel: "实时调度",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.freertosScheduler");
+	},
 	description:
 		"FreeRTOS 任务调度器，支持多级优先级、信号量/互斥锁同步、队列通信与软件定时器",
 	safetyLevel: "DAL-B",
@@ -1464,7 +1489,9 @@ const CPP_SMART_POINTER_TEMPLATE: ContractTemplate = {
 	id: "cpp-smart-pointer",
 	name: "CppSmartPointerManager",
 	category: "cpp",
-	categoryLabel: "C++ RAII",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.cppSmartPointer");
+	},
 	description:
 		"基于 RAII 的智能指针资源管理器，使用 std::unique_ptr/shared_ptr 管理航电系统动态资源",
 	safetyLevel: "DAL-A",
@@ -1643,7 +1670,9 @@ const CPP_EXCEPTION_TEMPLATE: ContractTemplate = {
 	id: "cpp-exception-hierarchy",
 	name: "CppExceptionHierarchy",
 	category: "cpp",
-	categoryLabel: "C++ 异常",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.cppExceptionHierarchy");
+	},
 	description: "C++ 自定义异常层次结构，支持安全执行包装器与全局异常处理器",
 	safetyLevel: "DAL-A",
 	inputs: [
@@ -1779,7 +1808,9 @@ const CPP_INHERITANCE_TEMPLATE: ContractTemplate = {
 	id: "cpp-polymorphic-handler",
 	name: "CppPolymorphicHandler",
 	category: "cpp",
-	categoryLabel: "C++ 多态",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.cppPolymorphicHandler");
+	},
 	description: "C++ 虚函数多态处理器链，支持增益/偏移/限幅处理器的动态组合",
 	safetyLevel: "DAL-B",
 	inputs: [
@@ -1931,7 +1962,9 @@ const RUST_OWNERSHIP_TEMPLATE: ContractTemplate = {
 	id: "rust-ownership-manager",
 	name: "RustOwnershipManager",
 	category: "rust",
-	categoryLabel: "Rust 所有权",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.rustOwnershipManager");
+	},
 	description:
 		"Rust 所有权与借用规则示例：航电资源管理器，演示所有权转移、不可变/可变借用",
 	safetyLevel: "DAL-A",
@@ -2085,7 +2118,9 @@ const RUST_RESULT_TEMPLATE: ContractTemplate = {
 	id: "rust-result-handler",
 	name: "RustResultHandler",
 	category: "rust",
-	categoryLabel: "Rust Result",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.rustResultHandler");
+	},
 	description: "Rust Result 错误处理示例：自定义错误类型、? 运算符、错误传播链",
 	safetyLevel: "DAL-A",
 	inputs: [
@@ -2228,7 +2263,9 @@ const RUST_ASYNC_TEMPLATE: ContractTemplate = {
 	id: "rust-async-pipeline",
 	name: "RustAsyncPipeline",
 	category: "rust",
-	categoryLabel: "Rust async",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.rustAsyncPipeline");
+	},
 	description:
 		"Rust tokio 异步并发管道，支持 Arc<Mutex> 共享状态、mpsc 通道、并发工作池",
 	safetyLevel: "DAL-B",
@@ -2398,7 +2435,11 @@ const ARINC653_PARTITION_SCHEDULER_TEMPLATE: ContractTemplate = {
 	id: "arinc653-partition-scheduler",
 	name: "Arinc653PartitionScheduler",
 	category: "arinc653",
-	categoryLabel: "ARINC653 调度配置",
+	get categoryLabel(): string {
+		return i18n.global.t(
+			"contractTemplate.category.arinc653PartitionScheduler",
+		);
+	},
 	description:
 		"ARINC 653 分区调度器配置模板，定义分区名/MTF周期/时间片/入口函数/错误处理函数，符合 DO-178C DAL-A",
 	safetyLevel: "DAL-A",
@@ -2635,7 +2676,9 @@ const FREERTOS_TASK_SCHEDULER_TEMPLATE: ContractTemplate = {
 	id: "freertos-task-scheduler",
 	name: "FreeRTOSTaskScheduler",
 	category: "freertos",
-	categoryLabel: "FreeRTOS 调度配置",
+	get categoryLabel(): string {
+		return i18n.global.t("contractTemplate.category.freertosTaskScheduler");
+	},
 	description:
 		"FreeRTOS 任务调度器配置模板，定义任务名/优先级/周期/执行预算/栈大小/队列长度，符合 DO-178C DAL-B",
 	safetyLevel: "DAL-B",

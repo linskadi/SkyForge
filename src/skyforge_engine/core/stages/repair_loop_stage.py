@@ -35,8 +35,8 @@ class RepairLoopStage:
         self, artifact: dict[str, Any], context: dict[str, Any] | None = None
     ) -> StageResult:
         from skyforge_engine.agents.code_repairer import CodeRepairerAgent
+        from skyforge_engine.tools.base_scanner import MultiLanguageScanner
         from skyforge_engine.tools.contract_checker import check as contract_check
-        from skyforge_engine.tools.cppcheck_scanner import scan_multi as cppcheck_scan
 
         context = context or {}
         hook = _normalize_hook(context.get("log_hook"))
@@ -46,6 +46,7 @@ class RepairLoopStage:
         req_id = context.get("req_id", self._req_id)
 
         repairer = CodeRepairerAgent()
+        scanner = MultiLanguageScanner()
         current_code = code
         repair_history: list[dict[str, Any]] = []
         final_violations: list[Any] = []
@@ -56,7 +57,7 @@ class RepairLoopStage:
         for iteration in range(1, self._max_iterations + 1):
             await hook("REPAIR", "info", f"第 {iteration} 轮：扫描违规")
             sync_cb, pending_logs = _make_sync_log_collector()
-            violations = cppcheck_scan(current_code, language=language, log_callback=sync_cb)
+            violations = scanner.scan(current_code, language=language)
             await _flush_collected_logs(hook, pending_logs)
             final_violations = violations
 
@@ -85,7 +86,7 @@ class RepairLoopStage:
 
             # ---- 不退步检测：修复后重新扫描，防止引入新违规 ----
             sync_cb2, pending_logs2 = _make_sync_log_collector()
-            post_repair_violations = cppcheck_scan(repair_result.code, language=language, log_callback=sync_cb2)
+            post_repair_violations = scanner.scan(repair_result.code, language=language)
             await _flush_collected_logs(hook, pending_logs2)
             if len(post_repair_violations) > len(violations) or (
                 # 检测引入新规则 ID（例如修复 15.5 时引入 15.1 goto）
@@ -149,7 +150,7 @@ class RepairLoopStage:
             current_code = repair_result.code
 
         sync_cb, pending_logs = _make_sync_log_collector()
-        final_violations = cppcheck_scan(current_code, language=language, log_callback=sync_cb)
+        final_violations = scanner.scan(current_code, language=language)
         await _flush_collected_logs(hook, pending_logs)
 
         if contract and contract_check_result is None:
@@ -174,12 +175,13 @@ class RepairLoopStage:
         post_verification: dict[str, Any] = {}
 
         try:
-            from skyforge_engine.tools.cbmc_verifier import run_cbmc_verification
+            from skyforge_engine.core.verifiers import CBMCVerifier
 
             # CBMC 仅支持 C/C++，非 C 代码跳过
             cbmc_result = None
             if language in ("c", "cpp"):
-                cbmc_result = run_cbmc_verification(current_code, unwind=10)
+                verifier = CBMCVerifier()
+                cbmc_result = verifier.verify(code=current_code, unwind=10)
             else:
                 await hook(
                     "SYSTEM",
@@ -189,26 +191,27 @@ class RepairLoopStage:
             if cbmc_result and cbmc_result.tool_available:
                 post_verification["cbmc"] = {
                     "passed": cbmc_result.passed,
-                    "status": cbmc_result.status,
+                    "status": "passed" if cbmc_result.passed else "failed",
                     "violations": len(cbmc_result.violations),
-                    "time_ms": cbmc_result.time_ms,
+                    "time_ms": cbmc_result.duration_ms,
                 }
                 await hook(
                     "SYSTEM",
                     "info",
-                    f"CBMC: {'PASSED' if cbmc_result.passed else 'FAILED'} ({cbmc_result.time_ms:.0f}ms)",
+                    f"CBMC: {'PASSED' if cbmc_result.passed else 'FAILED'} ({cbmc_result.duration_ms:.0f}ms)",
                 )
         except Exception as e:
             logger.debug(f"Pipeline:CBMC skipped: {e}")
 
         try:
-            from skyforge_engine.tools.z3_verifier import verify_contract_constraints
+            from skyforge_engine.core.verifiers import Z3Verifier
 
             if contract:
-                z3_result = verify_contract_constraints([], [{"expr": contract}])
+                verifier = Z3Verifier()
+                z3_result = verifier.verify(contract=contract)
                 if z3_result.tool_available:
                     post_verification["z3"] = {
-                        "satisfiable": z3_result.satisfiable,
+                        "satisfiable": z3_result.passed,
                         "violations": z3_result.violations,
                     }
         except Exception as e:

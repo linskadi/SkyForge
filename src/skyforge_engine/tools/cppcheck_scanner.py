@@ -212,29 +212,37 @@ def scan_with_result(
 
 
 def _find_cppcheck_cfg_dir() -> str | None:
-    """在 Windows 上搜索 Cppcheck 的 cfg 目录（含 std.cfg）。
+    """搜索 Cppcheck 的 cfg 目录（含 std.cfg）。
 
-    Cppcheck 二进制在 Windows 上可能将 FILESDIR 硬编码为构建机器路径，
+    Windows 上 Cppcheck 二进制可能将 FILESDIR 硬编码为构建机器路径，
     导致运行时找不到 std.cfg。本函数搜索实际安装路径。
+    Linux/macOS 上 cppcheck 通常安装到标准路径，但本函数仍做搜索以确保可靠。
     """
     import sys
-    if sys.platform != "win32":
-        return None
     from pathlib import Path
 
     candidates: list[str] = []
-    # 通过 cppcheck 可执行文件相对路径推导（最可靠）
+    # 通过 cppcheck 可执行文件相对路径推导（最可靠，全平台通用）
     cppcheck_path = _find_cppcheck() or shutil.which("cppcheck")
     if cppcheck_path:
         cppcheck_dir = Path(cppcheck_path).resolve().parent
         candidates.append(str(cppcheck_dir / ".." / "share" / "cppcheck" / "cfg"))
         candidates.append(str(cppcheck_dir / "cfg"))
-    # MSYS2 ucrt64 / mingw64
-    candidates.append(r"C:\msys64\ucrt64\share\cppcheck\cfg")
-    candidates.append(r"C:\msys64\mingw64\share\cppcheck\cfg")
-    # 标准安装路径
-    candidates.append(r"C:\Program Files\cppcheck\cfg")
-    candidates.append(r"C:\Program Files (x86)\cppcheck\cfg")
+
+    if sys.platform == "win32":
+        # MSYS2 ucrt64 / mingw64
+        candidates.append(r"C:\msys64\ucrt64\share\cppcheck\cfg")
+        candidates.append(r"C:\msys64\mingw64\share\cppcheck\cfg")
+        # 标准安装路径
+        candidates.append(r"C:\Program Files\cppcheck\cfg")
+        candidates.append(r"C:\Program Files (x86)\cppcheck\cfg")
+    else:
+        # Linux 标准路径
+        candidates.append("/usr/share/cppcheck/cfg")
+        candidates.append("/usr/local/share/cppcheck/cfg")
+        # macOS Homebrew 路径
+        candidates.append("/usr/local/share/cppcheck/cfg")  # Homebrew Intel
+        candidates.append("/opt/homebrew/share/cppcheck/cfg")  # Homebrew Apple Silicon
 
     for path in candidates:
         if Path(path).exists() and (Path(path) / "std.cfg").exists():
@@ -243,27 +251,35 @@ def _find_cppcheck_cfg_dir() -> str | None:
 
 
 def _find_misra_addon() -> str | None:
-    """在 Windows 上搜索 misra.py addon 的完整路径。"""
+    """搜索 misra.py addon 的完整路径。"""
     import sys
-    if sys.platform != "win32":
-        return None
     # 常见安装路径
     candidates = []
-    # MSYS2 ucrt64
-    candidates.append(r"C:\msys64\ucrt64\share\cppcheck\addons\misra.py")
-    # MSYS2 mingw64
-    candidates.append(r"C:\msys64\mingw64\share\cppcheck\addons\misra.py")
-    # 标准安装路径
-    candidates.append(r"C:\Program Files\cppcheck\addons\misra.py")
-    candidates.append(r"C:\Program Files (x86)\cppcheck\addons\misra.py")
-    # 通过 cppcheck 可执行文件定位
-    import shutil
+
+    # 通过 cppcheck 可执行文件定位（全平台通用）
     cppcheck_path = shutil.which("cppcheck")
     if cppcheck_path:
         from pathlib import Path
         cppcheck_dir = Path(cppcheck_path).parent
         candidates.append(str(cppcheck_dir / ".." / "share" / "cppcheck" / "addons" / "misra.py"))
         candidates.append(str(cppcheck_dir / "addons" / "misra.py"))
+
+    if sys.platform == "win32":
+        # MSYS2 ucrt64
+        candidates.append(r"C:\msys64\ucrt64\share\cppcheck\addons\misra.py")
+        # MSYS2 mingw64
+        candidates.append(r"C:\msys64\mingw64\share\cppcheck\addons\misra.py")
+        # 标准安装路径
+        candidates.append(r"C:\Program Files\cppcheck\addons\misra.py")
+        candidates.append(r"C:\Program Files (x86)\cppcheck\addons\misra.py")
+    else:
+        # Linux 标准路径
+        candidates.append("/usr/share/cppcheck/addons/misra.py")
+        candidates.append("/usr/local/share/cppcheck/addons/misra.py")
+        # macOS Homebrew 路径
+        candidates.append("/usr/local/share/cppcheck/addons/misra.py")  # Homebrew Intel
+        candidates.append("/opt/homebrew/share/cppcheck/addons/misra.py")  # Homebrew Apple Silicon
+
     for path in candidates:
         from pathlib import Path
         if Path(path).exists():

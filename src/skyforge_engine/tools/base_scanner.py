@@ -93,14 +93,28 @@ class CppcheckScanner(BaseScanner):
     def _find_misra_addon(self) -> str:
         """查找MISRA addon路径。"""
         import sys
+        candidates = []
+        # 通过 cppcheck 可执行文件定位（全平台通用）
+        cppcheck_path = shutil.which("cppcheck")
+        if cppcheck_path:
+            from pathlib import Path
+            cppcheck_dir = Path(cppcheck_path).parent
+            candidates.append(str(cppcheck_dir / ".." / "share" / "cppcheck" / "addons" / "misra.py"))
+            candidates.append(str(cppcheck_dir / "addons" / "misra.py"))
+
         if sys.platform == "win32":
-            candidates = [
-                r"C:\msys64\ucrt64\share\cppcheck\addons\misra.py",
-                r"C:\msys64\mingw64\share\cppcheck\addons\misra.py",
-            ]
-            for path in candidates:
-                if os.path.exists(path):
-                    return path
+            candidates.append(r"C:\msys64\ucrt64\share\cppcheck\addons\misra.py")
+            candidates.append(r"C:\msys64\mingw64\share\cppcheck\addons\misra.py")
+        else:
+            # Linux 标准路径
+            candidates.append("/usr/share/cppcheck/addons/misra.py")
+            candidates.append("/usr/local/share/cppcheck/addons/misra.py")
+            # macOS Homebrew 路径
+            candidates.append("/opt/homebrew/share/cppcheck/addons/misra.py")  # Apple Silicon
+
+        for path in candidates:
+            if os.path.exists(path):
+                return path
         return ""
     
     def is_available(self) -> bool:

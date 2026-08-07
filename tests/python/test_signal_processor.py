@@ -25,7 +25,6 @@ from signal_processor import (
     DataQuality,
     create_processor,
     validate_input,
-    MAX_BUFFER_SIZE,
 )
 
 
@@ -192,7 +191,6 @@ class TestCodingStandards:
 
     def test_snake_case_naming(self):
         """验证 snake_case 命名规范。"""
-        import inspect
         from signal_processor import SignalProcessor, create_processor, validate_input
         
         # 检查方法名

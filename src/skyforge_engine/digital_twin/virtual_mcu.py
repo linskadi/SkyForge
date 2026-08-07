@@ -51,7 +51,7 @@ class HILConfig:
     """
 
     mode: HILMode = HILMode.VIRTUAL
-    serial_port: str = "COM3"
+    serial_port: str = ""  # 空值，由 from_settings() 根据平台填充默认值
     baud_rate: int = 115200
     serial_timeout: int = 5
     jtag_device: str = "STLINK"
@@ -64,13 +64,20 @@ class HILConfig:
     @classmethod
     def from_settings(cls) -> "HILConfig":
         """从全局配置构建 HILConfig。"""
+        import sys
         mode_str = getattr(settings, "HIL_INTERFACE", "serial")
         mode = HILMode.SERIAL if mode_str == "serial" else HILMode.JTAG_SWD
         if not getattr(settings, "HIL_ENABLED", False):
             mode = HILMode.VIRTUAL
+        # 跨平台默认串口：Windows → COM3，macOS → /dev/tty.usbserial，Linux → /dev/ttyUSB0
+        default_port = "COM3"
+        if sys.platform == "darwin":
+            default_port = "/dev/tty.usbserial"
+        elif sys.platform.startswith("linux"):
+            default_port = "/dev/ttyUSB0"
         return cls(
             mode=mode,
-            serial_port=getattr(settings, "HIL_SERIAL_PORT", "COM3"),
+            serial_port=getattr(settings, "HIL_SERIAL_PORT", default_port),
             baud_rate=getattr(settings, "HIL_BAUD_RATE", 115200),
             serial_timeout=getattr(settings, "HIL_SERIAL_TIMEOUT", 5),
             jtag_device=getattr(settings, "HIL_JTAG_DEVICE", "STLINK"),

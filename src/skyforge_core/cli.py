@@ -77,21 +77,47 @@ def cmd_check(args: argparse.Namespace) -> int:
     code = Path(args.code).read_text(encoding="utf-8")
     contract = Path(args.contract).read_text(encoding="utf-8") if args.contract else None
 
-    from skyforge_engine.tools.cppcheck_scanner import scan as cppcheck_scan
+    from skyforge_engine.core.verifiers import CppcheckVerifier
     from skyforge_engine.tools.contract_checker import check as contract_check
 
     logger.info(f"SkyForge Core: 开始校验 {args.code}")
 
-    violations = cppcheck_scan(code)
+    # 使用 L3 验证器层 CppcheckVerifier（真实 Cppcheck）。
+    # cppcheck 不可用时降级为 Mock 模式扫描，保持离线可用（与后端 Pipeline 行为一致）。
+    verifier = CppcheckVerifier()
+    if verifier.is_available():
+        verification = verifier.verify(code)
+        violations = verification.violations
+        engine = "cppcheck"
+    else:
+        logger.warning("SkyForge Core: cppcheck 不可用，降级为 Mock 模式扫描")
+        from skyforge_engine.tools.base_scanner import MultiLanguageScanner
+
+        scanner = MultiLanguageScanner()
+        raw = scanner.scan(code, language="c")
+        violations = [
+            {
+                "file": v.file,
+                "line": v.line,
+                "column": v.column,
+                "severity": v.severity,
+                "rule_id": v.rule_id,
+                "message": v.message,
+            }
+            for v in raw
+        ]
+        engine = "mock"
+
     contract_result = None
     if contract:
         contract_result = contract_check(code, contract)
 
     # 输出结果
     print("=== MISRA-C 扫描 ===")
+    print(f"引擎: {engine}")
     print(f"违规数: {len(violations)}")
     for v in violations:
-        print(f"  [{v.rule_id}] L{v.line}: {v.message}")
+        print(f"  [{v['rule_id']}] L{v['line']}: {v['message']}")
 
     if contract_result:
         passed = contract_result.passed if hasattr(contract_result, 'passed') else contract_result.get("passed", False)
@@ -203,11 +229,18 @@ def cmd_verify(args: argparse.Namespace) -> int:
         else:
             logger.warning(f"代码文件不存在，跳过 CBMC: {code_path}")
 
-    from skyforge_engine.tools.contract_formal_verifier import verify_contract
+    from skyforge_engine.core.protocols import ToolNotFoundError
+    from skyforge_engine.core.verifiers import ContractVerifier
 
     logger.info(f"SkyForge Core: 开始形式化验证 {contract_path}")
 
-    verification = verify_contract(contract_text, code=code_text)
+    verifier = ContractVerifier()
+    try:
+        verification = verifier.verify(contract=contract_text, code=code_text)
+    except (ToolNotFoundError, ValueError) as exc:
+        logger.error(f"SkyForge Core: 契约形式化验证失败: {exc}")
+        print(f"❌ 契约形式化验证失败: {exc}")
+        return 2
     checks = _build_verification_checks(verification)
     summary = _summarize_checks(checks)
     tool_label = _verification_tool_label(verification)
@@ -243,25 +276,26 @@ def cmd_verify(args: argparse.Namespace) -> int:
 def _build_verification_checks(verification) -> list[dict]:
     """将底层 VerificationResult 转换为结构化检查项列表。
 
-    映射规则（保持与 verify_contract 接口向后兼容，不修改底层逻辑）：
+    映射规则（使用 ContractVerifier，结果存于 VerificationResult.metadata）：
     - 约束一致性 (Z3): PASS/FAIL/SKIPPED，反例来自 contradictions
     - 边界测试用例生成 (Z3): PASS/SKIPPED
     - 有界模型检查 (CBMC): PASS/FAIL/SKIPPED，反例来自 cbmc_output
     """
+    meta = verification.metadata
     checks: list[dict] = []
 
     # Check 1: Z3 约束一致性
-    if verification.z3_available:
+    if meta.get("z3_available"):
         counter_example = None
         status = "passed"
-        if not verification.is_consistent:
+        if not meta.get("is_consistent"):
             status = "failed"
-            counter_example = "; ".join(verification.contradictions) if verification.contradictions else "约束不可同时满足"
+            counter_example = "; ".join(meta.get("contradictions") or []) or "约束不可同时满足"
         checks.append({
             "name": "Constraint consistency",
             "tool": "Z3",
             "status": status,
-            "duration_ms": int(verification.z3_solver_time_ms or 0),
+            "duration_ms": int(meta.get("z3_solver_time_ms") or 0),
             "counter_example": counter_example,
         })
     else:
@@ -274,11 +308,11 @@ def _build_verification_checks(verification) -> list[dict]:
         })
 
     # Check 2: Z3 边界测试用例生成
-    if verification.z3_available:
-        if verification.test_case_count > 0:
+    if meta.get("z3_available"):
+        if (meta.get("test_case_count") or 0) > 0:
             status = "passed"
             counter_example = None
-        elif not verification.is_consistent:
+        elif not meta.get("is_consistent"):
             status = "skipped"
             counter_example = "契约不一致，跳过测试用例生成"
         else:
@@ -301,18 +335,18 @@ def _build_verification_checks(verification) -> list[dict]:
         })
 
     # Check 3: CBMC 有界模型检查
-    if verification.cbmc_available:
-        if verification.cbmc_verified:
+    if meta.get("cbmc_available"):
+        if meta.get("cbmc_verified"):
             status = "passed"
             counter_example = None
         else:
             status = "failed"
-            counter_example = verification.cbmc_output[:500] if verification.cbmc_output else "CBMC 验证未通过"
+            counter_example = meta.get("cbmc_output", "")[:500] or "CBMC 验证未通过"
         checks.append({
             "name": "Bounded model checking",
             "tool": "CBMC",
             "status": status,
-            "duration_ms": int(verification.cbmc_time_ms or 0),
+            "duration_ms": int(meta.get("cbmc_time_ms") or 0),
             "counter_example": counter_example,
         })
     else:
@@ -347,10 +381,11 @@ def _summarize_checks(checks: list[dict]) -> dict:
 
 def _verification_tool_label(verification) -> str:
     """生成顶部 Tool 标签：Z3 / CBMC / Z3+CBMC / Mock。"""
+    meta = verification.metadata
     tools = []
-    if verification.z3_available:
+    if meta.get("z3_available"):
         tools.append("Z3")
-    if verification.cbmc_available:
+    if meta.get("cbmc_available"):
         tools.append("CBMC")
     if not tools:
         return "Mock (Z3/CBMC 均不可用)"

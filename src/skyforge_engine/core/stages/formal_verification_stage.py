@@ -28,24 +28,30 @@ class FormalVerificationStage:
         contract = artifact.get("contract", "")
 
         try:
-            from skyforge_engine.tools.contract_formal_verifier import verify_contract
+            from skyforge_engine.core.verifiers import ContractVerifier
 
-            formal_result = verify_contract(contract, code=None)
-            artifact["formal_verification"] = formal_result.to_dict()
-            if not formal_result.is_consistent:
+            verifier = ContractVerifier()
+            formal_result = verifier.verify(code="", contract=contract)
+            artifact["formal_verification"] = {
+                "passed": formal_result.passed,
+                "tool_available": formal_result.tool_available,
+                "violations": formal_result.violations,
+                "output": formal_result.output,
+                "duration_ms": formal_result.duration_ms,
+            }
+            if not formal_result.passed:
                 await hook(
                     "SYSTEM",
                     "warn",
-                    f"契约形式化验证发现 {len(formal_result.contradictions)} 处逻辑矛盾，"
+                    f"契约形式化验证发现 {len(formal_result.violations)} 处逻辑矛盾，"
                     "建议审查契约条件",
                 )
             else:
                 await hook(
                     "SYSTEM",
                     "info",
-                    f"契约形式化验证通过 (Z3: {'可用' if formal_result.z3_available else '不可用'}, "
-                    f"CBMC: {'可用' if formal_result.cbmc_available else ' unavailable'})"
-                    f"{' + 生成' + str(formal_result.test_case_count) + '个边界测试用例' if formal_result.test_case_count > 0 else ''}",
+                    f"契约形式化验证通过 "
+                    f"(tool_available={formal_result.tool_available})",
                 )
         except ImportError:
             await hook("SYSTEM", "info", "契约形式化验证跳过 (模块未安装)")

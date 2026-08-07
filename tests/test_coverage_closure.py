@@ -49,7 +49,6 @@ int main() {
     assert "method" in result, "method 字段必须存在"
     assert result["method"] in ("gcov", "static_analysis"), f"method 值异常: {result['method']}"
     print(f"\n  ✅ 补丁1验证通过：method={result['method']}")
-    return result
 
 
 def test_patch3_do178_objectives_with_method():
@@ -163,12 +162,11 @@ def test_patch2_report_generator_renders_coverage():
         assert "静态分析回退" in html, "HTML 应显示静态分析回退标签"
         assert "判定点详情" in html, "HTML 应包含判定点详情表"
         print("\n  ✅ 补丁2验证通过：HTML 正确渲染覆盖率区块")
-        return html
     except Exception as e:
         print(f"  ❌ 补丁2验证失败: {e}")
         import traceback
         traceback.print_exc()
-        return None
+        raise
 
 
 def test_fallback_behavior():

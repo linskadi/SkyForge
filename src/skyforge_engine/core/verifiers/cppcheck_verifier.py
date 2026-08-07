@@ -193,18 +193,27 @@ class CppcheckVerifier:
             return self._parse_output(combined, src_path)
 
     def _find_misra_addon(self) -> str | None:
-        if sys.platform != "win32":
-            return None
         candidates: list[str] = []
-        candidates.append(r"C:\msys64\ucrt64\share\cppcheck\addons\misra.py")
-        candidates.append(r"C:\msys64\mingw64\share\cppcheck\addons\misra.py")
-        candidates.append(r"C:\Program Files\cppcheck\addons\misra.py")
-        candidates.append(r"C:\Program Files (x86)\cppcheck\addons\misra.py")
+        # 通过 cppcheck 可执行文件定位（全平台通用）
         cppcheck_path = shutil.which("cppcheck")
         if cppcheck_path:
             cppcheck_dir = Path(cppcheck_path).parent
             candidates.append(str(cppcheck_dir / ".." / "share" / "cppcheck" / "addons" / "misra.py"))
             candidates.append(str(cppcheck_dir / "addons" / "misra.py"))
+
+        if sys.platform == "win32":
+            candidates.append(r"C:\msys64\ucrt64\share\cppcheck\addons\misra.py")
+            candidates.append(r"C:\msys64\mingw64\share\cppcheck\addons\misra.py")
+            candidates.append(r"C:\Program Files\cppcheck\addons\misra.py")
+            candidates.append(r"C:\Program Files (x86)\cppcheck\addons\misra.py")
+        else:
+            # Linux 标准路径
+            candidates.append("/usr/share/cppcheck/addons/misra.py")
+            candidates.append("/usr/local/share/cppcheck/addons/misra.py")
+            # macOS Homebrew 路径
+            candidates.append("/usr/local/share/cppcheck/addons/misra.py")  # Homebrew Intel
+            candidates.append("/opt/homebrew/share/cppcheck/addons/misra.py")  # Homebrew Apple Silicon
+
         for path in candidates:
             if Path(path).exists():
                 return path
