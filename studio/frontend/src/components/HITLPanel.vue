@@ -25,13 +25,13 @@ import {
  *
  * 注意：与 HIL（Hardware-in-the-Loop 硬件在环）无关，HIL 位于 digital_twin/ 目录。
  */
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import SourceBadge from "@/components/SourceBadge.vue";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getHITLHistory } from "@/services/api";
 import { getApi } from "@/services/apiSwitcher";
-import { useExecutionStore } from "@/stores/executionStore";
 import type { ReviewTemplate } from "@/stores/hitlStore";
 import { useHITLStore } from "@/stores/hitlStore";
 import type {
@@ -40,8 +40,8 @@ import type {
 	HITLHistoryItem,
 } from "@/types/domain";
 
-const execution = useExecutionStore();
 const hitlStore = useHITLStore();
+const { t } = useI18n();
 
 const expandedTemplate = ref<ReviewTemplate | null>(null);
 
@@ -94,7 +94,8 @@ const loadPending = async () => {
 		historyList.value = history;
 	} catch (err) {
 		console.error("[HITLPanel] 加载失败：", err);
-		errorMsg.value = err instanceof Error ? err.message : "加载失败";
+		errorMsg.value =
+			err instanceof Error ? err.message : t("hitlPanel.loadFailed");
 		// 历史加载失败时清空，避免显示陈旧数据
 		historyList.value = [];
 	} finally {
@@ -142,7 +143,8 @@ const onApprove = async (item: HITLApproval) => {
 		showHistory.value = true;
 	} catch (err) {
 		console.error("[HITLPanel] 批准失败：", err);
-		errorMsg.value = err instanceof Error ? err.message : "批准失败";
+		errorMsg.value =
+			err instanceof Error ? err.message : t("hitlPanel.approveFailed");
 	} finally {
 		actionLoading.value = { ...actionLoading.value, [item.request_id]: false };
 	}
@@ -152,7 +154,7 @@ const onApprove = async (item: HITLApproval) => {
 const onReject = async (item: HITLApproval) => {
 	const comments = getComment(item.request_id);
 	if (!comments.trim()) {
-		errorMsg.value = "拒绝时必须填写理由";
+		errorMsg.value = t("hitlPanel.rejectRequiresReason");
 		return;
 	}
 	actionLoading.value = { ...actionLoading.value, [item.request_id]: true };
@@ -162,7 +164,8 @@ const onReject = async (item: HITLApproval) => {
 		showHistory.value = true;
 	} catch (err) {
 		console.error("[HITLPanel] 拒绝失败：", err);
-		errorMsg.value = err instanceof Error ? err.message : "拒绝失败";
+		errorMsg.value =
+			err instanceof Error ? err.message : t("hitlPanel.rejectFailed");
 	} finally {
 		actionLoading.value = { ...actionLoading.value, [item.request_id]: false };
 	}
@@ -174,7 +177,7 @@ const remainingTime = (
 ): { text: string; urgent: boolean; expired: boolean } => {
 	const diff = deadline - now.value;
 	if (diff <= 0) {
-		return { text: "已超时", urgent: true, expired: true };
+		return { text: t("hitlPanel.expired"), urgent: true, expired: true };
 	}
 	const minutes = Math.floor(diff / 60000);
 	const seconds = Math.floor((diff % 60000) / 1000);
@@ -194,6 +197,17 @@ const formatTime = (ts: number): string => {
 
 /** 待审批数量 */
 const pendingCount = computed(() => pendingList.value.length);
+
+/** 审批结果状态标签：已知状态映射到 i18n 键，未知状态原样透传 */
+const approvalStatusKeyMap: Record<string, string> = {
+	approved: "hitlPanel.status.approved",
+	rejected: "hitlPanel.status.rejected",
+};
+
+const approvalStatusLabel = (status: string): string => {
+	const key = approvalStatusKeyMap[status];
+	return key ? t(key) : status;
+};
 
 onMounted(() => {
 	loadPending();
@@ -233,17 +247,17 @@ function handleVisibilityChange() {
       <CardTitle class="card-title">
         <ClipboardList class="title-icon" />
         <div class="flex items-center gap-2">
-          <span>HITL 人工审查</span>
-          <SourceBadge source="observed" label="人工审查" />
+          <span>{{ $t("hitlPanel.title") }}</span>
+          <SourceBadge source="observed" :label="$t('hitlPanel.manualReview')" />
         </div>
         <span class="title-hint">
-          待审批
+          {{ $t("hitlPanel.pending") }}
           <span class="count-badge">{{ pendingCount }}</span>
         </span>
         <Button variant="ghost" size="sm" class="refresh-btn" :disabled="loading" @click="loadPending">
           <RefreshCw v-if="loading" class="animate-spin" />
           <RefreshCw v-else />
-          刷新
+          {{ $t("hitlPanel.refresh") }}
         </Button>
       </CardTitle>
     </CardHeader>
@@ -251,17 +265,17 @@ function handleVisibilityChange() {
       <div v-if="errorMsg" class="error-msg">
         <AlertCircle class="error-icon" />
         <span>{{ errorMsg }}</span>
-        <button type="button" class="retry-btn" @click="loadPending">重试</button>
+        <button type="button" class="retry-btn" @click="loadPending">{{ $t("hitlPanel.retry") }}</button>
       </div>
 
       <div v-if="loading && pendingList.length === 0" class="loading-state">
         <Loader2 class="animate-spin" />
-        <p>正在加载待审批列表...</p>
+        <p>{{ $t("hitlPanel.loadingPending") }}</p>
       </div>
 
       <div v-else-if="pendingList.length === 0" class="empty-state">
         <CheckCircle2 class="success-icon" />
-        <p>暂无待审批项</p>
+        <p>{{ $t("hitlPanel.emptyPending") }}</p>
       </div>
 
       <!-- 待审批列表 -->
@@ -299,12 +313,12 @@ function handleVisibilityChange() {
               <pre>{{ item.content_detail }}</pre>
             </div>
             <div class="meta-row">
-              <span>提交时间：{{ formatTime(item.submitted_at) }}</span>
-              <span>截止时间：{{ formatTime(item.deadline) }}</span>
+              <span>{{ $t("hitlPanel.submittedAt", { time: formatTime(item.submitted_at) }) }}</span>
+              <span>{{ $t("hitlPanel.deadline", { time: formatTime(item.deadline) }) }}</span>
             </div>
             <div v-if="expandedTemplate && expandedTemplate.items.length > 0" class="template-section">
               <div class="template-header">
-                <span class="template-title">审查模板</span>
+                <span class="template-title">{{ $t("hitlPanel.reviewTemplate") }}</span>
                 <span class="template-version">v{{ expandedTemplate.version }}</span>
               </div>
               <div class="template-items">
@@ -322,7 +336,7 @@ function handleVisibilityChange() {
               class="comment-input"
               :value="getComment(item.request_id)"
               @input="setComment(item.request_id, ($event.target as HTMLTextAreaElement).value)"
-              placeholder="请输入审批评论（拒绝时必填）..."
+              :placeholder="$t('hitlPanel.commentPlaceholder')"
               rows="3"
             />
             <div class="action-row">
@@ -332,7 +346,7 @@ function handleVisibilityChange() {
               >
                 <CheckCircle2 v-if="!actionLoading[item.request_id]" />
                 <Loader2 v-else class="animate-spin" />
-                批准
+                {{ $t("hitlPanel.approveBtn") }}
               </Button>
               <Button
                 variant="outline"
@@ -340,7 +354,7 @@ function handleVisibilityChange() {
                 @click="onReject(item)"
               >
                 <XCircle />
-                拒绝
+                {{ $t("hitlPanel.rejectBtn") }}
               </Button>
             </div>
           </div>
@@ -351,7 +365,7 @@ function handleVisibilityChange() {
       <div class="history-section">
         <div class="history-header" @click="showHistory = !showHistory">
           <History class="history-icon" />
-          <span class="history-title">审批历史</span>
+          <span class="history-title">{{ $t("hitlPanel.history") }}</span>
           <span class="count-badge">{{ historyList.length }}</span>
           <component
             :is="showHistory ? ChevronDown : ChevronRight"
@@ -360,7 +374,7 @@ function handleVisibilityChange() {
         </div>
         <div v-if="showHistory" class="history-list">
           <div v-if="historyList.length === 0" class="empty-state small">
-            <p>暂无审批历史</p>
+            <p>{{ $t("hitlPanel.emptyHistory") }}</p>
           </div>
           <div
             v-for="h in historyList"
@@ -373,12 +387,12 @@ function handleVisibilityChange() {
               <span class="history-name">{{ h.checkpoint_name }}</span>
               <code class="request-id">{{ h.request_id }}</code>
               <span class="status-badge" :class="h.status">
-                {{ h.status === "approved" ? "✅ 已批准" : "❌ 已拒绝" }}
+                {{ approvalStatusLabel(h.status) }}
               </span>
               <span v-if="h.reviewed_at" class="reviewed-time">{{ formatTime(h.reviewed_at) }}</span>
             </div>
             <div v-if="h.comments" class="history-comments">
-              评论：{{ h.comments }}
+              {{ $t("hitlPanel.comment", { comment: h.comments }) }}
             </div>
           </div>
         </div>

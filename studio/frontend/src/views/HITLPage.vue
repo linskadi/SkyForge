@@ -17,6 +17,7 @@ import {
 	XCircle,
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +26,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { getHITLHistory } from "@/services/api";
 import { getApi } from "@/services/apiSwitcher";
-import { useExecutionStore } from "@/stores/executionStore";
 import type { ReviewComment, ReviewTemplate } from "@/stores/hitlStore";
 import { useHITLStore } from "@/stores/hitlStore";
 import type {
@@ -35,8 +35,8 @@ import type {
 } from "@/types/domain";
 
 const router = useRouter();
-const execution = useExecutionStore();
 const hitlStore = useHITLStore();
+const { t } = useI18n();
 
 const currentTemplate = ref<ReviewTemplate | null>(null);
 const currentComments = ref<ReviewComment[]>([]);
@@ -62,25 +62,25 @@ const historyFilterResult = ref<HistoryFilterResult>("all");
 
 const checkpointConfig: Record<
 	HITLCheckpointType,
-	{ name: string; icon: string; color: string }
+	{ nameKey: string; icon: string; color: string }
 > = {
 	requirement_review: {
-		name: "需求审查",
+		nameKey: "hitl.checkpoint.requirement_review",
 		icon: "📝",
 		color: "text-sky-500 bg-sky-500/10",
 	},
 	contract_review: {
-		name: "契约审查",
+		nameKey: "hitl.checkpoint.contract_review",
 		icon: "📋",
 		color: "text-violet-500 bg-violet-500/10",
 	},
 	code_review: {
-		name: "代码审查",
+		nameKey: "hitl.checkpoint.code_review",
 		icon: "💻",
 		color: "text-emerald-500 bg-emerald-500/10",
 	},
 	final_review: {
-		name: "最终审查",
+		nameKey: "hitl.checkpoint.final_review",
 		icon: "🏁",
 		color: "text-rose-500 bg-rose-500/10",
 	},
@@ -109,28 +109,28 @@ const stats = computed<StatCard[]>(() => {
 
 	return [
 		{
-			label: "待审查",
+			label: t("hitl.statPending"),
 			value: pending,
 			trend: 2,
 			icon: ClipboardList,
 			variant: "default",
 		},
 		{
-			label: "已通过",
+			label: t("hitl.statApproved"),
 			value: approved,
 			trend: 5,
 			icon: ShieldCheck,
 			variant: "success",
 		},
 		{
-			label: "已拒绝",
+			label: t("hitl.statRejected"),
 			value: rejected,
 			trend: -1,
 			icon: ShieldX,
 			variant: "destructive",
 		},
 		{
-			label: "超时",
+			label: t("hitl.statTimeout"),
 			value: timeout,
 			trend: 0,
 			icon: Clock,
@@ -182,7 +182,7 @@ const loadPending = async () => {
 		}
 	} catch (err) {
 		console.error("[HITLPage] 加载失败：", err);
-		errorMsg.value = err instanceof Error ? err.message : "加载失败";
+		errorMsg.value = err instanceof Error ? err.message : t("hitl.loadFailed");
 	} finally {
 		loading.value = false;
 	}
@@ -193,7 +193,7 @@ const remainingTime = (
 ): { text: string; urgent: boolean; expired: boolean } => {
 	const diff = deadline - now.value;
 	if (diff <= 0) {
-		return { text: "已超时", urgent: true, expired: true };
+		return { text: t("hitl.expired"), urgent: true, expired: true };
 	}
 	const minutes = Math.floor(diff / 60000);
 	const seconds = Math.floor((diff % 60000) / 1000);
@@ -202,12 +202,6 @@ const remainingTime = (
 		urgent: diff < 5 * 60 * 1000,
 		expired: false,
 	};
-};
-
-const formatTime = (ts: number): string => {
-	const d = new Date(ts);
-	const pad = (n: number) => n.toString().padStart(2, "0");
-	return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
 const formatFullTime = (ts: number): string => {
@@ -241,7 +235,8 @@ const onApprove = async () => {
 		await loadPending();
 	} catch (err) {
 		console.error("[HITLPage] 批准失败：", err);
-		errorMsg.value = err instanceof Error ? err.message : "批准失败";
+		errorMsg.value =
+			err instanceof Error ? err.message : t("hitl.approveFailed");
 	} finally {
 		actionLoading.value = { ...actionLoading.value, [item.request_id]: false };
 	}
@@ -251,7 +246,7 @@ const onReject = async () => {
 	const item = selectedItem.value;
 	if (!item) return;
 	if (!commentText.value.trim()) {
-		errorMsg.value = "拒绝时必须填写理由";
+		errorMsg.value = t("hitl.rejectRequiresReason");
 		return;
 	}
 	actionLoading.value = { ...actionLoading.value, [item.request_id]: true };
@@ -261,7 +256,8 @@ const onReject = async () => {
 		await loadPending();
 	} catch (err) {
 		console.error("[HITLPage] 拒绝失败：", err);
-		errorMsg.value = err instanceof Error ? err.message : "拒绝失败";
+		errorMsg.value =
+			err instanceof Error ? err.message : t("hitl.rejectFailed");
 	} finally {
 		actionLoading.value = { ...actionLoading.value, [item.request_id]: false };
 	}
@@ -333,10 +329,25 @@ const nextStatus = (current: string): "open" | "addressed" | "resolved" => {
 	return "open";
 };
 
-const statusLabel: Record<string, string> = {
-	open: "待处理",
-	addressed: "已回应",
-	resolved: "已解决",
+const commentStatusKeyMap: Record<string, string> = {
+	open: "hitl.commentStatus.open",
+	addressed: "hitl.commentStatus.addressed",
+	resolved: "hitl.commentStatus.resolved",
+};
+
+const statusLabel = (status: string): string => {
+	const key = commentStatusKeyMap[status];
+	return key ? t(key) : status;
+};
+
+const approvalStatusKeyMap: Record<string, string> = {
+	approved: "hitl.status.approved",
+	rejected: "hitl.status.rejected",
+};
+
+const approvalStatusLabel = (status: string): string => {
+	const key = approvalStatusKeyMap[status];
+	return key ? t(key) : status;
 };
 
 const statusClass: Record<string, string> = {
@@ -383,17 +394,17 @@ function handleVisibilityChange() {
 					<button
 						class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:border-primary hover:text-primary"
 						@click="router.push('/')"
-						title="返回首页"
+						:title="$t('hitl.backHome')"
 					>
 						<ArrowLeft class="h-4 w-4" />
 					</button>
 					<h1 class="text-2xl font-semibold text-foreground flex items-center gap-2">
 						<ClipboardList class="h-6 w-6 text-primary" />
-						HITL 审查工作台
+						{{ $t("hitl.title") }}
 					</h1>
 				</div>
 				<p class="text-sm text-muted-foreground ml-11">
-					需求审查 / 契约审查 / 代码审查 / 最终审查 — Human-in-the-Loop 检查点管理
+					{{ $t("hitl.subtitle") }}
 				</p>
 			</header>
 
@@ -416,7 +427,7 @@ function handleVisibilityChange() {
 											: 'text-rose-500'
 									"
 								>
-									{{ stat.trend >= 0 ? "+" : "" }}{{ stat.trend }} 较昨日
+									{{ stat.trend >= 0 ? "+" : "" }}{{ stat.trend }} {{ $t("hitl.trendVsYesterday") }}
 								</p>
 							</div>
 							<div
@@ -439,12 +450,12 @@ function handleVisibilityChange() {
 				<TabsList class="mb-6">
 					<TabsTrigger value="pending" class="gap-2">
 						<Shield class="h-4 w-4" />
-						待审查
+						{{ $t("hitl.tabPending") }}
 						<Badge variant="secondary" class="ml-1">{{ pendingList.length }}</Badge>
 					</TabsTrigger>
 					<TabsTrigger value="history" class="gap-2">
 						<History class="h-4 w-4" />
-						审查历史
+						{{ $t("hitl.tabHistory") }}
 					</TabsTrigger>
 				</TabsList>
 
@@ -455,9 +466,9 @@ function handleVisibilityChange() {
 						>
 							<CardHeader class="pb-3 border-b border-border">
 								<div class="flex items-center justify-between">
-									<CardTitle class="text-base font-semibold">
-										待审查列表
-									</CardTitle>
+								<CardTitle class="text-base font-semibold">
+									{{ $t("hitl.pendingListTitle") }}
+								</CardTitle>
 									<Button
 										variant="ghost"
 										size="sm"
@@ -473,11 +484,11 @@ function handleVisibilityChange() {
 							<CardContent class="p-0">
 								<div v-if="loading && pendingList.length === 0" class="p-8 text-center">
 									<Loader2 class="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-									<p class="mt-2 text-sm text-muted-foreground">加载中...</p>
+									<p class="mt-2 text-sm text-muted-foreground">{{ $t("hitl.loading") }}</p>
 								</div>
 								<div v-else-if="pendingList.length === 0" class="p-8 text-center">
 									<CheckCircle2 class="h-8 w-8 mx-auto text-emerald-500" />
-									<p class="mt-2 text-sm text-muted-foreground">暂无待审查项</p>
+									<p class="mt-2 text-sm text-muted-foreground">{{ $t("hitl.emptyPending") }}</p>
 								</div>
 								<div v-else class="max-h-[600px] overflow-y-auto">
 									<template
@@ -486,7 +497,7 @@ function handleVisibilityChange() {
 									>
 										<div v-if="items.length > 0" class="px-4 py-2 bg-muted/30 border-b border-border">
 											<span class="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-												{{ checkpointConfig[type as HITLCheckpointType].name }}
+												{{ $t(checkpointConfig[type as HITLCheckpointType].nameKey) }}
 												({{ items.length }})
 											</span>
 										</div>
@@ -554,14 +565,14 @@ function handleVisibilityChange() {
 						>
 							<CardHeader class="pb-3 border-b border-border">
 								<CardTitle class="text-base font-semibold">
-									详情预览
+									{{ $t("hitl.detailPreview") }}
 								</CardTitle>
 							</CardHeader>
 							<CardContent class="p-0">
 								<div v-if="!selectedItem" class="p-8 text-center">
 									<FileText class="h-8 w-8 mx-auto text-muted-foreground" />
 									<p class="mt-2 text-sm text-muted-foreground">
-										请选择一个审查项
+										{{ $t("hitl.selectPrompt") }}
 									</p>
 								</div>
 								<template v-else>
@@ -579,13 +590,13 @@ function handleVisibilityChange() {
 										</div>
 										<div class="grid grid-cols-2 gap-4 text-sm">
 											<div>
-												<p class="text-muted-foreground mb-1">提交时间</p>
+												<p class="text-muted-foreground mb-1">{{ $t("hitl.submittedAt") }}</p>
 												<p class="font-medium">
 													{{ formatFullTime(selectedItem.submitted_at) }}
 												</p>
 											</div>
 											<div>
-												<p class="text-muted-foreground mb-1">截止时间</p>
+												<p class="text-muted-foreground mb-1">{{ $t("hitl.deadline") }}</p>
 												<p
 													class="font-medium"
 													:class="{
@@ -601,7 +612,7 @@ function handleVisibilityChange() {
 									</div>
 									<div class="p-5 border-b border-border">
 										<h4 class="text-sm font-semibold text-foreground mb-3">
-											内容预览
+											{{ $t("hitl.contentPreview") }}
 										</h4>
 										<p class="text-sm text-muted-foreground mb-3">
 											{{ selectedItem.content_preview }}
@@ -617,21 +628,21 @@ function handleVisibilityChange() {
 									</div>
 									<div class="p-5">
 										<h4 class="text-sm font-semibold text-foreground mb-3">
-											关联任务信息
+											{{ $t("hitl.taskInfo") }}
 										</h4>
 										<div class="grid grid-cols-3 gap-4 text-sm">
 											<div>
-												<p class="text-muted-foreground mb-1">任务ID</p>
+												<p class="text-muted-foreground mb-1">{{ $t("hitl.taskId") }}</p>
 												<p class="font-medium font-mono text-xs">
 													TASK-{{ selectedItem.request_id.split("-").pop() }}
 												</p>
 											</div>
 											<div>
-												<p class="text-muted-foreground mb-1">语言</p>
+												<p class="text-muted-foreground mb-1">{{ $t("hitl.language") }}</p>
 												<p class="font-medium">C</p>
 											</div>
 											<div>
-												<p class="text-muted-foreground mb-1">模型</p>
+												<p class="text-muted-foreground mb-1">{{ $t("hitl.model") }}</p>
 												<p class="font-medium">DeepSeek</p>
 											</div>
 										</div>
@@ -639,14 +650,14 @@ function handleVisibilityChange() {
 									<div v-if="currentTemplate" class="p-5 border-t border-border">
 										<div class="flex items-center justify-between mb-3">
 											<h4 class="text-sm font-semibold text-foreground">
-												审查模板
+												{{ $t("hitl.reviewTemplate") }}
 											</h4>
 											<Badge variant="outline" class="text-xs">
 												v{{ currentTemplate.version }}
 											</Badge>
 										</div>
 										<div v-if="currentTemplate.items.length === 0" class="text-sm text-muted-foreground">
-											暂无审查项
+											{{ $t("hitl.emptyTemplateItems") }}
 										</div>
 										<div v-else class="space-y-3">
 											<div
@@ -666,7 +677,7 @@ function handleVisibilityChange() {
 													{{ item.description }}
 												</p>
 												<p v-if="item.guideline_ref" class="text-xs text-primary mt-1">
-													参考：{{ item.guideline_ref }}
+													{{ $t("hitl.reference", { ref: item.guideline_ref }) }}
 												</p>
 											</div>
 										</div>
@@ -680,14 +691,14 @@ function handleVisibilityChange() {
 						>
 							<CardHeader class="pb-3 border-b border-border">
 								<CardTitle class="text-base font-semibold">
-									审查操作
+									{{ $t("hitl.actions") }}
 								</CardTitle>
 							</CardHeader>
 							<CardContent class="p-5">
 								<div v-if="!selectedItem" class="text-center py-8">
 									<Shield class="h-8 w-8 mx-auto text-muted-foreground" />
 									<p class="mt-2 text-sm text-muted-foreground">
-										请先选择审查项
+										{{ $t("hitl.selectPromptAction") }}
 									</p>
 								</div>
 								<template v-else>
@@ -702,7 +713,7 @@ function handleVisibilityChange() {
 												class="h-5 w-5"
 											/>
 											<Loader2 v-else class="h-5 w-5 animate-spin" />
-											批准通过
+											{{ $t("hitl.approveBtn") }}
 										</Button>
 										<Button
 											variant="destructive"
@@ -711,17 +722,17 @@ function handleVisibilityChange() {
 											@click="onReject"
 										>
 											<XCircle class="h-5 w-5" />
-											拒绝
+											{{ $t("hitl.rejectBtn") }}
 										</Button>
 										<div class="pt-2">
 											<label
 												class="text-sm font-medium text-foreground mb-2 block"
 											>
-												审查评论
+												{{ $t("hitl.reviewComment") }}
 											</label>
 											<Textarea
 												v-model="commentText"
-												placeholder="请输入审查评论（拒绝时必填）..."
+												:placeholder="$t('hitl.commentPlaceholder')"
 												rows="5"
 												class="resize-none"
 											/>
@@ -730,7 +741,7 @@ function handleVisibilityChange() {
 											<div class="flex items-center gap-2 mb-3">
 												<MessageSquare class="h-4 w-4 text-muted-foreground" />
 												<label class="text-sm font-medium text-foreground">
-													审查意见
+													{{ $t("hitl.reviewOpinions") }}
 												</label>
 												<Badge variant="secondary" class="text-xs ml-auto">
 													{{ currentComments.length }}
@@ -739,7 +750,7 @@ function handleVisibilityChange() {
 											<div class="space-y-2">
 												<Textarea
 													v-model="newCommentText"
-													placeholder="添加审查意见..."
+													:placeholder="$t('hitl.addOpinionPlaceholder')"
 													rows="3"
 													class="resize-none text-sm"
 												/>
@@ -751,7 +762,7 @@ function handleVisibilityChange() {
 												>
 													<Loader2 v-if="submittingComment" class="h-4 w-4 animate-spin" />
 													<MessageSquare v-else class="h-4 w-4" />
-													提交意见
+													{{ $t("hitl.submitOpinion") }}
 												</Button>
 											</div>
 											<div v-if="currentComments.length > 0" class="mt-4 space-y-3 max-h-[300px] overflow-y-auto">
@@ -769,7 +780,7 @@ function handleVisibilityChange() {
 															class="text-xs border"
 															:class="statusClass[c.status]"
 														>
-															{{ statusLabel[c.status] }}
+															{{ statusLabel(c.status) }}
 														</Badge>
 														<span class="text-xs text-muted-foreground ml-auto">
 															{{ c.created_at }}
@@ -779,8 +790,8 @@ function handleVisibilityChange() {
 														{{ c.content }}
 													</p>
 													<div v-if="c.code_ref || c.contract_ref" class="text-xs text-muted-foreground mb-2 space-y-1">
-														<p v-if="c.code_ref">代码: {{ c.code_ref }}</p>
-														<p v-if="c.contract_ref">契约: {{ c.contract_ref }}</p>
+														<p v-if="c.code_ref">{{ $t("hitl.codeRef", { ref: c.code_ref }) }}</p>
+														<p v-if="c.contract_ref">{{ $t("hitl.contractRef", { ref: c.contract_ref }) }}</p>
 													</div>
 													<div class="flex gap-2">
 														<Button
@@ -789,7 +800,7 @@ function handleVisibilityChange() {
 															class="text-xs h-7 px-2"
 															@click="onUpdateCommentStatus(c.id, nextStatus(c.status))"
 														>
-															标记为 {{ statusLabel[nextStatus(c.status)] }}
+															{{ $t("hitl.markAs", { status: statusLabel(nextStatus(c.status)) }) }}
 														</Button>
 													</div>
 												</div>
@@ -800,7 +811,7 @@ function handleVisibilityChange() {
 											class="pt-4 border-t border-border"
 										>
 											<p class="text-xs text-muted-foreground mb-3">
-												已选择 {{ selectedIds.size }} 项
+												{{ $t("hitl.selectedCount", { count: selectedIds.size }) }}
 											</p>
 											<Button
 												variant="secondary"
@@ -808,7 +819,7 @@ function handleVisibilityChange() {
 												class="w-full"
 												@click="batchApprove"
 											>
-												批量批准
+												{{ $t("hitl.batchApprove") }}
 											</Button>
 										</div>
 									</div>
@@ -823,7 +834,7 @@ function handleVisibilityChange() {
 						<CardHeader class="pb-3 border-b border-border">
 							<div class="flex items-center justify-between flex-wrap gap-4">
 								<CardTitle class="text-base font-semibold">
-									审查历史记录
+									{{ $t("hitl.historyTitle") }}
 								</CardTitle>
 								<div class="flex items-center gap-3">
 									<div class="flex items-center gap-2">
@@ -832,24 +843,24 @@ function handleVisibilityChange() {
 											v-model="historyFilterType"
 											class="h-8 rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 										>
-											<option value="all">全部类型</option>
-											<option value="requirement_review">需求审查</option>
-											<option value="contract_review">契约审查</option>
-											<option value="code_review">代码审查</option>
-											<option value="final_review">最终审查</option>
+											<option value="all">{{ $t("hitl.filterAllTypes") }}</option>
+											<option value="requirement_review">{{ $t("hitl.checkpoint.requirement_review") }}</option>
+											<option value="contract_review">{{ $t("hitl.checkpoint.contract_review") }}</option>
+											<option value="code_review">{{ $t("hitl.checkpoint.code_review") }}</option>
+											<option value="final_review">{{ $t("hitl.checkpoint.final_review") }}</option>
 										</select>
 										<select
 											v-model="historyFilterResult"
 											class="h-8 rounded-md border border-border bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
 										>
-											<option value="all">全部结果</option>
-											<option value="approved">已通过</option>
-											<option value="rejected">已拒绝</option>
+											<option value="all">{{ $t("hitl.filterAllResults") }}</option>
+											<option value="approved">{{ $t("hitl.resultApproved") }}</option>
+											<option value="rejected">{{ $t("hitl.resultRejected") }}</option>
 										</select>
 									</div>
 									<Button variant="outline" size="sm" @click="exportHistory">
 										<Download class="h-4 w-4" />
-										导出
+										{{ $t("hitl.export") }}
 									</Button>
 								</div>
 							</div>
@@ -862,32 +873,32 @@ function handleVisibilityChange() {
 											<th
 												class="text-left font-medium text-muted-foreground px-5 py-3 border-b border-border"
 											>
-												时间
+												{{ $t("hitl.colTime") }}
 											</th>
 											<th
 												class="text-left font-medium text-muted-foreground px-5 py-3 border-b border-border"
 											>
-												类型
+												{{ $t("hitl.colType") }}
 											</th>
 											<th
 												class="text-left font-medium text-muted-foreground px-5 py-3 border-b border-border"
 											>
-												标题
+												{{ $t("hitl.colTitle") }}
 											</th>
 											<th
 												class="text-left font-medium text-muted-foreground px-5 py-3 border-b border-border"
 											>
-												结果
+												{{ $t("hitl.colResult") }}
 											</th>
 											<th
 												class="text-left font-medium text-muted-foreground px-5 py-3 border-b border-border"
 											>
-												审查人
+												{{ $t("hitl.colReviewer") }}
 											</th>
 											<th
 												class="text-left font-medium text-muted-foreground px-5 py-3 border-b border-border"
 											>
-												评论
+												{{ $t("hitl.colComment") }}
 											</th>
 										</tr>
 									</thead>
@@ -919,7 +930,7 @@ function handleVisibilityChange() {
 													}"
 													class="text-xs border-0"
 												>
-													{{ item.status === "approved" ? "✅ 通过" : "❌ 拒绝" }}
+													{{ approvalStatusLabel(item.status) }}
 												</Badge>
 											</td>
 											<td class="px-5 py-3 text-foreground">
@@ -935,7 +946,7 @@ function handleVisibilityChange() {
 												class="px-5 py-12 text-center text-muted-foreground"
 											>
 												<History class="h-8 w-8 mx-auto mb-2 opacity-50" />
-												<p>暂无审查历史记录</p>
+												<p>{{ $t("hitl.emptyHistory") }}</p>
 											</td>
 										</tr>
 									</tbody>

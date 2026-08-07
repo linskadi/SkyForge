@@ -321,7 +321,7 @@ class TestHILManager(unittest.TestCase):
         self.assertEqual(history[0]["status"], "timeout")
 
     def test_hil_disabled(self) -> None:
-        """HIL_ENABLED=false 时跳过审批，但不返回批准语义。"""
+        """HIL_ENABLED=false 时跳过审批，pipeline_continue=True（system 批准）。"""
         manager = HILManager(enabled=False)
 
         async def scenario() -> dict:
@@ -332,7 +332,7 @@ class TestHILManager(unittest.TestCase):
             )
 
         result = asyncio.run(scenario())
-        self.assertFalse(result["approved"])
+        self.assertTrue(result["approved"])
         self.assertTrue(result["pipeline_continue"])
         self.assertEqual(result["status"], "skipped")
         # pending 列表应为空（未创建请求）

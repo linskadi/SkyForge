@@ -123,14 +123,14 @@ async def hitl_history() -> dict[str, Any]:
 # 审查模板、意见追踪、统计端点
 # ============================================================================
 
-from app.core.hil.hil_manager import (
+from app.core.hil.hil_manager import (  # noqa: E402
     add_comment,
     compute_stats,
     get_comments,
     get_review_template,
     update_comment_status,
 )
-from app.schemas.hitl import ReviewComment
+from app.schemas.hitl import ReviewComment  # noqa: E402
 
 
 @router.get("/api/hil/template/{checkpoint}")

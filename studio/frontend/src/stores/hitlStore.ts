@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { getApi } from "@/services/apiSwitcher";
 
 export interface ReviewTemplateItem {
 	id: string;

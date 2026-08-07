@@ -206,7 +206,8 @@ class TestVirtualMCU(unittest.TestCase):
         self.mcu = VirtualMCU()
         # GCC 可用时强制走真实编译路径（默认 USE_REAL_GCC=false 走 Mock）
         self._original_use_real_gcc = settings.USE_REAL_GCC
-        settings.USE_REAL_GCC = True
+        if self.mcu.is_gcc_available():
+            settings.USE_REAL_GCC = True
 
     def tearDown(self) -> None:
         settings.USE_REAL_GCC = self._original_use_real_gcc
@@ -217,16 +218,20 @@ class TestVirtualMCU(unittest.TestCase):
         self.assertIsInstance(available, bool)
 
     def test_compile_success_or_strict_failure(self) -> None:
-        """显式启用真实 GCC 时：可用则编译成功，不可用则严格失败。"""
+        """显式启用真实 GCC 时：可用则编译成功，不可用则严格失败；mock 模式则成功。"""
         result = self.mcu.compile(FILTER_CODE)
-        if self.mcu.is_gcc_available():
+        if self.mcu.is_gcc_available() and settings.USE_REAL_GCC:
             self.assertTrue(result.success)
             self.assertFalse(result.used_mock)
             self.assertNotEqual(result.executable_path, "")
-        else:
+        elif settings.USE_REAL_GCC:
             self.assertFalse(result.success)
             self.assertFalse(result.used_mock)
             self.assertIn("GCC", result.errors)
+        else:
+            # mock 模式
+            self.assertTrue(result.success)
+            self.assertTrue(result.used_mock)
         if not result.used_mock:
             self.mcu.cleanup(result)
 

@@ -662,7 +662,7 @@ def reset_hil_manager() -> None:
 # 审查模板、意见追踪、统计
 # ============================================================================
 
-from app.schemas.hitl import (
+from app.schemas.hitl import (  # noqa: E402
     HITLStats,
     ReviewComment,
     ReviewCommentsBundle,
