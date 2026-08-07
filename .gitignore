@@ -79,3 +79,6 @@ docker-compose.override.yml
 scripts/node_modules/
 scripts/.env
 
+# === Internal planning (not for repo) ===
+.omo/
+
