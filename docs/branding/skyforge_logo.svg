@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="badge" x1="140" y1="80" x2="884" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A1F44"/>
+      <stop offset="0.55" stop-color="#15538F"/>
+      <stop offset="1" stop-color="#2E90E5"/>
+    </linearGradient>
+    <linearGradient id="plane" x1="300" y1="360" x2="700" y2="620" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#8FD4FF"/>
+    </linearGradient>
+    <linearGradient id="spark" x1="230" y1="250" x2="794" y2="774" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7DD3FC" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#7DD3FC" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#7DD3FC" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.75">
+      <stop offset="0" stop-color="#38BDF8" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#38BDF8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 徽章底 -->
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#badge)"/>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#glow)"/>
+  <rect x="48" y="48" width="928" height="928" rx="206" stroke="#7DD3FC" stroke-opacity="0.25" stroke-width="6"/>
+
+  <!-- 锻铸光痕（对角斜纹） -->
+  <rect x="170" y="200" width="760" height="760" rx="200" fill="url(#spark)"/>
+
+  <!-- 纸飞机（升力三角翼） -->
+  <g>
+    <path d="M300 640 L560 340 L430 566 Z" fill="url(#plane)"/>
+    <path d="M430 566 L560 340 L620 686 L540 640 Z" fill="#FFFFFF" fill-opacity="0.92"/>
+    <path d="M300 640 L540 640 L430 566 Z" fill="#0A1F44" fill-opacity="0.14"/>
+    <path d="M540 640 L620 686 L540 640 Z" fill="#B7E4FF"/>
+  </g>
+
+  <!-- 飞行轨迹 -->
+  <path d="M215 715 C300 690 360 690 420 700" stroke="#8FD4FF" stroke-width="10" stroke-linecap="round" stroke-dasharray="4 26" fill="none"/>
+  <circle cx="700" cy="272" r="16" fill="#8FD4FF"/>
+  <circle cx="742" cy="232" r="10" fill="#8FD4FF" fill-opacity="0.7"/>
+
+  <!-- 品牌字标 -->
+  <text x="512" y="790" text-anchor="middle" font-family="Arial Black, Segoe UI, Arial, sans-serif" font-weight="900" font-size="150" fill="#FFFFFF" letter-spacing="6">SF</text>
+  <text x="512" y="866" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-weight="500" font-size="54" fill="#8FD4FF" letter-spacing="16">SKYFORGE</text>
+</svg>

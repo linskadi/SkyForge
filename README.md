@@ -17,23 +17,16 @@
 
 ---
 
-## 📊 当前可复现状态 (2026-07-22)
+## 📊 当前可复现状态 (2026-08-07)
 
 | 指标 | 数值 | 说明 |
 |------|------|------|
-| 后端测试 | **265/267 passed (99.3%)** | `uv run pytest src/skyforge_engine/tests/ -q` |
-| 前端测试 | **172/172 passed (100%)** | `npx vitest run` (14 test files) |
+| 后端测试 | **281 passed (5 warnings)** | `uv run pytest src/skyforge_engine/tests/ -q` |
+| 全仓库测试 | **461+ passed** | 含前端 180 passed (15 test files) |
 | Pipeline Stage | **12/12 全部完成** | 零崩溃，含修复闭环+退步检测 |
-| DO-178C DAL-A 通过率 | **21/21 (100%)** | 满足 15，部分满足 6，未满足 0 |
-| DO-178C DAL-C 通过率 | **17/21 (81%)** | 满足 12，部分满足 5，未满足 0 |
-| MISRA-C 违规 | **0 条** | Cppcheck 2.21 + MISRA addon 真实扫描 |
-| 语句覆盖率 | **100.0%** | gcov 真实数据 (GCC 16.1.0) |
-| 分支覆盖率 | **100.0%** | gcov 真实数据 |
-| MC/DC 覆盖率 | **100.0%** | gcov-dump 解析 (.gcno 过滤 harness main) |
-| GCC 编译 | **通过** | GCC 16.1.0 (w64devkit) |
-| CBMC 有界模型检查 | **通过** | 0 violations |
-| 工具链验证 | **3/3 工具可用 + 8/8 文档完整** | TQP/TOR 齐全 |
-| 证据包 | **25 条证据，8 个类别** | DO-178C 合规辅助证据 |
+| MISRA 修复规则 | **130 条规则** | 通用修复器 + 配置表（重构后减少 1934 行） |
+| 代码总量 | **~35,000 行** | Python + TypeScript/Vue |
+| 跨平台 | **Windows / macOS / Linux** | 全平台适配完成 |
 | LLM 支持 | DeepSeek V4 Flash (API) + Mock 模式 | 双模式切换 |
 
 ### DAL-A 未完全达标项（如实说明）
@@ -91,7 +84,7 @@ SkyForge 采用**六层引擎架构**(Layer 0-5),自底向上逐层增强,每一
 ### 方式一：一键部署（推荐）
 
 ```bash
-# Windows Git Bash / Linux / macOS
+# macOS / Linux / Windows Git Bash
 sh start.sh
 ```
 
@@ -112,6 +105,24 @@ make dev                         # 启动 FastAPI (8000) + Vite (5173)
 # 前端 UI:         http://localhost:5173
 # API 文档(Swagger): http://localhost:8000/docs
 ```
+
+### macOS 特别说明
+
+```bash
+# 1. 安装 Homebrew (如未安装)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 2. 安装 uv (Python 包管理器)
+brew install uv
+
+# 3. 安装 Node.js 18+
+brew install node@18
+
+# 4. 一键启动
+sh start.sh
+```
+
+> **注意**: macOS 上 Cppcheck 可通过 `brew install cppcheck` 安装，CBMC 可通过 `brew install cbmc` 安装。缺失时自动降级到 Mock 模式。
 
 ### 方式三：Docker 部署
 
@@ -168,6 +179,24 @@ HITL (Human-in-the-Loop) 在需求、契约和代码检查点等待人工决定�
 
 ---
 
+## 🔗 链上证据锚定 (Evidence Anchoring)
+
+将 DO-178C 验证证据包的 SHA-256 哈希锚定到 **Ethereum Sepolia** 测试网，
+为适航追溯证据提供不可篡改的链上时间戳与可审计提交者来源。
+
+- 合约: [`contracts/EvidenceAnchor.sol`](./contracts/EvidenceAnchor.sol)（开放写入 + 链上校验）
+- 后端: [`skyforge_engine/chain/evidence_anchor.py`](./src/skyforge_engine/chain/evidence_anchor.py) — canonical SHA-256 哈希计算
+- API: `POST /api/evidence/anchor-info` — 返回锚定哈希与链信息（计算免费，上链需钱包签名）
+- 前端: `/anchor` 页面（链上锚定）— 计算哈希 / MetaMask 上链 / 链上校验
+- 部署: `cd scripts && npm install && node deploy_anchor.mjs`（需 Sepolia 测试 ETH）
+
+```bash
+# 验证锚定哈希计算
+uv run pytest src/skyforge_engine/tests/test_evidence_anchor.py -q
+```
+
+---
+
 ## 📁 目录结构
 
 ```
@@ -186,6 +215,7 @@ SkyForge/
 │   │   ├── verifiers/                 ←   L3 验证工具链层: VerifierChain + Z3/CBMC/Cppcheck/GCC
 │   │   ├── adapters/                  ←   L2 仿真验证层(SIL/PIL/HIL): QEMU/串口/ARINC653/仿真引擎
 │   │   ├── protocols/                 ←   L0 协议层: 抽象基类/模式守卫/Provider协议
+│   │   ├── chain/                     ←   链上证据锚定: canonical SHA-256 + ABI 常量
 │   │   ├── strategies/                ←   LLM策略: 离线策略/云API策略/本地策略
 │   │   ├── standards/                 ←   可插拔编码标准(MISRA-C / MISRA C++ / Python)
 │   │   ├── renderers/                 ←   报告渲染器
@@ -228,7 +258,8 @@ SkyForge/
 │       ├── src/
 │       │   ├── pages/                 ←   路由页面(10个页面)
 │       │   │   └── dashboard/         ←     首页(/)
-│       │   ├── views/                 ←   页面视图(Generate / Compose / HITLPage / RecordDetail / Records / Lab / Settings / ArchitectureView)
+│   │   ├── views/                 ←   页面视图(Generate / Compose / HITLPage / RecordDetail / Records / Lab / Settings / ArchitectureView)
+│   │   ├── views/ChainAnchor.vue  ←   链上证据锚定页(/anchor, MetaMask 上链)
 │       │   ├── components/            ←   40+ UI组件 + shadcn-vue
 │       │   ├── stores/                ←   Pinia状态(5个store)
 │       │   ├── services/              ←   API 调用 / 离线模式 + 任务网关
@@ -251,7 +282,7 @@ SkyForge/
 └── .github/                           ← CI/CD工作流
 ```
 
-### 前端路由(10个页面)
+### 前端路由(11个页面)
 
 | 路径 | 页面 | 文件 |
 |------|------|------|
@@ -265,8 +296,9 @@ SkyForge/
 | `/compose` | 组件组合验证 | `views/Compose.vue` |
 | `/misra` | MISRA规则搜索 | `pages/misra/index.vue` |
 | `/hitl` | HITL人工审查 | `views/HITLPage.vue` |
+| `/anchor` | 链上证据锚定 | `views/ChainAnchor.vue` |
 
-### 顶部导航栏(6个)
+### 顶部导航栏(7个)
 
 1. 首页 (`/`)
 2. 六层架构 (`/architecture`)
@@ -274,6 +306,7 @@ SkyForge/
 4. 运行记录 (`/records`)
 5. 能力实验室 (`/lab`)
 6. 系统设置 (`/settings`)
+7. 链上锚定 (`/anchor`)
 
 ### 三种执行模式 Profile
 

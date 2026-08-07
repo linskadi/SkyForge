@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="720" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#08162E"/>
+      <stop offset="0.55" stop-color="#0E3A66"/>
+      <stop offset="1" stop-color="#1E6FA8"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="90" y1="60" x2="430" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0A1F44"/>
+      <stop offset="1" stop-color="#2E90E5"/>
+    </linearGradient>
+    <linearGradient id="plane" x1="170" y1="190" x2="380" y2="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#8FD4FF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.24" cy="0.35" r="0.6">
+      <stop offset="0" stop-color="#38BDF8" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#38BDF8" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect width="1280" height="720" fill="url(#glow)"/>
+
+  <!-- 夜空网格 -->
+  <g stroke="#7DD3FC" stroke-opacity="0.10" stroke-width="2">
+    <path d="M0 160 H1280 M0 320 H1280 M0 480 H1280 M0 640 H1280"/>
+    <path d="M160 0 V720 M320 0 V720 M480 0 V720 M640 0 V720 M800 0 V720 M960 0 V720 M1120 0 V720"/>
+  </g>
+  <g fill="#8FD4FF" fill-opacity="0.5">
+    <circle cx="90" cy="110" r="3"/><circle cx="240" cy="70" r="2"/>
+    <circle cx="420" cy="140" r="2.5"/><circle cx="700" cy="90" r="3"/>
+    <circle cx="980" cy="150" r="2"/><circle cx="1150" cy="80" r="2.5"/>
+    <circle cx="1220" cy="220" r="2"/><circle cx="600" cy="600" r="2.5"/>
+    <circle cx="900" cy="620" r="3"/><circle cx="1180" cy="560" r="2"/>
+  </g>
+
+  <!-- 徽章 -->
+  <rect x="60" y="70" width="380" height="380" rx="96" fill="url(#badge)"/>
+  <rect x="76" y="86" width="348" height="348" rx="82" stroke="#7DD3FC" stroke-opacity="0.3" stroke-width="4"/>
+
+  <!-- 徽章内纸飞机 -->
+  <g>
+    <path d="M140 330 L250 190 L196 302 Z" fill="url(#plane)"/>
+    <path d="M196 302 L250 190 L286 372 L244 336 Z" fill="#FFFFFF" fill-opacity="0.92"/>
+    <path d="M140 330 L244 336 L196 302 Z" fill="#0A1F44" fill-opacity="0.15"/>
+    <path d="M244 336 L286 372 L244 336 Z" fill="#B7E4FF"/>
+  </g>
+  <path d="M108 356 C150 340 185 340 215 346" stroke="#8FD4FF" stroke-width="6" stroke-linecap="round" stroke-dasharray="3 14" fill="none"/>
+
+  <!-- 字标 -->
+  <text x="620" y="230" font-family="Arial Black, Segoe UI, Arial, sans-serif" font-weight="900" font-size="96" fill="#FFFFFF" letter-spacing="2">SkyForge</text>
+  <text x="628" y="292" font-family="Segoe UI, Arial, sans-serif" font-weight="500" font-size="34" fill="#8FD4FF" letter-spacing="10">天锻 · AI-POWERED AVIATION SOFTWARE</text>
+
+  <!-- 标语 -->
+  <text x="620" y="390" font-family="Segoe UI, Arial, sans-serif" font-weight="400" font-size="26" fill="#CBE7FF" letter-spacing="1">
+    Forging the Future of Aviation Software, One Agent at a Time.
+  </text>
+  <text x="620" y="432" font-family="Segoe UI, Arial, sans-serif" font-weight="400" font-size="22" fill="#8FB8DC" letter-spacing="1">
+    AI 驱动的航空机载软件工程平台 · DO-178C 需求 / 编码 / 验证 / 追溯
+  </text>
+
+  <!-- 特性标签 -->
+  <g font-family="Segoe UI, Arial, sans-serif" font-weight="600" font-size="20" fill="#9FDBFF">
+    <rect x="620" y="478" width="150" height="44" rx="22" stroke="#38BDF8" stroke-opacity="0.4" stroke-width="2"/>
+    <text x="695" y="507" text-anchor="middle">DO-178C</text>
+    <rect x="786" y="478" width="170" height="44" rx="22" stroke="#38BDF8" stroke-opacity="0.4" stroke-width="2"/>
+    <text x="871" y="507" text-anchor="middle">Multi-Agent</text>
+    <rect x="972" y="478" width="160" height="44" rx="22" stroke="#38BDF8" stroke-opacity="0.4" stroke-width="2"/>
+    <text x="1052" y="507" text-anchor="middle">On-Chain</text>
+    <rect x="1148" y="478" width="112" height="44" rx="22" stroke="#38BDF8" stroke-opacity="0.4" stroke-width="2"/>
+    <text x="1204" y="507" text-anchor="middle">MISRA-C</text>
+  </g>
+
+  <!-- 底部 -->
+  <line x1="620" y1="580" x2="1220" y2="580" stroke="#38BDF8" stroke-opacity="0.35" stroke-width="2"/>
+  <text x="620" y="620" font-family="Segoe UI, Arial, sans-serif" font-weight="500" font-size="20" fill="#7FB8DC" letter-spacing="2">
+    ChainHack 2026 · Industrial 5.0 × AI × Web3 · SkyForge Team
+  </text>
+</svg>

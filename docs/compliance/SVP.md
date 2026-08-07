@@ -178,8 +178,8 @@
 
 | 验证活动 | 状态 | 覆盖 | 责任人 | 实现位置 |
 |---------|------|------|--------|---------|
-| Python 测试 | ✅ 已实施 | 596 项通过 + 11 subtests | 开发团队 | `studio/app/tests/` + `src/skyforge_engine/tests/` |
-| 前端测试 | ✅ 已实施 | 172 项通过（14 文件），E2E 4 项通过 | 开发团队 | `studio/frontend/src/**/*.test.ts` |
+| Python 测试 | ✅ 已实施 | 645 项通过 + 2 skipped | 开发团队 | `studio/app/tests/` + `src/skyforge_engine/tests/` |
+| 前端测试 | ✅ 已实施 | 180 项通过（15 文件） | 开发团队 | `studio/frontend/src/**/*.test.ts` |
 | Cppcheck 扫描 | ✅ 已实施 | 真实/模拟双模式 | 开发团队 | `cppcheck_runner.py` |
 | 契约校验 | ✅ 已实施 | 语义分析 (pre/post/inv/fh) | 开发团队 | `contract_checker.py` |
 | 数字孪生仿真 | ✅ 已实施 | 5 类故障注入 | 验证团队 | `simulation_engine.py` |

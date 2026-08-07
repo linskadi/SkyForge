@@ -94,7 +94,7 @@ DO-330（Software Tool Qualification Considerations）定义工具鉴定的目�
 
 | 活动 | 方法 | 当前覆盖 |
 |------|------|---------|
-| 自动化测试 | pytest / Vitest | 后端/引擎/LLM 安全 596 项 + 11 subtests；前端 172 项；E2E 4 项 |
+| 自动化测试 | pytest / Vitest | 后端/引擎/LLM 安全 645 项 + 2 skipped；前端 180 项 |
 | 集成测试 | 全流程 Pipeline 测试 | 测试报告模块 |
 | 异常测试 | 故障注入 + 边界条件 | 数字孪生 5 类故障 |
 | 确定性测试 | 同一输入多次运行 | ⚠️ 待实施（LLM 非确定性，已通过 temperature=0.3 + seed 固定缓解） |

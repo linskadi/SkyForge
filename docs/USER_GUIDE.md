@@ -2,7 +2,7 @@
 
 ## 快速开始
 
-> **版本**：v0.5.0 &nbsp;&nbsp; **更新日期**：2026-07-21
+> **版本**：v0.4.0 &nbsp;&nbsp; **更新日期**：2026-08-07
 
 ---
 
@@ -12,14 +12,13 @@
 
 | 项目 | 值 |
 |------|-----|
-| 版本 | v0.5.0 |
-| 更新日期 | 2026-07-21 |
-| 基准测试通过率 | 12/12 (100%) |
-| 后端/引擎/LLM安全测试 | 596 pytest passed，11 subtests passed |
-| 前端测试 | 172 Vitest passed，4 E2E passed |
-| MISRA自动修复规则 | 57条 |
+| 版本 | v0.4.0 |
+| 更新日期 | 2026-08-07 |
+| 后端测试 | 281 pytest passed |
+| 前端测试 | 180 Vitest passed（15 test files） |
+| MISRA自动修复规则 | 130 条（通用修复器 + 配置表） |
 | DO-178C合规文档 | 9份 |
-| 故障注入类型 | 5类 |
+| 跨平台 | Windows / macOS / Linux |
 
 #### 1.2 环境要求
 
@@ -1382,10 +1381,10 @@ rm -rf studio/frontend/dist
 
 | 范围 | 命令 | 结果 |
 |------|------|------|
-| 前端单元/组件/服务测试 | `pnpm test` | 14 个测试文件，172 项测试通过 |
+| 前端单元/组件/服务测试 | `pnpm test` | 15 个测试文件，180 项测试通过 |
 | 前端生产构建 | `pnpm build` | `vue-tsc -b && vite build` 通过 |
 | 前端演示 E2E | `pnpm test:e2e` | 4 项 Playwright 检查通过（演示离线、设置弹窗） |
-| 后端 / 引擎 / LLM 安全测试 | `uv run pytest -q` | 596 项通过 + 11 个 subtests |
+| 后端 / 引擎 / LLM 安全测试 | `uv run pytest -q` | 645 项通过 + 2 skipped |
 | Python 静态检查 | `uv run ruff check .` | 通过 |
 | Git 冲突标记 | `rg` 严格扫描 `<<<<<<< / ======= / >>>>>>>` | 未发现真实合并冲突 |
 | PPT 文本溢出 | `slides_test.py` | 通过 |

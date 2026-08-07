@@ -4,13 +4,13 @@
 
 ### v0.5.0 (当前版本)
 
-**发布日期**: 2026-07-21
+**发布日期**: 2026-07-21（文档更新 2026-08-06）
 
 **核心功能**:
 - [x] 引擎六层架构升级（L0-L5: Protocols/LLM Client/Simulation & Verification/Verifier Chain/Agent Strategy/Orchestration）
 - [x] PipelineOrchestrator 编排器，调度 12 个 Stage
 - [x] V1 唯一任务协议（idempotency_key + 事件续传 + provenance）
-- [x] 11 个前端页面 + 6 项顶部导航栏
+- [x] 11 个前端页面 + 7 项顶部导航栏
 - [x] 三种执行模式 Profile（demo/cloud/local）
 - [x] 验证工具链可插拔（Z3/CBMC/Cppcheck/GCC）
 - [x] 仿真验证层（SIL: 虚拟MCU/虚拟传感器/故障注入 | PIL: QEMU/ARINC653 | HIL: 串口/JTAG-SWD）
@@ -30,8 +30,8 @@
 - [x] 形式化验证（z3 SMT + cbmc 有界模型检查）
 
 **测试覆盖**:
-- 后端/引擎/LLM 安全测试：596 pytest passed，11 subtests passed
-- 前端测试：172 Vitest passed，4 E2E passed
+- 后端/引擎/LLM 安全测试：645 pytest passed，2 skipped（全仓库口径；引擎层 281 passed）
+- 前端测试：180 Vitest passed（15 test files）
 
 ---
 
@@ -88,4 +88,4 @@
 
 ---
 
-*最后更新: 2026-07-21*
+*最后更新: 2026-08-06*
