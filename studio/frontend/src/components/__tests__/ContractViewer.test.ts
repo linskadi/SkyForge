@@ -1,7 +1,10 @@
-import { mount } from "@vue/test-utils";
+import { config, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Contract } from "@/services/mockApi";
+import { createTestI18n } from "@/test-utils/i18n";
 import ContractViewer from "../ContractViewer.vue";
+
+config.global.plugins = [createTestI18n()];
 
 vi.mock("@/utils/tagParser", () => ({
 	parseConTags: vi.fn((text: string) => {

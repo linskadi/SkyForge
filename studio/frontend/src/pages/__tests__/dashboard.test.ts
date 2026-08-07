@@ -1,7 +1,10 @@
-import { mount } from "@vue/test-utils";
+import { config, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Dashboard from "@/pages/dashboard/index.vue";
+import { createTestI18n } from "@/test-utils/i18n";
+
+config.global.plugins = [createTestI18n()];
 
 const mockPush = vi.fn();
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: mockPush }) }));

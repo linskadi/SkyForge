@@ -1,6 +1,9 @@
-import { mount } from "@vue/test-utils";
+import { config, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestI18n } from "@/test-utils/i18n";
 import WaveformChart from "../WaveformChart.vue";
+
+config.global.plugins = [createTestI18n()];
 
 vi.mock("vue-echarts", () => ({
 	default: {

@@ -1,9 +1,12 @@
-import { mount } from "@vue/test-utils";
+import { config, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { useExecutionStore } from "@/stores/executionStore";
+import { createTestI18n } from "@/test-utils/i18n";
 import AgentTerminal from "../AgentTerminal.vue";
+
+config.global.plugins = [createTestI18n()];
 
 vi.mock("@tanstack/vue-virtual", () => ({
 	useVirtualizer: vi.fn(() =>

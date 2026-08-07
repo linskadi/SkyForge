@@ -1,5 +1,8 @@
-import { mount } from "@vue/test-utils";
+import { config, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTestI18n } from "@/test-utils/i18n";
+
+config.global.plugins = [createTestI18n()];
 
 const mockGenerate = vi.fn().mockResolvedValue({
 	code: "int filter(int x) { return x; }",
