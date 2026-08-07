@@ -14,8 +14,11 @@ import {
  * - 最终轮高亮"✅ 0 违规"或"⚠️ 仍有 N 个违规"
  */
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import type { RepairIteration } from "@/services/mockApi";
 import CodeDiff from "./CodeDiff.vue";
+
+const { t } = useI18n();
 
 interface Props {
 	/** 修复历史列表 */
@@ -43,20 +46,20 @@ const finalViolations = (): number => {
 </script>
 <template>
   <div v-if="history.length === 0" class="empty">
-    暂无修复历史
+    {{ t("repairTimeline.empty") }}
   </div>
   <div v-else class="repair-timeline">
     <!-- 总览徽章 -->
     <div class="overview">
-      <span class="overview-label">🔧 MISRA 修复闭环</span>
+      <span class="overview-label">{{ t("repairTimeline.overviewLabel") }}</span>
       <span class="overview-stat">
-        共 {{ history.length }} 轮修复
+        {{ t("repairTimeline.totalRounds", { count: history.length }) }}
       </span>
       <span class="overview-stat">
-        初始 {{ history[0].violations_before }} 个违规
+        {{ t("repairTimeline.initialViolations", { count: history[0].violations_before }) }}
       </span>
       <span class="overview-stat" :class="{ 'pass': finalViolations() === 0, 'fail': finalViolations() !== 0 }">
-        → 最终 {{ finalViolations() }} 个违规
+        {{ t("repairTimeline.finalViolations", { count: finalViolations() }) }}
       </span>
     </div>
 
@@ -79,16 +82,16 @@ const finalViolations = (): number => {
                 class="round-icon"
                 :class="{ pass: iter.violations_after === 0, warn: iter.violations_after !== 0 }"
               />
-              <span class="round-name">第 {{ iter.round }} 轮修复</span>
+              <span class="round-name">{{ t("repairTimeline.roundName", { round: iter.round }) }}</span>
               <span v-if="isFinal(iter.round)" class="final-badge">
-                最终轮
+                {{ t("repairTimeline.finalBadge") }}
               </span>
             </div>
             <div class="round-stats">
-              <span class="stat-before">{{ iter.violations_before }} 违规</span>
+              <span class="stat-before">{{ t("repairTimeline.violations", { count: iter.violations_before }) }}</span>
               <span class="stat-arrow">→</span>
               <span class="stat-after" :class="{ pass: iter.violations_after === 0, warn: iter.violations_after !== 0 }">
-                {{ iter.violations_after }} 违规
+                {{ t("repairTimeline.violations", { count: iter.violations_after }) }}
               </span>
             </div>
             <component
@@ -97,14 +100,14 @@ const finalViolations = (): number => {
             />
           </div>
           <div class="fixed-rules">
-            <span class="rules-label">修复规则：</span>
+            <span class="rules-label">{{ t("repairTimeline.fixedRules") }}</span>
             <span
               v-for="rule in iter.violations_fixed"
               :key="rule"
               class="rule-tag fixed"
             >{{ rule }}</span>
             <span v-if="iter.violations_remaining.length > 0" class="rules-label remaining">
-              剩余：
+              {{ t("repairTimeline.remainingRules") }}
             </span>
             <span
               v-for="rule in iter.violations_remaining"
@@ -116,14 +119,14 @@ const finalViolations = (): number => {
             {{ iter.description }}
           </div>
           <div v-if="isFinal(iter.round) && iter.violations_after === 0" class="final-status pass">
-            ✅ 全部违规已修复，MISRA-C 合规检查通过
+            {{ t("repairTimeline.finalPassed") }}
           </div>
           <div v-else-if="isFinal(iter.round) && iter.violations_after > 0" class="final-status fail">
-            ⚠️ 仍有 {{ iter.violations_after }} 个违规未修复
+            {{ t("repairTimeline.finalRemaining", { count: iter.violations_after }) }}
           </div>
           <div v-if="expandedRound === iter.round" class="diff-section">
             <div class="diff-title">
-              📝 代码对比（修复前 → 修复后）
+              {{ t("repairTimeline.diffTitle") }}
             </div>
             <CodeDiff :before="iter.before_code" :after="iter.after_code" filename="code.c" />
           </div>

@@ -10,6 +10,7 @@ import {
 } from "./mockApi";
 import "@/mock/data";
 
+import { i18n } from "@/i18n";
 import { API_BASE_URL, deleteJSON, getJSON, postJSON } from "@/services/client";
 import { generateNormalSimulationResult } from "@/services/simulation";
 import type { GenerateResult } from "@/types/domain";
@@ -23,6 +24,19 @@ import type {
 	TaskHandle,
 	TaskSummary,
 } from "@/types/execution";
+
+/**
+ * 翻译 data 层标签：键可解析时返回译文，
+ * 键缺失（t 返回键路径本身）时回退到调用方提供的默认字符串。
+ */
+function dataT(
+	key: string,
+	fallback: string,
+	params?: Record<string, unknown>,
+): string {
+	const resolved = i18n.global.t(key, params ?? {});
+	return resolved === key ? fallback : resolved;
+}
 
 const STAGES = [
 	"requirement",
@@ -230,7 +244,10 @@ export class ServerTaskGateway implements TaskGateway {
 				onError?.(error instanceof Error ? error : new Error(String(error)));
 			}
 		};
-		socket.onerror = () => onError?.(new Error("任务事件连接失败"));
+		socket.onerror = () =>
+			onError?.(
+				new Error(dataT("data.error.taskEventsFailed", "任务事件连接失败")),
+			);
 		return { close: () => socket.close() };
 	}
 
@@ -252,9 +269,18 @@ export class ServerTaskGateway implements TaskGateway {
 	}
 }
 
-const mockGateway = new MockTaskGateway();
 const serverGateway = new ServerTaskGateway();
 
-export function getTaskGateway(profile: ExecutionProfileId): TaskGateway {
+export function getTaskGateway(_profile: ExecutionProfileId): TaskGateway {
 	return serverGateway;
+}
+
+export async function fetchVerifiedRecordingTask(
+	taskId: string,
+): Promise<TaskDetail | null> {
+	try {
+		return await serverGateway.getTask(taskId);
+	} catch {
+		return null;
+	}
 }

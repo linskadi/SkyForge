@@ -3,6 +3,7 @@
  * 纯计算函数：波形生成、IIR 滤波、波形统计、故障注入
  */
 
+import { i18n } from "@/i18n";
 import {
 	ADC_CENTER,
 	FILTER_ALPHA,
@@ -654,6 +655,19 @@ export function pickComposedCode(connection: ComposeConnection): string {
 	}
 }
 
+/**
+ * 翻译 data 层标签：键可解析时返回译文，
+ * 键缺失（t 返回键路径本身）时回退到调用方提供的默认字符串。
+ */
+function dataT(
+	key: string,
+	fallback: string,
+	params?: Record<string, unknown>,
+): string {
+	const resolved = i18n.global.t(key, params ?? {});
+	return resolved === key ? fallback : resolved;
+}
+
 /** 构造兼容性检查结果（mock） */
 export function buildCompatibility(
 	compA: string,
@@ -663,36 +677,48 @@ export function buildCompatibility(
 	const checks: CompatibilityCheckItem[] = [
 		{
 			id: "COMPAT-001",
-			check: "组件 A 输出类型与组件 B 输入类型匹配",
+			check: dataT(
+				"data.compat.checkATypeMatch",
+				"组件 A 输出类型与组件 B 输入类型匹配",
+			),
 			passed: true,
 		},
 		{
 			id: "COMPAT-002",
-			check: "组件 A 输出范围在组件 B 输入允许范围内",
+			check: dataT(
+				"data.compat.checkARange",
+				"组件 A 输出范围在组件 B 输入允许范围内",
+			),
 			passed: true,
 		},
 		{
 			id: "COMPAT-003",
-			check: "组件 A 后置条件与组件 B 前置条件无冲突",
+			check: dataT(
+				"data.compat.checkConditionConflict",
+				"组件 A 后置条件与组件 B 前置条件无冲突",
+			),
 			passed: true,
 		},
 		{
 			id: "COMPAT-004",
-			check: "连接方式与组件接口签名一致",
+			check: dataT("data.compat.checkSignature", "连接方式与组件接口签名一致"),
 			passed: true,
 		},
 		{
 			id: "COMPAT-005",
-			check: "无循环依赖或类型循环",
+			check: dataT("data.compat.checkNoCycle", "无循环依赖或类型循环"),
 			passed: connection !== "feedback",
 			reason:
 				connection === "feedback"
-					? "反馈连接需要额外的稳定性分析，建议增加收敛性检查（mock 警告）"
+					? dataT(
+							"data.compat.feedbackReason",
+							"反馈连接需要额外的稳定性分析，建议增加收敛性检查（mock 警告）",
+						)
 					: undefined,
 		},
 		{
 			id: "COMPAT-006",
-			check: "组合后不变式集合可满足",
+			check: dataT("data.compat.checkInvariants", "组合后不变式集合可满足"),
 			passed: true,
 		},
 	];

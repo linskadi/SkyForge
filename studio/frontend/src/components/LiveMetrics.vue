@@ -21,8 +21,10 @@ import {
 	ref,
 	watch,
 } from "vue";
+import { useI18n } from "vue-i18n";
 import { Card, CardContent } from "@/components/ui/card";
 import { getJSON } from "@/services/client";
+import { getTaskGateway } from "@/services/taskGateway";
 import { useExecutionStore } from "@/stores/executionStore";
 
 /** 后端 /api/dashboard/system-status 返回结构（局部声明，避免新增类型文件） */
@@ -93,7 +95,6 @@ async function fetchSystemStatus() {
 
 async function fetchTaskMetrics() {
 	try {
-		const { getTaskGateway } = await import("@/services/taskGateway");
 		const tasks = await getTaskGateway(execution.profileId).listTasks();
 		if (!isMounted) return;
 		const running = tasks.filter((t) => t.status === "running").length;
@@ -172,12 +173,15 @@ const toolChips = computed<ToolChip[]>(() => {
 	}));
 });
 
-const llmMode = computed(() => {
-	const mode = status.value?.llm?.mode;
-	if (!mode) return "未知";
-	if (mode === "mock") return "Mock";
-	if (mode === "local") return "Local";
-	if (mode === "api" || mode === "cloud") return "API";
+const llmModeRaw = computed(() => status.value?.llm?.mode ?? "");
+
+const llmModeLabel = computed(() => {
+	const { t } = useI18n();
+	const mode = llmModeRaw.value;
+	if (!mode) return t("liveMetrics.llmUnknown");
+	if (mode === "mock") return t("liveMetrics.llmMock");
+	if (mode === "local") return t("liveMetrics.llmLocal");
+	if (mode === "api" || mode === "cloud") return t("liveMetrics.llmApi");
 	return mode;
 });
 
@@ -188,6 +192,13 @@ const dbRows = computed(() => status.value?.persistence?.db_rows ?? 0);
 const dbTables = computed(() => status.value?.persistence?.tables ?? null);
 const backendOnline = computed(() => status.value?.backend === "online");
 
+/** 工具状态 → 翻译键（渲染时再 $t） */
+const toolStateLabel: Record<"ok" | "down" | "unknown", string> = {
+	ok: "liveMetrics.toolAvailable",
+	down: "liveMetrics.toolDown",
+	unknown: "liveMetrics.toolUnknown",
+};
+
 function formatMs(ms: number): string {
 	if (!ms) return "—";
 	if (ms < 1000) return `${ms}ms`;
@@ -196,7 +207,7 @@ function formatMs(ms: number): string {
 </script>
 
 <template>
-  <Card class="live-metrics-card" aria-label="LiveMetrics 实时指标">
+  <Card class="live-metrics-card" :aria-label="$t('liveMetrics.ariaLabel')">
     <CardContent class="live-metrics-content">
       <header class="lm-header">
         <div class="lm-title">
@@ -204,44 +215,44 @@ function formatMs(ms: number): string {
           <strong>LiveMetrics</strong>
           <span class="lm-pulse" :class="{ active: !loading && !error }" aria-hidden="true" />
         </div>
-        <span v-if="error" class="lm-error" :title="error">轮询异常</span>
-        <span v-else-if="loading" class="lm-loading">加载中…</span>
-        <span v-else class="lm-updated">5s 刷新</span>
+        <span v-if="error" class="lm-error" :title="error">{{ $t("liveMetrics.pollError") }}</span>
+        <span v-else-if="loading" class="lm-loading">{{ $t("liveMetrics.loading") }}</span>
+        <span v-else class="lm-updated">{{ $t("liveMetrics.refreshInterval", { seconds: POLL_INTERVAL_MS / 1000 }) }}</span>
       </header>
 
       <div class="lm-grid">
         <!-- 任务三色指示 -->
         <div class="lm-cell">
-          <span class="lm-label">任务</span>
-          <div class="task-dots" role="group" aria-label="任务分布">
-            <span class="task-stat running" :title="`运行中 ${taskCount.running}`">
-              <span class="dot" />{{ taskCount.running }} <small>运行</small>
+          <span class="lm-label">{{ $t("liveMetrics.tasks") }}</span>
+          <div class="task-dots" role="group" :aria-label="$t('liveMetrics.taskDistribution')">
+            <span class="task-stat running" :title="$t('liveMetrics.runningCount', { count: taskCount.running })">
+              <span class="dot" />{{ taskCount.running }} <small>{{ $t("liveMetrics.runningShort") }}</small>
             </span>
-            <span class="task-stat done" :title="`完成 ${taskCount.completed}`">
-              <span class="dot" />{{ taskCount.completed }} <small>完成</small>
+            <span class="task-stat done" :title="$t('liveMetrics.doneCount', { count: taskCount.completed })">
+              <span class="dot" />{{ taskCount.completed }} <small>{{ $t("liveMetrics.doneShort") }}</small>
             </span>
-            <span class="task-stat failed" :title="`失败 ${taskCount.failed}`">
-              <span class="dot" />{{ taskCount.failed }} <small>失败</small>
+            <span class="task-stat failed" :title="$t('liveMetrics.failedCount', { count: taskCount.failed })">
+              <span class="dot" />{{ taskCount.failed }} <small>{{ $t("liveMetrics.failedShort") }}</small>
             </span>
           </div>
         </div>
 
         <!-- 平均响应时间（大字号） -->
         <div class="lm-cell metric-cell">
-          <span class="lm-label"><Gauge :size="11"/> 平均响应</span>
+          <span class="lm-label"><Gauge :size="11"/> {{ $t("liveMetrics.avgResponse") }}</span>
           <span class="metric-value">{{ formatMs(avgResponseMs) }}</span>
         </div>
 
         <!-- 工具可用性灯 -->
         <div class="lm-cell tool-cell">
-          <span class="lm-label"><Wrench :size="11"/> 工具链</span>
+          <span class="lm-label"><Wrench :size="11"/> {{ $t("liveMetrics.toolchain") }}</span>
           <div class="tool-chips">
             <span
               v-for="t in toolChips"
               :key="t.key"
               class="tool-chip"
               :class="t.state"
-              :title="`${t.name}: ${t.state === 'ok' ? '可用' : t.state === 'down' ? '不可用' : '未上报'}`"
+              :title="`${t.name}: ${$t(toolStateLabel[t.state])}`"
             >
               <span class="tool-led" aria-hidden="true" />{{ t.name }}
             </span>
@@ -252,7 +263,7 @@ function formatMs(ms: number): string {
         <div class="lm-cell llm-cell">
           <span class="lm-label"><Cpu :size="11"/> LLM</span>
           <div class="llm-row">
-            <span class="llm-badge" :class="llmMode.toLowerCase()">{{ llmMode }}</span>
+            <span class="llm-badge" :class="llmModeRaw.toLowerCase()">{{ llmModeLabel }}</span>
             <span class="llm-model" :title="llmProvider ? `${llmProvider} / ${llmModel}` : llmModel">
               {{ llmModel }}
             </span>
@@ -261,31 +272,31 @@ function formatMs(ms: number): string {
 
         <!-- 数据库行数 -->
         <div class="lm-cell db-cell">
-          <span class="lm-label"><Database :size="11"/> 数据库</span>
+          <span class="lm-label"><Database :size="11"/> {{ $t("liveMetrics.database") }}</span>
           <template v-if="dbTables">
             <span class="db-value">
-              Tasks: {{ (dbTables.tasks ?? 0).toLocaleString() }}
+              {{ $t("liveMetrics.tasksCount") }} {{ (dbTables.tasks ?? 0).toLocaleString() }}
               <small>|</small>
-              History: {{ (dbTables.task_history ?? 0).toLocaleString() }}
+              {{ $t("liveMetrics.historyCount") }} {{ (dbTables.task_history ?? 0).toLocaleString() }}
             </span>
           </template>
           <template v-else>
-            <span class="db-value">{{ dbRows.toLocaleString() }} <small>行</small></span>
+            <span class="db-value">{{ dbRows.toLocaleString() }} <small>{{ $t("liveMetrics.rows") }}</small></span>
           </template>
         </div>
 
         <!-- 模式切换次数 -->
         <div class="lm-cell switch-cell">
-          <span class="lm-label">模式切换</span>
-          <span class="switch-value">{{ switchCount }} <small>次</small></span>
+          <span class="lm-label">{{ $t("liveMetrics.modeSwitch") }}</span>
+          <span class="switch-value">{{ switchCount }} <small>{{ $t("liveMetrics.times") }}</small></span>
         </div>
 
         <!-- 后端状态 -->
         <div class="lm-cell backend-cell">
-          <span class="lm-label">后端</span>
+          <span class="lm-label">{{ $t("liveMetrics.backend") }}</span>
           <span class="backend-state" :class="{ online: backendOnline, offline: !backendOnline && !!status }">
             <span class="state-dot" aria-hidden="true" />
-            {{ backendOnline ? "在线" : (status ? "离线" : "未连接") }}
+            {{ backendOnline ? $t("liveMetrics.online") : (status ? $t("liveMetrics.offline") : $t("liveMetrics.disconnected")) }}
           </span>
         </div>
       </div>

@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import WaveformChart from "@/components/WaveformChart.vue";
 import { MOCK_CODE, SIM_STEPS } from "@/mock/data";
-import { getApi } from "@/services/api";
+import { getApi } from "@/services/apiSwitcher";
 import { genSineInput, lowpassFilter } from "@/services/simulation";
 import type {
 	FaultParams,
@@ -37,26 +37,26 @@ import type {
 const quickLinks = [
 	{
 		icon: GitMerge,
-		title: "组件组合",
-		text: "组合两个已验证组件并检查接口兼容性",
+		labelKey: "lab.quickLinks.composeTitle",
+		textKey: "lab.quickLinks.composeText",
 		to: "/compose",
 	},
 	{
 		icon: SearchCode,
-		title: "规则实验室",
-		text: "搜索 C/C++/Python 三种语言的编码标准规则",
+		labelKey: "lab.quickLinks.misraTitle",
+		textKey: "lab.quickLinks.misraText",
 		to: "/misra",
 	},
 	{
 		icon: UserCheck,
-		title: "HITL 人工审查",
-		text: "由审查人批准、驳回或要求修改生成产物",
+		labelKey: "lab.quickLinks.hitlTitle",
+		textKey: "lab.quickLinks.hitlText",
 		to: "/hitl",
 	},
 	{
 		icon: Cpu,
-		title: "Hardware-in-the-Loop",
-		text: "真实硬件在环接口预留，与人工审查语义分离",
+		labelKey: "lab.quickLinks.hilTitle",
+		textKey: "lab.quickLinks.hilText",
 		to: "",
 	},
 ];
@@ -176,19 +176,31 @@ const quickStats = computed(() => {
 	const s = currentResult.value.statistics;
 	const violations = !currentResult.value.passed ? 1 : 0;
 	return [
-		{ label: "仿真步数", value: s.total_steps, unit: "steps" },
 		{
-			label: "输出范围",
+			labelKey: "lab.stats.labelSteps",
+			value: s.total_steps,
+			unitKey: "lab.stats.unitSteps",
+		},
+		{
+			labelKey: "lab.stats.labelRange",
 			value: `${s.output_min} ~ ${s.output_max}`,
-			unit: "uint16",
+			unitKey: "lab.stats.unitRange",
 		},
-		{ label: "输出均值", value: s.output_mean, unit: "mean" },
 		{
-			label: "输出方差",
-			value: computeVariance(currentResult.value.output_waveform),
-			unit: "σ²",
+			labelKey: "lab.stats.labelMean",
+			value: s.output_mean,
+			unitKey: "lab.stats.unitMean",
 		},
-		{ label: "契约违反", value: violations, unit: "次" },
+		{
+			labelKey: "lab.stats.labelVariance",
+			value: computeVariance(currentResult.value.output_waveform),
+			unitKey: "lab.stats.unitVariance",
+		},
+		{
+			labelKey: "lab.stats.labelViolations",
+			value: violations,
+			unitKey: "lab.stats.unitViolations",
+		},
 	];
 });
 
@@ -205,18 +217,18 @@ function computeVariance(data: number[]): number {
 		<div class="px-6 py-8 max-w-[1600px] mx-auto">
 			<header class="mb-6">
 				<span class="text-xs font-bold tracking-widest text-primary">
-					SIMULATION LAB
+					{{ $t("lab.eyebrow") }}
 				</span>
-				<h1 class="text-2xl font-semibold mt-1">仿真实验室</h1>
+				<h1 class="text-2xl font-semibold mt-1">{{ $t("lab.title") }}</h1>
 				<p class="text-muted-foreground text-sm mt-1">
-					数字孪生仿真工作台：代码建模、契约绑定、故障注入、波形分析
+					{{ $t("lab.subtitle") }}
 				</p>
 			</header>
 
 			<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
 				<router-link
 					v-for="link in quickLinks"
-					:key="link.title"
+					:key="link.labelKey"
 					:to="link.to"
 					:class="{ 'pointer-events-none opacity-60': !link.to }"
 					class="block"
@@ -232,9 +244,9 @@ function computeVariance(data: number[]): number {
 									<component :is="link.icon" :size="20" />
 								</div>
 								<div class="min-w-0">
-									<h3 class="text-sm font-semibold">{{ link.title }}</h3>
+									<h3 class="text-sm font-semibold">{{ $t(link.labelKey) }}</h3>
 									<p class="text-xs text-muted-foreground mt-1">
-										{{ link.text }}
+										{{ $t(link.textKey) }}
 									</p>
 								</div>
 							</div>
@@ -246,33 +258,32 @@ function computeVariance(data: number[]): number {
 			<Card class="mb-6">
 				<CardContent class="p-4 flex flex-wrap items-center justify-between gap-4">
 					<div>
-						<h2 class="text-lg font-semibold">仿真工作台</h2>
+						<h2 class="text-lg font-semibold">{{ $t("lab.workspace.title") }}</h2>
 						<p class="text-xs text-muted-foreground mt-0.5">
-							配置代码与契约，注入故障，观察波形变化
+							{{ $t("lab.workspace.desc") }}
 						</p>
 					</div>
 					<div class="flex flex-wrap items-center gap-3">
 						<div class="flex items-center gap-2">
 							<Label for="multi-compare" class="text-xs whitespace-nowrap">
-								多轮对比
+								{{ $t("lab.multiCompare") }}
 							</Label>
 							<Switch
 								id="multi-compare"
 								v-model="multiCompareEnabled"
-								@change="(e) => (multiCompareEnabled = e.target.checked)"
 							/>
 						</div>
 						<Button variant="outline" size="sm" @click="handleReset">
 							<RefreshCw class="w-4 h-4" />
-							重置
+							{{ $t("lab.btn.reset") }}
 						</Button>
 						<Button variant="outline" size="sm" @click="handleExport" :disabled="!currentResult">
 							<Download class="w-4 h-4" />
-							导出结果
+							{{ $t("lab.btn.export") }}
 						</Button>
 						<Button size="sm" @click="handleStartSimulation" :disabled="isSimulating">
 							<Play class="w-4 h-4" />
-							{{ isSimulating ? "仿真中..." : "启动仿真" }}
+							{{ isSimulating ? $t("lab.btn.simulating") : $t("lab.btn.start") }}
 						</Button>
 					</div>
 				</CardContent>
@@ -282,23 +293,23 @@ function computeVariance(data: number[]): number {
 				<div class="xl:col-span-2 space-y-6">
 					<Card>
 						<CardHeader class="pb-3">
-							<CardTitle class="text-base">配置区</CardTitle>
+							<CardTitle class="text-base">{{ $t("lab.config.title") }}</CardTitle>
 							<CardDescription class="text-xs">
-								代码、契约、故障注入三项配置
+								{{ $t("lab.config.desc") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent class="pt-0">
 							<Tabs v-model="activeTab" defaultValue="code">
 								<TabsList class="w-full grid grid-cols-3 mb-4">
-									<TabsTrigger value="code">代码</TabsTrigger>
-									<TabsTrigger value="contract">契约</TabsTrigger>
-									<TabsTrigger value="fault">故障注入</TabsTrigger>
+									<TabsTrigger value="code">{{ $t("lab.tab.code") }}</TabsTrigger>
+									<TabsTrigger value="contract">{{ $t("lab.tab.contract") }}</TabsTrigger>
+									<TabsTrigger value="fault">{{ $t("lab.tab.fault") }}</TabsTrigger>
 								</TabsList>
 
 								<TabsContent value="code" class="mt-0">
 									<div class="space-y-3">
 										<div>
-											<Label class="text-xs mb-2 block">C 语言代码</Label>
+											<Label class="text-xs mb-2 block">{{ $t("lab.code.langC") }}</Label>
 											<Textarea
 												v-model="codeContent"
 												class="font-mono text-xs min-h-[280px] resize-y bg-muted border-border"
@@ -307,11 +318,11 @@ function computeVariance(data: number[]): number {
 										</div>
 										<div class="flex gap-3">
 											<div class="flex-1">
-												<Label class="text-xs mb-1.5 block">输入端口</Label>
+												<Label class="text-xs mb-1.5 block">{{ $t("lab.code.inputPorts") }}</Label>
 												<Input value="raw_value: uint16, sample_rate: uint16" readonly class="text-xs font-mono bg-muted" />
 											</div>
 											<div class="flex-1">
-												<Label class="text-xs mb-1.5 block">输出端口</Label>
+												<Label class="text-xs mb-1.5 block">{{ $t("lab.code.outputPorts") }}</Label>
 												<Input value="filtered_value: uint16" readonly class="text-xs font-mono bg-muted" />
 											</div>
 										</div>
@@ -321,28 +332,28 @@ function computeVariance(data: number[]): number {
 								<TabsContent value="contract" class="mt-0">
 									<div class="space-y-4">
 										<div>
-											<Label class="text-xs mb-2 block">前置条件 Preconditions</Label>
+											<Label class="text-xs mb-2 block">{{ $t("lab.contract.preconditions") }}</Label>
 											<Textarea
 												v-model="preconditions"
-												placeholder="每行一个条件表达式"
+												:placeholder="$t('lab.contract.conditionPlaceholder')"
 												class="font-mono text-xs min-h-[80px] resize-y bg-muted border-border"
 												spellcheck="false"
 											/>
 										</div>
 										<div>
-											<Label class="text-xs mb-2 block">后置条件 Postconditions</Label>
+											<Label class="text-xs mb-2 block">{{ $t("lab.contract.postconditions") }}</Label>
 											<Textarea
 												v-model="postconditions"
-												placeholder="每行一个条件表达式"
+												:placeholder="$t('lab.contract.conditionPlaceholder')"
 												class="font-mono text-xs min-h-[80px] resize-y bg-muted border-border"
 												spellcheck="false"
 											/>
 										</div>
 										<div>
-											<Label class="text-xs mb-2 block">不变式 Invariants</Label>
+											<Label class="text-xs mb-2 block">{{ $t("lab.contract.invariants") }}</Label>
 											<Textarea
 												v-model="invariants"
-												placeholder="每行一个不变式"
+												:placeholder="$t('lab.contract.invariantPlaceholder')"
 												class="font-mono text-xs min-h-[60px] resize-y bg-muted border-border"
 												spellcheck="false"
 											/>
@@ -361,9 +372,9 @@ function computeVariance(data: number[]): number {
 				<div class="xl:col-span-3 space-y-6">
 					<Card>
 						<CardHeader class="pb-3">
-							<CardTitle class="text-base">波形对比</CardTitle>
+							<CardTitle class="text-base">{{ $t("lab.waveform.title") }}</CardTitle>
 							<CardDescription class="text-xs">
-								输入/输出波形叠加 · 故障区间高亮 · 支持缩放拖动
+								{{ $t("lab.waveform.desc") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent class="pt-0">
@@ -377,18 +388,21 @@ function computeVariance(data: number[]): number {
 								/>
 								<div v-if="!currentResult.passed && currentResult.contract_violation" class="p-3 bg-destructive/10 border border-destructive/30 rounded-component-sm">
 									<div class="flex items-center gap-2 text-destructive text-xs font-semibold">
-										<span>⚠ 契约违约</span>
+										<span>⚠ {{ $t("lab.waveform.violation") }}</span>
 										<code class="font-mono">[{{ currentResult.contract_violation.contract_id }}]</code>
 									</div>
 									<p class="text-xs text-muted-foreground mt-1">
-										第 {{ currentResult.contract_violation.timestep }} 步：{{ currentResult.contract_violation.message }}
+										{{ $t("lab.waveform.violationDetail", {
+											step: currentResult.contract_violation.timestep,
+											message: currentResult.contract_violation.message,
+										}) }}
 									</p>
 								</div>
 							</div>
 							<div v-else class="flex items-center justify-center h-[320px] border border-dashed border-border rounded-component-sm bg-muted/30">
 								<div class="text-center">
 									<div class="text-4xl mb-3">📈</div>
-									<p class="text-sm text-muted-foreground">点击"启动仿真"生成波形</p>
+									<p class="text-sm text-muted-foreground">{{ $t("lab.waveform.emptyHint") }}</p>
 								</div>
 							</div>
 						</CardContent>
@@ -396,31 +410,31 @@ function computeVariance(data: number[]): number {
 
 					<Card>
 						<CardHeader class="pb-3">
-							<CardTitle class="text-base">统计信息</CardTitle>
+							<CardTitle class="text-base">{{ $t("lab.stats.title") }}</CardTitle>
 							<CardDescription class="text-xs">
-								仿真运行统计与契约验证结果
+								{{ $t("lab.stats.desc") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent class="pt-0">
 							<div v-if="quickStats" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
 								<div
 									v-for="stat in quickStats"
-									:key="stat.label"
+									:key="stat.labelKey"
 									class="p-3 bg-card border border-border rounded-component-sm"
 								>
 									<div class="text-[11px] text-muted-foreground uppercase tracking-wide">
-										{{ stat.label }}
+										{{ $t(stat.labelKey) }}
 									</div>
 									<div class="text-lg font-semibold mt-1 font-mono">
 										{{ stat.value }}
 									</div>
 									<div class="text-[10px] text-muted-foreground mt-0.5">
-										{{ stat.unit }}
+										{{ $t(stat.unitKey) }}
 									</div>
 								</div>
 							</div>
 							<div v-else class="flex items-center justify-center h-[80px] text-sm text-muted-foreground">
-								暂无仿真数据
+								{{ $t("lab.stats.empty") }}
 							</div>
 						</CardContent>
 					</Card>
@@ -428,13 +442,13 @@ function computeVariance(data: number[]): number {
 					<Card v-if="multiCompareEnabled && simulationHistory.length > 0">
 						<CardHeader class="pb-3">
 							<CardTitle class="text-base">
-								仿真历史对比
+								{{ $t("lab.history.title") }}
 								<span class="text-xs font-normal text-muted-foreground ml-2">
-									共 {{ simulationHistory.length }} 轮
+									{{ $t("lab.history.rounds", { count: simulationHistory.length }) }}
 								</span>
 							</CardTitle>
 							<CardDescription class="text-xs">
-								多轮仿真结果叠加展示，差异高亮
+								{{ $t("lab.history.desc") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent class="pt-0">
@@ -446,17 +460,21 @@ function computeVariance(data: number[]): number {
 									:class="result.passed ? 'border-l-4 border-l-success' : 'border-l-4 border-l-destructive'"
 								>
 									<div class="flex items-center justify-between mb-2">
-										<span class="text-xs font-semibold">第 {{ idx + 1 }} 轮</span>
+										<span class="text-xs font-semibold">{{ $t("lab.history.round", { n: idx + 1 }) }}</span>
 										<span
 											class="text-[10px] px-2 py-0.5 rounded-full font-medium"
 											:class="result.passed ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'"
 										>
-											{{ result.passed ? '通过' : '违约' }}
+											{{ result.passed ? $t("lab.history.passed") : $t("lab.history.violated") }}
 										</span>
 									</div>
 									<div class="text-[11px] text-muted-foreground space-y-1">
-										<div>故障：{{ result.fault_type ?? "无" }}</div>
-										<div>步数：{{ result.total_steps }} · 输出范围：{{ result.statistics.output_min }} ~ {{ result.statistics.output_max }}</div>
+										<div>{{ $t("lab.history.fault", { type: result.fault_type ?? $t("lab.history.noFault") }) }}</div>
+										<div>{{ $t("lab.history.stepRange", {
+											steps: result.total_steps,
+											min: result.statistics.output_min,
+											max: result.statistics.output_max,
+										}) }}</div>
 									</div>
 									<WaveformChart
 										:input-data="result.input_waveform"
@@ -472,9 +490,9 @@ function computeVariance(data: number[]): number {
 
 					<Card v-if="currentResult">
 						<CardHeader class="pb-3">
-							<CardTitle class="text-base">仿真详情</CardTitle>
+							<CardTitle class="text-base">{{ $t("lab.detail.title") }}</CardTitle>
 							<CardDescription class="text-xs">
-								完整仿真结果与终端日志
+								{{ $t("lab.detail.desc") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent class="pt-0">

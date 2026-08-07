@@ -20,6 +20,7 @@ import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import VChart from "vue-echarts";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import SourceBadge from "@/components/SourceBadge.vue";
 import { Badge } from "@/components/ui/badge";
@@ -42,6 +43,7 @@ use([
 ]);
 
 const router = useRouter();
+const { t } = useI18n();
 
 const isMounted = ref(false);
 const systemStatus = ref<SystemStatus | null>(null);
@@ -115,12 +117,12 @@ function formatTimeAgo(iso: string | null): string {
 	if (!iso) return "-";
 	const diff = Date.now() - new Date(iso).getTime();
 	const mins = Math.floor(diff / 60000);
-	if (mins < 1) return "刚刚";
-	if (mins < 60) return `${mins} 分钟前`;
+	if (mins < 1) return t("dashboard.time.justNow");
+	if (mins < 60) return t("dashboard.time.minutesAgo", { n: mins });
 	const hours = Math.floor(mins / 60);
-	if (hours < 24) return `${hours} 小时前`;
+	if (hours < 24) return t("dashboard.time.hoursAgo", { n: hours });
 	const days = Math.floor(hours / 24);
-	return `${days} 天前`;
+	return t("dashboard.time.daysAgo", { n: days });
 }
 
 const statusBadgeVariant = (status: RecentTask["status"]) => {
@@ -139,11 +141,11 @@ const statusBadgeVariant = (status: RecentTask["status"]) => {
 const statusLabel = (status: RecentTask["status"]) => {
 	switch (status) {
 		case "done":
-			return "已完成";
+			return t("dashboard.statusLabel.done");
 		case "running":
-			return "运行中";
+			return t("dashboard.statusLabel.running");
 		case "error":
-			return "失败";
+			return t("dashboard.statusLabel.error");
 		default:
 			return status;
 	}
@@ -219,7 +221,7 @@ const complianceChartOption = computed(() => {
 		},
 		yAxis: {
 			type: "value",
-			name: "违规数",
+			name: t("dashboard.compliance.violationAxis"),
 			nameTextStyle: { color: "hsl(var(--muted-foreground))", fontSize: 11 },
 			axisLine: { lineStyle: { color: "hsl(var(--border))" } },
 			axisTick: { lineStyle: { color: "hsl(var(--border))" } },
@@ -281,7 +283,7 @@ onBeforeUnmount(() => {
 			:class="{ 'animate-in-active': isMounted }"
 		>
 			<div class="section-header">
-				<h2 class="section-title">系统状态</h2>
+				<h2 class="section-title">{{ $t("dashboard.status.sectionTitle") }}</h2>
 			</div>
 			<div class="status-grid">
 				<Card class="status-card">
@@ -290,13 +292,13 @@ onBeforeUnmount(() => {
 							<Server :size="20" />
 						</div>
 						<div class="status-card-info">
-							<div class="status-card-label">后端服务</div>
+							<div class="status-card-label">{{ $t("dashboard.status.backend") }}</div>
 							<div class="status-card-value">
 								<span
 									class="status-dot"
 									:class="systemStatus?.backend === 'online' ? 'online' : 'error'"
 								/>
-								{{ systemStatus?.backend === 'online' ? '在线' : '离线' }}
+								{{ systemStatus?.backend === 'online' ? $t('dashboard.status.online') : $t('dashboard.status.offline') }}
 							</div>
 						</div>
 					</CardContent>
@@ -308,16 +310,16 @@ onBeforeUnmount(() => {
 							<Activity :size="20" />
 						</div>
 						<div class="status-card-info">
-							<div class="status-card-label">LLM 引擎</div>
+							<div class="status-card-label">{{ $t("dashboard.status.llm") }}</div>
 							<div class="status-card-value">
 								<span
 									class="status-dot"
 									:class="systemStatus?.llm.available ? 'online' : 'error'"
 								/>
-								{{ systemStatus?.llm.available ? '在线' : '离线' }}
+								{{ systemStatus?.llm.available ? $t('dashboard.status.online') : $t('dashboard.status.offline') }}
 							</div>
 							<div class="status-card-detail">
-								模式: {{ systemStatus?.llm.mode === 'mock' ? '模拟' : systemStatus?.llm.mode }}
+								{{ $t('dashboard.status.mode') }} {{ systemStatus?.llm.mode === 'mock' ? $t('backend.mock') : systemStatus?.llm.mode }}
 								<span v-if="systemStatus?.llm.model">
 									· {{ systemStatus.llm.model }}
 								</span>
@@ -332,7 +334,7 @@ onBeforeUnmount(() => {
 							<Wrench :size="20" />
 						</div>
 						<div class="status-card-info">
-							<div class="status-card-label">工具链</div>
+							<div class="status-card-label">{{ $t("dashboard.status.tools") }}</div>
 							<div class="status-card-value">
 								<span
 									class="status-dot"
@@ -344,8 +346,8 @@ onBeforeUnmount(() => {
 								/>
 								{{
 									systemStatus?.tools.gcc || systemStatus?.tools.z3
-										? '可用'
-										: '离线'
+										? $t('dashboard.status.available')
+										: $t('dashboard.status.offline')
 								}}
 							</div>
 							<div class="status-card-detail">
@@ -375,8 +377,8 @@ onBeforeUnmount(() => {
 							<Code2 :size="28" />
 						</div>
 						<div class="action-text">
-							<h3 class="action-title">新建代码生成任务</h3>
-							<p class="action-desc">从自然语言需求开始，生成符合 DO-178C 的可信代码</p>
+							<h3 class="action-title">{{ $t("dashboard.action.newTask") }}</h3>
+							<p class="action-desc">{{ $t("dashboard.action.newTaskDesc") }}</p>
 						</div>
 						<ArrowRight :size="20" class="action-arrow" />
 					</CardContent>
@@ -388,9 +390,13 @@ onBeforeUnmount(() => {
 							<Clock :size="28" />
 						</div>
 						<div class="action-text">
-							<h3 class="action-title">继续上次任务</h3>
+							<h3 class="action-title">{{ $t("dashboard.action.continue") }}</h3>
 							<p class="action-desc">
-								{{ lastTask ? '回到最近一次运行的任务上下文' : '查看历史运行记录' }}
+								{{
+									lastTask
+										? $t('dashboard.action.continueDesc')
+										: $t('dashboard.action.continueFallback')
+								}}
 							</p>
 						</div>
 						<ArrowRight :size="20" class="action-arrow" />
@@ -403,8 +409,8 @@ onBeforeUnmount(() => {
 							<FileCode2 :size="28" />
 						</div>
 						<div class="action-text">
-							<h3 class="action-title">从 SCADE 导入</h3>
-							<p class="action-desc">导入 SCADE G-Lustre 模型，转换为需求与契约</p>
+							<h3 class="action-title">{{ $t("dashboard.action.importScade") }}</h3>
+							<p class="action-desc">{{ $t("dashboard.action.importScadeDesc") }}</p>
 						</div>
 						<ArrowRight :size="20" class="action-arrow" />
 					</CardContent>
@@ -419,18 +425,18 @@ onBeforeUnmount(() => {
 			<Card class="section-card">
 				<CardHeader class="section-card-header">
 					<CardTitle class="section-card-title flex items-center gap-2">
-						<span>最近任务</span>
-						<SourceBadge source="observed" label="实时数据" />
+						<span>{{ $t("dashboard.recent.title") }}</span>
+						<SourceBadge source="observed" :label="$t('dashboard.recent.liveSource')" />
 					</CardTitle>
 					<router-link to="/records" class="view-all-link">
-						查看全部 <ArrowRight :size="14" />
+						{{ $t("dashboard.recent.viewAll") }} <ArrowRight :size="14" />
 					</router-link>
 				</CardHeader>
 				<CardContent class="section-card-content">
 					<div v-if="recentTasks.length === 0" class="empty-state">
 						<FileText :size="40" class="empty-icon" />
-						<p class="empty-title">暂无任务记录</p>
-						<p class="empty-desc">点击上方按钮创建您的第一个代码生成任务</p>
+						<p class="empty-title">{{ $t("dashboard.recent.emptyTitle") }}</p>
+						<p class="empty-desc">{{ $t("dashboard.recent.emptyDesc") }}</p>
 					</div>
 					<div v-else class="task-list">
 						<div
@@ -454,7 +460,7 @@ onBeforeUnmount(() => {
 								<div class="task-details">
 									<span class="task-detail-item">
 										<ShieldCheck :size="12" />
-										{{ task.violation_count }} 违规
+										{{ $t('dashboard.recent.violations', { n: task.violation_count }) }}
 									</span>
 									<span v-if="task.duration_ms > 0" class="task-detail-item">
 										<Clock :size="12" />
@@ -479,8 +485,8 @@ onBeforeUnmount(() => {
 				<Card class="compliance-stats-card">
 					<CardHeader class="compliance-card-header">
 						<CardTitle class="compliance-card-title flex items-center gap-2">
-							<span>DO-178C 合规率</span>
-							<SourceBadge source="observed" label="统计数据" />
+							<span>{{ $t("dashboard.compliance.title") }}</span>
+							<SourceBadge source="observed" :label="$t('dashboard.compliance.statsSource')" />
 						</CardTitle>
 					</CardHeader>
 					<CardContent class="compliance-stats-content">
@@ -492,20 +498,20 @@ onBeforeUnmount(() => {
 										: 0
 								}}%
 							</span>
-							<span class="compliance-rate-label">平均合规率</span>
+							<span class="compliance-rate-label">{{ $t("dashboard.compliance.avgRate") }}</span>
 						</div>
 						<div class="compliance-metrics">
 							<div class="metric-item">
 								<span class="metric-value">{{ dashboardStats?.today_count ?? 0 }}</span>
-								<span class="metric-label">今日任务</span>
+								<span class="metric-label">{{ $t("dashboard.compliance.todayCount") }}</span>
 							</div>
 							<div class="metric-item">
 								<span class="metric-value">{{ dashboardStats?.today_done ?? 0 }}</span>
-								<span class="metric-label">已完成</span>
+								<span class="metric-label">{{ $t("dashboard.compliance.todayDone") }}</span>
 							</div>
 							<div class="metric-item">
 								<span class="metric-value">{{ dashboardStats?.total_count ?? 0 }}</span>
-								<span class="metric-label">总任务数</span>
+								<span class="metric-label">{{ $t("dashboard.compliance.totalCount") }}</span>
 							</div>
 						</div>
 					</CardContent>
@@ -513,7 +519,7 @@ onBeforeUnmount(() => {
 
 				<Card class="compliance-chart-card">
 					<CardHeader class="compliance-card-header">
-						<CardTitle class="compliance-card-title">违规数趋势</CardTitle>
+						<CardTitle class="compliance-card-title">{{ $t("dashboard.compliance.trendTitle") }}</CardTitle>
 					</CardHeader>
 					<CardContent class="compliance-chart-content">
 						<v-chart
@@ -524,7 +530,7 @@ onBeforeUnmount(() => {
 						/>
 						<div v-else class="chart-empty">
 							<Activity :size="32" class="empty-icon" />
-							<p>暂无趋势数据</p>
+							<p>{{ $t("dashboard.compliance.noTrend") }}</p>
 						</div>
 					</CardContent>
 				</Card>

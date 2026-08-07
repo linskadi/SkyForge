@@ -1,22 +1,16 @@
 <script setup lang="ts">
 import {
 	CheckCircle2,
-	ChevronDown,
 	CloudCog,
 	Cpu,
 	Download,
 	Eye,
 	EyeOff,
-	FolderOpen,
-	Hammer,
-	LayoutPanelLeft,
 	Loader2,
 	Monitor,
 	Moon,
 	Palette,
 	RefreshCw,
-	ShieldCheck,
-	Sparkles,
 	Sun,
 	Terminal,
 	Wrench,
@@ -24,6 +18,7 @@ import {
 	Zap,
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import SettingsDialog from "@/components/SettingsDialog.vue";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +41,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast/use-toast";
 import { useTheme } from "@/composables/useTheme";
+import { useLocale } from "@/i18n/useLocale";
 import {
 	getLLMConfig,
 	type LLMConfig,
@@ -53,6 +49,7 @@ import {
 	saveLLMConfig,
 	testLLMConnection,
 } from "@/services/api";
+import { API_TOKEN_STORAGE_KEY } from "@/services/client";
 import { useExecutionStore } from "@/stores/executionStore";
 import { useProviderStore } from "@/stores/providerStore";
 import { useToolchainStore } from "@/stores/toolchainStore";
@@ -60,9 +57,17 @@ import type { ExecutionProfileId } from "@/types/execution";
 
 const execution = useExecutionStore();
 const providerStore = useProviderStore();
-const { isDark, toggleTheme } = useTheme();
+const { isDark } = useTheme();
 const { toast } = useToast();
 const toolchainStore = useToolchainStore();
+const { t } = useI18n();
+const { locale, setLocale } = useLocale();
+
+async function onChangeLocale(value: unknown) {
+	if (typeof value !== "string") return;
+	if (value === locale.value) return;
+	await setLocale(value as "zh-CN" | "en", "settings");
+}
 
 const activeInstallHint = ref<string>("");
 const installHintTool = ref<string>("");
@@ -84,7 +89,7 @@ async function showInstallHint(toolName: string) {
 	if (platform.includes("win")) key = "windows";
 	else if (platform.includes("mac")) key = "macos";
 	activeInstallHint.value =
-		hints[key] || hints["linux"] || "请参考官方文档安装";
+		hints[key] || hints.linux || t("settings.toolchain.installHintFallback");
 }
 
 function closeInstallHint() {
@@ -93,28 +98,36 @@ function closeInstallHint() {
 }
 
 function getToolStatusLabel(tool: { found: boolean; version: string }) {
-	if (tool.found && tool.version) return "已检测";
-	return "未安装";
+	if (tool.found && tool.version) return t("settings.toolchain.detected");
+	return t("settings.toolchain.notInstalled");
 }
 
 const llmSettingsOpen = ref(false);
 const activeTab = ref("profile");
 
-const profileDescriptions: Record<
-	ExecutionProfileId,
-	{ title: string; description: string; limitation: string }
-> = {
+const profileDescriptions = computed<
+	Record<
+		ExecutionProfileId,
+		{ title: string; description: string; limitation: string }
+	>
+>(() => ({
 	cloud: {
-		title: "云 API",
-		description: "DeepSeek、Qwen、OpenAI、Anthropic 或自定义兼容 API。",
-		limitation: "需要有效的 API Key 与网络连接",
+		title: t("settings.profile.cloud.title"),
+		description: t("settings.profile.cloud.description"),
+		limitation: t("settings.profile.cloud.limitation"),
 	},
 	local: {
-		title: "本地模型",
-		description: "连接 Ollama、LM Studio 等本机 OpenAI-compatible 服务。",
-		limitation: "需要本机运行 LLM 服务，性能取决于硬件",
+		title: t("settings.profile.local.title"),
+		description: t("settings.profile.local.description"),
+		limitation: t("settings.profile.local.limitation"),
 	},
-};
+}));
+
+const modeButtons = computed(() => [
+	{ key: "mock", label: t("settings.modeBtn.mock") },
+	{ key: "api", label: t("settings.mode.api") },
+	{ key: "local", label: t("settings.modeBtn.local") },
+]);
 
 type ApiProvider = "deepseek" | "qwen" | "openai" | "anthropic" | "custom";
 const PROVIDER_DEFAULT_BASE_URL: Record<ApiProvider, string> = {
@@ -127,6 +140,7 @@ const PROVIDER_DEFAULT_BASE_URL: Record<ApiProvider, string> = {
 
 const activeMode = ref(providerStore.derivedMode);
 const apiProvider = ref<ApiProvider>("deepseek");
+const apiToken = ref(localStorage.getItem(API_TOKEN_STORAGE_KEY) ?? "");
 const apiKey = ref("");
 const storedApiKeyMask = ref("");
 const apiBaseUrl = ref("");
@@ -165,6 +179,7 @@ watch(apiProvider, (next, prev) => {
 async function loadLlmConfig() {
 	const local = providerStore.getLLMConfig();
 	activeMode.value = local.mode;
+	apiToken.value = localStorage.getItem(API_TOKEN_STORAGE_KEY) ?? "";
 	if (local.mode === "api") {
 		apiProvider.value = (
 			["deepseek", "qwen", "openai", "anthropic", "custom"].includes(
@@ -280,7 +295,7 @@ async function handleTest() {
 		testResult.value = {
 			ok: false,
 			latency_ms: 0,
-			message: err instanceof Error ? err.message : "测试失败",
+			message: err instanceof Error ? err.message : t("settings.testFailed"),
 		};
 		testStatus.value = "fail";
 	}
@@ -292,6 +307,7 @@ async function handleSaveLlm() {
 	try {
 		const config = buildConfig();
 		await saveLLMConfig(config);
+		localStorage.setItem(API_TOKEN_STORAGE_KEY, apiToken.value);
 		execution.setProfile(config.mode === "local" ? "local" : "cloud");
 		if (config.mode === "api") {
 			providerStore.setProvider(config.provider ?? "deepseek");
@@ -300,14 +316,15 @@ async function handleSaveLlm() {
 			providerStore.setProvider(localProviderId);
 		}
 		toast({
-			title: "配置已保存",
-			description: "LLM 设置已成功更新",
+			title: t("settings.saveSuccess"),
+			description: t("settings.llmSavedDesc"),
 		});
 		window.dispatchEvent(new Event("skyforge-llm-config-changed"));
 	} catch (err) {
 		toast({
-			title: "保存失败",
-			description: err instanceof Error ? err.message : "未知错误",
+			title: t("settings.saveFailed"),
+			description:
+				err instanceof Error ? err.message : t("settings.unknownError"),
 			variant: "destructive",
 		});
 	} finally {
@@ -333,7 +350,6 @@ const reduceMotion = ref(
 );
 
 function applyThemeMode() {
-	const root = document.documentElement;
 	if (themeMode.value === "system") {
 		const prefersDark = window.matchMedia(
 			"(prefers-color-scheme: dark)",
@@ -389,9 +405,9 @@ if (savedReduceMotion === "true") {
 	<main class="min-h-[calc(100dvh-var(--topbar-h,52px))] bg-background">
 		<div class="mx-auto max-w-6xl px-4 py-8 md:px-8">
 			<header class="mb-8">
-				<h1 class="text-2xl font-semibold tracking-tight md:text-3xl">系统设置</h1>
+				<h1 class="text-2xl font-semibold tracking-tight md:text-3xl">{{ $t("settings.title") }}</h1>
 				<p class="mt-2 text-sm text-muted-foreground md:text-base">
-					配置运行来源、模型连接、工具链与界面偏好。所有设置均在本地保存，敏感信息由后端安全管理。
+					{{ $t("settings.subtitle") }}
 				</p>
 			</header>
 
@@ -399,19 +415,19 @@ if (savedReduceMotion === "true") {
 				<TabsList class="flex md:w-56 md:flex-col md:items-stretch md:gap-1 md:bg-transparent md:p-0">
 					<TabsTrigger value="profile" class="flex items-center justify-center gap-2 md:justify-start">
 						<Monitor class="h-4 w-4" />
-						<span>运行来源</span>
+						<span>{{ $t("settings.tabProfile") }}</span>
 					</TabsTrigger>
 					<TabsTrigger value="model" class="flex items-center justify-center gap-2 md:justify-start">
 						<CloudCog class="h-4 w-4" />
-						<span>模型连接</span>
+						<span>{{ $t("settings.tabModel") }}</span>
 					</TabsTrigger>
 					<TabsTrigger value="toolchain" class="flex items-center justify-center gap-2 md:justify-start">
 						<Wrench class="h-4 w-4" />
-						<span>工具链配置</span>
+						<span>{{ $t("settings.tabToolchain") }}</span>
 					</TabsTrigger>
 					<TabsTrigger value="preferences" class="flex items-center justify-center gap-2 md:justify-start">
 						<Palette class="h-4 w-4" />
-						<span>界面偏好</span>
+						<span>{{ $t("settings.tabPreferences") }}</span>
 					</TabsTrigger>
 				</TabsList>
 
@@ -419,8 +435,8 @@ if (savedReduceMotion === "true") {
 					<TabsContent value="profile" class="mt-0">
 						<Card>
 							<CardHeader>
-								<CardTitle class="text-xl">运行来源</CardTitle>
-								<CardDescription>选择当前页面和新任务的数据来源。切换后立即生效。</CardDescription>
+								<CardTitle class="text-xl">{{ $t("settings.profile.title") }}</CardTitle>
+								<CardDescription>{{ $t("settings.profile.description") }}</CardDescription>
 							</CardHeader>
 							<CardContent class="space-y-3">
 								<label
@@ -461,14 +477,14 @@ if (savedReduceMotion === "true") {
 														: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
 												]"
 											>
-												{{ profile.source === "simulated" ? "模拟" : "实时/回放" }}
+												{{ profile.source === "simulated" ? $t("settings.profile.sourceSimulated") : $t("settings.profile.sourceReplay") }}
 											</span>
 										</div>
 										<p class="mt-1 text-sm text-muted-foreground">
 											{{ profileDescriptions[profile.id].description }}
 										</p>
 										<p class="mt-2 text-xs text-muted-foreground">
-											限制：{{ profileDescriptions[profile.id].limitation }}
+											{{ $t("settings.profile.limitationLabel", { limitation: profileDescriptions[profile.id].limitation }) }}
 										</p>
 									</div>
 									<div
@@ -492,15 +508,27 @@ if (savedReduceMotion === "true") {
 					<TabsContent value="model" class="mt-0">
 						<Card>
 							<CardHeader>
-								<CardTitle class="text-xl">模型连接</CardTitle>
-								<CardDescription>配置后端 LLM 连接。API Key 由后端安全管理，不写入浏览器存储。</CardDescription>
+								<CardTitle class="text-xl">{{ $t("settings.model.title") }}</CardTitle>
+								<CardDescription>{{ $t("settings.model.description") }}</CardDescription>
 							</CardHeader>
 							<CardContent class="space-y-6">
+								<div class="rounded-lg border bg-muted/30 p-4 space-y-2">
+									<Label class="text-sm font-medium">{{ $t("settings.backend.tokenTitle") }}</Label>
+									<Input
+										v-model="apiToken"
+										type="password"
+										:placeholder="$t('settings.backend.tokenPlaceholder')"
+									/>
+									<p class="text-xs text-muted-foreground">
+										{{ $t("settings.backend.tokenHint") }}
+									</p>
+								</div>
+
 								<div class="space-y-3">
-									<Label>运行模式</Label>
+									<Label>{{ $t("settings.model.modeLabel") }}</Label>
 									<div class="grid grid-cols-3 gap-2">
 										<button
-											v-for="m in [{ key: 'mock', label: '模拟' }, { key: 'api', label: '云 API' }, { key: 'local', label: '本地' }]"
+											v-for="m in modeButtons"
 											:key="m.key"
 											type="button"
 											class="rounded-md border px-3 py-2 text-sm font-medium transition-all"
@@ -518,40 +546,40 @@ if (savedReduceMotion === "true") {
 
 								<div v-if="activeMode === 'mock'" class="rounded-lg border bg-muted/30 p-4">
 									<p class="text-sm text-muted-foreground">
-										前端模拟数据，不调用任何 LLM 服务。适用于无后端时的开发调试。
+										{{ $t("settings.mockDescPage") }}
 									</p>
 								</div>
 
 								<template v-else-if="activeMode === 'api'">
 									<div class="space-y-2">
-										<Label>Provider</Label>
+										<Label>{{ $t("settings.model.providerLabel") }}</Label>
 										<Select v-model="apiProviderSelect">
 											<SelectTrigger>
-												<SelectValue placeholder="选择 Provider" />
+												<SelectValue :placeholder="$t('settings.model.providerPlaceholder')" />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value="deepseek">DeepSeek</SelectItem>
-												<SelectItem value="qwen">通义千问（兼容 API）</SelectItem>
-												<SelectItem value="openai">OpenAI</SelectItem>
-												<SelectItem value="anthropic">Anthropic</SelectItem>
-												<SelectItem value="custom">自定义 OpenAI 兼容服务</SelectItem>
+												<SelectItem value="deepseek">{{ $t("settings.provider.deepseek.label") }}</SelectItem>
+												<SelectItem value="qwen">{{ $t("settings.provider.qwen.label") }}</SelectItem>
+												<SelectItem value="openai">{{ $t("settings.provider.openai.label") }}</SelectItem>
+												<SelectItem value="anthropic">{{ $t("settings.provider.anthropic.label") }}</SelectItem>
+												<SelectItem value="custom">{{ $t("settings.provider.custom.label") }}</SelectItem>
 											</SelectContent>
 										</Select>
 									</div>
 
 									<div class="space-y-2">
-										<Label for="llm-api-key">API Key</Label>
+										<Label for="llm-api-key">{{ $t("settings.model.apiKeyLabel") }}</Label>
 										<div class="relative">
 											<Input
 												id="llm-api-key"
 												v-model="apiKey"
 												:type="showApiKey ? 'text' : 'password'"
-												:placeholder="storedApiKeyMask ? `已配置 ${storedApiKeyMask}；留空表示不修改` : '输入 API Key；留空表示不修改'"
+												:placeholder="storedApiKeyMask ? $t('settings.model.apiKeyPlaceholderSet', { mask: storedApiKeyMask }) : $t('settings.model.apiKeyPlaceholder')"
 												class="pr-10"
 											/>
 											<button
 												type="button"
-												:aria-label="showApiKey ? '隐藏 API Key' : '显示 API Key'"
+												:aria-label="showApiKey ? $t('settings.model.hideApiKey') : $t('settings.model.showApiKey')"
 												class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
 												@click="showApiKey = !showApiKey"
 											>
@@ -560,21 +588,21 @@ if (savedReduceMotion === "true") {
 											</button>
 										</div>
 										<p class="text-xs text-muted-foreground">
-											密钥通过 HTTPS 提交给后端，不写入 localStorage；留空会沿用已配置密钥。
+											{{ $t("settings.model.apiKeyHintPage") }}
 										</p>
 									</div>
 
 									<div class="space-y-2">
-										<Label>Base URL</Label>
+										<Label>{{ $t("settings.model.baseUrlLabel") }}</Label>
 										<Input v-model="apiBaseUrl" placeholder="https://api.openai.com/v1" />
-										<p class="text-xs text-muted-foreground">留空将自动使用 Provider 默认地址。</p>
+										<p class="text-xs text-muted-foreground">{{ $t("settings.model.baseUrlHint") }}</p>
 									</div>
 
 									<div class="space-y-2">
-										<Label>Model</Label>
+										<Label>{{ $t("settings.model.modelLabel") }}</Label>
 										<Select v-if="apiModels.length > 0" v-model="apiModel">
 											<SelectTrigger>
-												<SelectValue placeholder="选择模型" />
+												<SelectValue :placeholder="$t('settings.model.selectModelPlaceholder')" />
 											</SelectTrigger>
 											<SelectContent>
 												<SelectItem v-for="m in apiModels" :key="m" :value="m">{{ m }}</SelectItem>
@@ -582,25 +610,25 @@ if (savedReduceMotion === "true") {
 										</Select>
 										<Input v-else v-model="apiModel" placeholder="gpt-4o / claude-3-5-sonnet" />
 										<p class="text-xs text-muted-foreground">
-											{{ apiModels.length > 0 ? `已检测到 ${apiModels.length} 个可用模型` : '指定模型 ID 或点击「测试连接」自动获取列表' }}
+											{{ apiModels.length > 0 ? $t("settings.model.modelsDetected", { count: apiModels.length }) : $t("settings.model.apiModelHint") }}
 										</p>
 									</div>
 								</template>
 
 								<template v-else-if="activeMode === 'local'">
 									<div class="space-y-2">
-										<Label>Base URL</Label>
+										<Label>{{ $t("settings.model.baseUrlLabel") }}</Label>
 										<Input v-model="localBaseUrl" placeholder="http://localhost:11434/v1" />
 										<p class="text-xs text-muted-foreground">
-											本地 OpenAI 兼容端点（如 Ollama）。默认 http://localhost:11434/v1
+											{{ $t("settings.model.localBaseUrlHint") }}
 										</p>
 									</div>
 
 									<div class="space-y-2">
-										<Label>Model</Label>
+										<Label>{{ $t("settings.model.modelLabel") }}</Label>
 										<Select v-if="localModels.length > 0" v-model="localModel">
 											<SelectTrigger>
-												<SelectValue placeholder="选择模型" />
+												<SelectValue :placeholder="$t('settings.model.selectModelPlaceholder')" />
 											</SelectTrigger>
 											<SelectContent>
 												<SelectItem v-for="m in localModels" :key="m" :value="m">{{ m }}</SelectItem>
@@ -608,7 +636,7 @@ if (savedReduceMotion === "true") {
 										</Select>
 										<Input v-else v-model="localModel" placeholder="auto / qwen2.5-coder:14b" />
 										<p class="text-xs text-muted-foreground">
-											{{ localModels.length > 0 ? `已检测到 ${localModels.length} 个可用模型` : '可选；点击「测试连接」自动获取模型列表' }}
+											{{ localModels.length > 0 ? $t("settings.model.modelsDetected", { count: localModels.length }) : $t("settings.model.localModelHint") }}
 										</p>
 									</div>
 								</template>
@@ -619,7 +647,7 @@ if (savedReduceMotion === "true") {
 										<CheckCircle2 v-else-if="testStatus === 'ok'" class="mr-1 h-3 w-3 text-green-500" />
 										<XCircle v-else-if="testStatus === 'fail'" class="mr-1 h-3 w-3 text-red-500" />
 										<Zap v-else class="mr-1 h-3 w-3" />
-										{{ testStatus === "testing" ? "测试中..." : "测试连接" }}
+										{{ testStatus === "testing" ? $t("settings.model.testing") : $t("settings.model.testConnection") }}
 									</Button>
 									<span v-if="testStatus === 'ok'" class="text-xs text-green-600 dark:text-green-400">
 										{{ testResult?.latency_ms }}ms · {{ testResult?.model }}
@@ -632,14 +660,14 @@ if (savedReduceMotion === "true") {
 								<label class="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
 									<input v-model="remember" type="checkbox" class="mt-1" />
 									<span>
-										<strong class="block">在此设备上记住配置</strong>
-										<small class="text-muted-foreground">写入已被 Git 忽略的 config/.env；取消勾选会清除磁盘上的 LLM 配置和密钥。</small>
+										<strong class="block">{{ $t("settings.model.rememberLabel") }}</strong>
+										<small class="text-muted-foreground">{{ $t("settings.model.rememberHint") }}</small>
 									</span>
 								</label>
 
 								<div class="flex justify-end">
 									<Button :disabled="isBusy" @click="handleSaveLlm">
-										{{ saving ? "保存中..." : "保存设置" }}
+										{{ saving ? $t("settings.model.saving") : $t("settings.model.saveButton") }}
 									</Button>
 								</div>
 							</CardContent>
@@ -649,15 +677,15 @@ if (savedReduceMotion === "true") {
 					<TabsContent value="toolchain" class="mt-0">
 						<Card>
 							<CardHeader>
-								<CardTitle class="text-xl">工具链配置</CardTitle>
-								<CardDescription>检测并配置代码分析与验证工具链。</CardDescription>
+								<CardTitle class="text-xl">{{ $t("settings.toolchain.title") }}</CardTitle>
+								<CardDescription>{{ $t("settings.toolchain.description") }}</CardDescription>
 							</CardHeader>
 							<CardContent class="space-y-3">
 								<div v-if="toolchainStore.loading" class="rounded-lg border p-4 text-center text-muted-foreground">
-									加载中...
+									{{ $t("common.loading") }}
 								</div>
 								<div v-else-if="toolchainStore.error" class="rounded-lg border p-4 text-center text-amber-600">
-									工具链状态获取失败：{{ toolchainStore.error }}
+									{{ $t("settings.toolchain.error", { error: toolchainStore.error }) }}
 								</div>
 								<div v-else class="space-y-3">
 									<div
@@ -684,12 +712,12 @@ if (savedReduceMotion === "true") {
 															v{{ tool.version }}
 														</span>
 														<span v-else class="text-xs text-muted-foreground">
-															需要 >= v{{ tool.min_version }}
+															{{ $t("settings.toolchain.requiresVersion", { version: tool.min_version }) }}
 														</span>
 													</div>
 													<p class="text-xs text-muted-foreground">{{ tool.description }}</p>
 													<p v-if="!tool.found && tool.install_hint" class="mt-1 text-xs text-amber-600 dark:text-amber-400">
-														安装提示: {{ tool.install_hint }}
+														{{ $t("settings.toolchain.installHintLabel", { hint: tool.install_hint }) }}
 													</p>
 												</div>
 											</div>
@@ -725,7 +753,7 @@ if (savedReduceMotion === "true") {
 													@click="showInstallHint(tool.name)"
 												>
 													<Download class="mr-1.5 h-3.5 w-3.5" />
-													安装指引
+													{{ $t("settings.toolchain.installGuide") }}
 												</Button>
 											</div>
 										</div>
@@ -735,7 +763,7 @@ if (savedReduceMotion === "true") {
 										>
 											<div class="flex items-start justify-between gap-2">
 												<div>
-													<p class="font-medium">{{ tool.name }} 安装指引</p>
+													<p class="font-medium">{{ $t("settings.toolchain.installGuideTitle", { tool: tool.name }) }}</p>
 													<p class="mt-1 text-muted-foreground">{{ activeInstallHint }}</p>
 												</div>
 												<Button variant="ghost" size="sm" @click="closeInstallHint">
@@ -752,12 +780,12 @@ if (savedReduceMotion === "true") {
 					<TabsContent value="preferences" class="mt-0 space-y-6">
 						<Card>
 							<CardHeader>
-								<CardTitle class="text-xl">外观</CardTitle>
-								<CardDescription>设置主题与视觉效果。</CardDescription>
+								<CardTitle class="text-xl">{{ $t("settings.preferences.appearanceTitle") }}</CardTitle>
+								<CardDescription>{{ $t("settings.preferences.appearanceDesc") }}</CardDescription>
 							</CardHeader>
 							<CardContent class="space-y-6">
 								<div class="space-y-3">
-									<Label>主题</Label>
+									<Label>{{ $t("settings.preferences.themeLabel") }}</Label>
 									<div class="grid grid-cols-3 gap-2">
 										<button
 											type="button"
@@ -770,7 +798,7 @@ if (savedReduceMotion === "true") {
 											@click="themeMode = 'light'; applyThemeMode()"
 										>
 											<Sun class="h-5 w-5" />
-											<span class="text-sm font-medium">浅色</span>
+											<span class="text-sm font-medium">{{ $t("settings.preferences.themeLight") }}</span>
 										</button>
 										<button
 											type="button"
@@ -783,7 +811,7 @@ if (savedReduceMotion === "true") {
 											@click="themeMode = 'dark'; applyThemeMode()"
 										>
 											<Moon class="h-5 w-5" />
-											<span class="text-sm font-medium">深色</span>
+											<span class="text-sm font-medium">{{ $t("settings.preferences.themeDark") }}</span>
 										</button>
 										<button
 											type="button"
@@ -796,15 +824,29 @@ if (savedReduceMotion === "true") {
 											@click="themeMode = 'system'; applyThemeMode()"
 										>
 											<Monitor class="h-5 w-5" />
-											<span class="text-sm font-medium">跟随系统</span>
+											<span class="text-sm font-medium">{{ $t("settings.preferences.themeSystem") }}</span>
 										</button>
 									</div>
 								</div>
 
+								<div class="space-y-3">
+									<Label>{{ $t("settings.language") }}</Label>
+									<Select :model-value="locale" @update:model-value="onChangeLocale">
+										<SelectTrigger>
+											<SelectValue :placeholder="$t('settings.language')" />
+										</SelectTrigger>
+										<SelectContent>
+											<SelectItem value="zh-CN">{{ $t("settings.langZh") }}</SelectItem>
+											<SelectItem value="en">{{ $t("settings.langEn") }}</SelectItem>
+										</SelectContent>
+									</Select>
+									<p class="text-xs text-muted-foreground">{{ $t("settings.languageDesc") }}</p>
+								</div>
+
 								<div class="flex items-center justify-between">
 									<div>
-										<p class="text-sm font-medium">减少动画</p>
-										<p class="text-xs text-muted-foreground">关闭非必要动画与过渡效果</p>
+										<p class="text-sm font-medium">{{ $t("settings.preferences.reduceMotion") }}</p>
+										<p class="text-xs text-muted-foreground">{{ $t("settings.preferences.reduceMotionDesc") }}</p>
 									</div>
 									<Switch :checked="reduceMotion" @change="setReduceMotion($event)" />
 								</div>
@@ -813,12 +855,12 @@ if (savedReduceMotion === "true") {
 
 						<Card>
 							<CardHeader>
-								<CardTitle class="text-xl">语言与通知</CardTitle>
-								<CardDescription>设置默认目标语言与通知偏好。</CardDescription>
+								<CardTitle class="text-xl">{{ $t("settings.preferences.languageTitle") }}</CardTitle>
+								<CardDescription>{{ $t("settings.preferences.languageDesc") }}</CardDescription>
 							</CardHeader>
 							<CardContent class="space-y-6">
 								<div class="space-y-2">
-									<Label>默认目标语言</Label>
+									<Label>{{ $t("settings.preferences.defaultTargetLang") }}</Label>
 									<div class="grid grid-cols-3 gap-2">
 										<button
 											v-for="lang in [{ key: 'c', label: 'C' }, { key: 'cpp', label: 'C++' }, { key: 'python', label: 'Python' }]"
@@ -839,16 +881,16 @@ if (savedReduceMotion === "true") {
 
 								<div class="flex items-center justify-between">
 									<div>
-										<p class="text-sm font-medium">桌面通知</p>
-										<p class="text-xs text-muted-foreground">任务完成时发送桌面通知</p>
+										<p class="text-sm font-medium">{{ $t("settings.preferences.desktopNotif") }}</p>
+										<p class="text-xs text-muted-foreground">{{ $t("settings.preferences.desktopNotifDesc") }}</p>
 									</div>
 									<Switch :checked="desktopNotifications" @change="setDesktopNotifications($event)" />
 								</div>
 
 								<div class="flex items-center justify-between">
 									<div>
-										<p class="text-sm font-medium">浏览器通知</p>
-										<p class="text-xs text-muted-foreground">任务进行中显示浏览器内通知</p>
+										<p class="text-sm font-medium">{{ $t("settings.preferences.browserNotif") }}</p>
+										<p class="text-xs text-muted-foreground">{{ $t("settings.preferences.browserNotifDesc") }}</p>
 									</div>
 									<Switch :checked="browserNotifications" @change="setBrowserNotifications($event)" />
 								</div>

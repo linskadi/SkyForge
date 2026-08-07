@@ -13,6 +13,7 @@ import {
 	XCircle,
 } from "@lucide/vue";
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import SourceBadge from "@/components/SourceBadge.vue";
 import Badge from "@/components/ui/badge/Badge.vue";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ import {
 } from "@/mock/data";
 import type { MisraRule, RuleStandard } from "@/types/domain";
 
+const { t } = useI18n();
+
 const activeTab = ref("misra");
 
 // ==================== 视图 A: MISRA 规则实验室 ====================
@@ -46,26 +49,41 @@ const misraStandards = ref<RuleStandard[]>(MOCK_RULE_STANDARDS);
 const misraCurrentStandardId = ref("misra_c_2012");
 
 interface MisraDisplayConfig {
-	placeholder: string;
-	emptyHint: string;
-	hintTags: string[];
+	placeholderKey: string;
+	emptyHintKey: string;
+	hintTagKeys: string[];
 }
 
 const MISRA_DISPLAY_CONFIG: Record<string, MisraDisplayConfig> = {
 	misra_c_2012: {
-		placeholder: "搜索 MISRA-C 规则 ID、标题或描述...",
-		emptyHint: "输入关键词搜索 MISRA-C:2012 规则",
-		hintTags: ["Rule 8.1", "初始化", "指针", "Required"],
+		placeholderKey: "compliance.search.placeholderC",
+		emptyHintKey: "compliance.search.emptyC",
+		hintTagKeys: [
+			"compliance.search.tagRule81",
+			"compliance.search.tagInit",
+			"compliance.search.tagPointer",
+			"compliance.search.tagRequired",
+		],
 	},
 	jsf_av_cpp: {
-		placeholder: "搜索 MISRA-C++ / JSF AV C++ 规则...",
-		emptyHint: "输入关键词搜索 C++ 编码标准规则",
-		hintTags: ["new/delete", "异常", "RAII", "Mandatory"],
+		placeholderKey: "compliance.search.placeholderCpp",
+		emptyHintKey: "compliance.search.emptyCpp",
+		hintTagKeys: [
+			"compliance.search.tagNewDelete",
+			"compliance.search.tagException",
+			"compliance.search.tagRaii",
+			"compliance.search.tagMandatory",
+		],
 	},
 	python_safety: {
-		placeholder: "搜索 Python 军工规范规则...",
-		emptyHint: "输入关键词搜索 Python 军工软件编程规范",
-		hintTags: ["eval", "exec", "global", "强制"],
+		placeholderKey: "compliance.search.placeholderPython",
+		emptyHintKey: "compliance.search.emptyPython",
+		hintTagKeys: [
+			"compliance.search.tagEval",
+			"compliance.search.tagExec",
+			"compliance.search.tagGlobal",
+			"compliance.search.tagForce",
+		],
 	},
 };
 
@@ -76,20 +94,24 @@ const misraCurrentConfig = computed<MisraDisplayConfig>(() => {
 	);
 });
 
+const LANG_KEY: Record<string, string> = {
+	c: "compliance.lang.c",
+	cpp: "compliance.lang.cpp",
+	python: "compliance.lang.python",
+};
+
 const misraCurrentStandardName = computed<string>(() => {
 	const std = misraStandards.value.find(
 		(s) => s.id === misraCurrentStandardId.value,
 	);
 	if (std) {
-		const langLabel =
-			std.language === "c"
-				? "C 语言"
-				: std.language === "cpp"
-					? "C++ 语言"
-					: "Python 语言";
-		return `${std.name} (${langLabel})`;
+		const langLabel = t(LANG_KEY[std.language] ?? LANG_KEY.c);
+		return t("compliance.standardFormat", { name: std.name, lang: langLabel });
 	}
-	return "MISRA-C:2012 (C 语言)";
+	return t("compliance.standardFormat", {
+		name: "MISRA-C:2012",
+		lang: t(LANG_KEY.c),
+	});
 });
 
 const misraCategoryVariant = (
@@ -183,49 +205,50 @@ interface ContractCheckItemLocal {
 }
 
 interface ContractSectionLocal {
-	title: string;
+	titleKey: string;
 	key: "preconditions" | "postconditions" | "invariants" | "fault_handling";
 	items: ContractCheckItemLocal[];
 }
 
 const contractSections: ContractSectionLocal[] = [
 	{
-		title: "前置条件 Preconditions",
+		titleKey: "compliance.contract.sections.preconditions",
 		key: "preconditions",
 		items: [
 			{
 				id: "CON-001-PRE-000",
 				expression: "sample_rate > 0",
-				description: "采样率必须大于 0",
+				description: t("compliance.contract.items.preSampleRate.description"),
 				passed: true,
 				assert_code: "assert(sample_rate > 0);",
 			},
 			{
 				id: "CON-001-PRE-001",
 				expression: "raw_value <= 65535",
-				description: "原始值不超过 uint16 范围",
+				description: t("compliance.contract.items.preRawRange.description"),
 				passed: true,
 				assert_code: "assert(raw_value <= 65535);",
 			},
 			{
 				id: "CON-001-PRE-002",
 				expression: "f != NULL",
-				description: "滤波器结构体指针非空",
+				description: t("compliance.contract.items.preFilterPtr.description"),
 				passed: false,
-				failure_reason:
-					"反例: f=NULL, 调用 filter_apply(NULL, 1000) 导致空指针解引用",
+				failure_reason: t(
+					"compliance.contract.items.preFilterPtr.failureReason",
+				),
 				assert_code: "assert(f != NULL);",
 			},
 		],
 	},
 	{
-		title: "后置条件 Postconditions",
+		titleKey: "compliance.contract.sections.postconditions",
 		key: "postconditions",
 		items: [
 			{
 				id: "CON-001-POST-000",
 				expression: "0 <= filtered_value <= 65535",
-				description: "输出值在合法范围内",
+				description: t("compliance.contract.items.postOutputRange.description"),
 				passed: true,
 				assert_code: "assert(result >= 0 && result <= 65535);",
 			},
@@ -233,42 +256,42 @@ const contractSections: ContractSectionLocal[] = [
 				id: "CON-001-POST-001",
 				expression:
 					"filtered_value == round(alpha * raw_value + (1 - alpha) * prev)",
-				description: "符合一阶 IIR 滤波公式",
+				description: t("compliance.contract.items.postIIR.description"),
 				passed: true,
 				assert_code: "assert(abs(result - expected) < TOLERANCE);",
 			},
 		],
 	},
 	{
-		title: "不变式 Invariants",
+		titleKey: "compliance.contract.sections.invariants",
 		key: "invariants",
 		items: [
 			{
 				id: "CON-001-INV-000",
 				expression: "0.0f <= alpha <= 1.0f",
-				description: "滤波系数 alpha 始终在 [0,1] 范围",
+				description: t("compliance.contract.items.invAlpha.description"),
 				passed: true,
 				assert_code: "assert(f->alpha >= 0.0f && f->alpha <= 1.0f);",
 			},
 		],
 	},
 	{
-		title: "故障处理 Fault Handling",
+		titleKey: "compliance.contract.sections.faultHandling",
 		key: "fault_handling",
 		items: [
 			{
 				id: "CON-001-FLT-000",
 				expression: "if sample_rate == 0 then return prev_filtered",
-				description: "采样率异常时保持上一拍输出",
+				description: t("compliance.contract.items.fltHoldPrev.description"),
 				passed: true,
 				assert_code: "if (sample_rate == 0) return f->prev_out;",
 			},
 			{
 				id: "CON-001-FLT-001",
 				expression: "if raw_value out of range then clamp",
-				description: "输入越界时钳位到合法范围",
+				description: t("compliance.contract.items.fltClamp.description"),
 				passed: false,
-				failure_reason: "反例: raw_value=70000（超出 uint16 上限时未做输入钳位",
+				failure_reason: t("compliance.contract.items.fltClamp.failureReason"),
 				assert_code: "if (raw_value > 65535) raw_value = 65535;",
 			},
 		],
@@ -312,40 +335,40 @@ interface FormalCheckItem {
 
 const formalZ3Checks: FormalCheckItem[] = [
 	{
-		name: "类型范围约束一致性",
+		name: t("compliance.formal.checks.z3TypeRange.name"),
 		status: "passed",
 		duration_ms: 23,
 		tool: "Z3",
-		detail: "所有整数类型范围约束一致，无矛盾",
+		detail: t("compliance.formal.checks.z3TypeRange.detail"),
 	},
 	{
-		name: "边界条件检查",
+		name: t("compliance.formal.checks.z3Boundary.name"),
 		status: "passed",
 		duration_ms: 11,
 		tool: "Z3",
-		detail: "上下界边界条件全部满足",
+		detail: t("compliance.formal.checks.z3Boundary.detail"),
 	},
 	{
-		name: "空指针安全性",
+		name: t("compliance.formal.checks.z3NullPointer.name"),
 		status: "failed",
 		duration_ms: 45,
 		tool: "Z3",
-		detail: "发现空指针解引用风险",
-		counter_example: "f=NULL, 调用 filter_apply(NULL, 1000)",
+		detail: t("compliance.formal.checks.z3NullPointer.detail"),
+		counter_example: t("compliance.formal.checks.z3NullPointer.counterExample"),
 	},
 	{
-		name: "数组越界检查",
+		name: t("compliance.formal.checks.z3ArrayBounds.name"),
 		status: "passed",
 		duration_ms: 18,
 		tool: "Z3",
-		detail: "所有数组访问均在合法范围内",
+		detail: t("compliance.formal.checks.z3ArrayBounds.detail"),
 	},
 	{
-		name: "算术溢出检查",
+		name: t("compliance.formal.checks.z3Overflow.name"),
 		status: "timeout",
 		duration_ms: 5000,
 		tool: "Z3",
-		detail: "超时（建议使用 CBMC 进行有界模型检查）",
+		detail: t("compliance.formal.checks.z3Overflow.detail"),
 	},
 ];
 
@@ -360,37 +383,37 @@ interface BoundaryTestCase {
 const boundaryTestCases: BoundaryTestCase[] = [
 	{
 		id: "BTC-001",
-		description: "输入最小值边界",
+		description: t("compliance.formal.checks.boundaryMinInput.description"),
 		input: "raw_value = 0",
 		expected: "filtered_value = 0",
 		status: "passed",
 	},
 	{
 		id: "BTC-002",
-		description: "输入最大值边界",
+		description: t("compliance.formal.checks.boundaryMaxInput.description"),
 		input: "raw_value = 65535",
 		expected: "filtered_value = 65535",
 		status: "passed",
 	},
 	{
 		id: "BTC-003",
-		description: "采样率为 0 故障模式",
+		description: t("compliance.formal.checks.boundarySampleRate.description"),
 		input: "sample_rate = 0",
-		expected: "保持上一拍输出",
+		expected: t("compliance.formal.checks.boundarySampleRateExpected"),
 		status: "passed",
 	},
 	{
 		id: "BTC-004",
-		description: "Alpha 系数下限边界",
+		description: t("compliance.formal.checks.boundaryAlphaLow.description"),
 		input: "alpha = 0.0",
-		expected: "输出 = 输入",
+		expected: t("compliance.formal.checks.boundaryAlphaLowExpected"),
 		status: "passed",
 	},
 	{
 		id: "BTC-005",
-		description: "Alpha 系数上限边界",
+		description: t("compliance.formal.checks.boundaryAlphaHigh.description"),
 		input: "alpha = 1.0",
-		expected: "输出 = 前值",
+		expected: t("compliance.formal.checks.boundaryAlphaHighExpected"),
 		status: "passed",
 	},
 ];
@@ -405,25 +428,25 @@ interface CBMCCheckItem {
 
 const cbmcChecks: CBMCCheckItem[] = [
 	{
-		name: "有界循环展开深度 10",
+		name: t("compliance.formal.checks.cbmcUnwind10.name"),
 		status: "passed",
 		duration_ms: 120,
 		bound: 10,
-		detail: "所有路径在展开深度 10 内安全",
+		detail: t("compliance.formal.checks.cbmcUnwind10.detail"),
 	},
 	{
-		name: "有界循环展开深度 50",
+		name: t("compliance.formal.checks.cbmcUnwind50.name"),
 		status: "passed",
 		duration_ms: 850,
 		bound: 50,
-		detail: "所有路径在展开深度 50 内安全",
+		detail: t("compliance.formal.checks.cbmcUnwind50.detail"),
 	},
 	{
-		name: "整数溢出有界检查",
+		name: t("compliance.formal.checks.cbmcOverflow.name"),
 		status: "failed",
 		duration_ms: 2300,
 		bound: 100,
-		detail: "在第 87 步发现整数溢出",
+		detail: t("compliance.formal.checks.cbmcOverflow.detail"),
 	},
 ];
 
@@ -436,9 +459,7 @@ const statusBadgeVariant = (
 };
 
 const statusText = (status: "passed" | "failed" | "timeout") => {
-	if (status === "passed") return "通过";
-	if (status === "failed") return "失败";
-	return "超时";
+	return t(`compliance.formal.status.${status}`);
 };
 
 // ==================== 视图 D: DO-178C 合规 ====================
@@ -452,235 +473,248 @@ interface DO178CObjective {
 	coverage: Record<string, CoverageStatus>;
 }
 
-const processAreas = ["规划", "需求", "设计", "编码", "验证"];
+const processAreas = [
+	"planning",
+	"requirements",
+	"design",
+	"coding",
+	"verification",
+];
+const processAreaLabelKey: Record<string, string> = {
+	planning: "compliance.do178c.areas.planning",
+	requirements: "compliance.do178c.areas.requirements",
+	design: "compliance.do178c.areas.design",
+	coding: "compliance.do178c.areas.coding",
+	verification: "compliance.do178c.areas.verification",
+};
 
 const do178cObjectives: DO178CObjective[] = [
 	{
 		id: "OBJ-01",
-		title: "软件计划制定",
+		title: t("compliance.do178c.objectives.obj1"),
 		level: "A",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "covered",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-02",
-		title: "开发环境建立",
+		title: t("compliance.do178c.objectives.obj2"),
 		level: "A",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "partial",
+			planning: "covered",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "partial",
 		},
 	},
 	{
 		id: "OBJ-03",
-		title: "软件需求分析",
+		title: t("compliance.do178c.objectives.obj3"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "na",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-04",
-		title: "软件需求评审",
+		title: t("compliance.do178c.objectives.obj4"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "covered",
-			设计: "covered",
-			编码: "partial",
-			验证: "covered",
+			planning: "na",
+			requirements: "covered",
+			design: "covered",
+			coding: "partial",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-05",
-		title: "软件架构设计",
+		title: t("compliance.do178c.objectives.obj5"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "na",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-06",
-		title: "软件详细设计",
+		title: t("compliance.do178c.objectives.obj6"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "partial",
-			设计: "covered",
-			编码: "covered",
-			验证: "partial",
+			planning: "na",
+			requirements: "partial",
+			design: "covered",
+			coding: "covered",
+			verification: "partial",
 		},
 	},
 	{
 		id: "OBJ-07",
-		title: "软件编码",
+		title: t("compliance.do178c.objectives.obj7"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "na",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "na",
+			requirements: "na",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-08",
-		title: "代码评审",
+		title: t("compliance.do178c.objectives.obj8"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "na",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "na",
+			requirements: "na",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-09",
-		title: "单元测试",
+		title: t("compliance.do178c.objectives.obj9"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "na",
-			设计: "partial",
-			编码: "covered",
-			验证: "covered",
+			planning: "na",
+			requirements: "na",
+			design: "partial",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-10",
-		title: "集成测试",
+		title: t("compliance.do178c.objectives.obj10"),
 		level: "A",
 		coverage: {
-			规划: "na",
-			需求: "partial",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "na",
+			requirements: "partial",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-11",
-		title: "软件配置管理",
+		title: t("compliance.do178c.objectives.obj11"),
 		level: "B",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "covered",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-12",
-		title: "问题报告与解决",
+		title: t("compliance.do178c.objectives.obj12"),
 		level: "B",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "covered",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-13",
-		title: "质量保证",
+		title: t("compliance.do178c.objectives.obj13"),
 		level: "B",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "covered",
-			编码: "partial",
-			验证: "covered",
+			planning: "covered",
+			requirements: "covered",
+			design: "covered",
+			coding: "partial",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-14",
-		title: "验证与确认",
+		title: t("compliance.do178c.objectives.obj14"),
 		level: "B",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "covered",
-			编码: "partial",
-			验证: "covered",
+			planning: "covered",
+			requirements: "covered",
+			design: "covered",
+			coding: "partial",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-15",
-		title: "需求追溯性分析",
+		title: t("compliance.do178c.objectives.obj15"),
 		level: "C",
 		coverage: {
-			规划: "na",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "covered",
+			planning: "na",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "covered",
 		},
 	},
 	{
 		id: "OBJ-16",
-		title: "软件开发标准",
+		title: t("compliance.do178c.objectives.obj16"),
 		level: "C",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "covered",
-			编码: "covered",
-			验证: "na",
+			planning: "covered",
+			requirements: "covered",
+			design: "covered",
+			coding: "covered",
+			verification: "na",
 		},
 	},
 	{
 		id: "OBJ-17",
-		title: "工具鉴定",
+		title: t("compliance.do178c.objectives.obj17"),
 		level: "C",
 		coverage: {
-			规划: "partial",
-			需求: "na",
-			设计: "na",
-			编码: "na",
-			验证: "uncovered",
+			planning: "partial",
+			requirements: "na",
+			design: "na",
+			coding: "na",
+			verification: "uncovered",
 		},
 	},
 	{
 		id: "OBJ-18",
-		title: "风险分析",
+		title: t("compliance.do178c.objectives.obj18"),
 		level: "D",
 		coverage: {
-			规划: "covered",
-			需求: "covered",
-			设计: "na",
-			编码: "na",
-			验证: "partial",
+			planning: "covered",
+			requirements: "covered",
+			design: "na",
+			coding: "na",
+			verification: "partial",
 		},
 	},
 	{
 		id: "OBJ-19",
-		title: "适航认证支持",
+		title: t("compliance.do178c.objectives.obj19"),
 		level: "E",
 		coverage: {
-			规划: "uncovered",
-			需求: "uncovered",
-			设计: "uncovered",
-			编码: "uncovered",
-			验证: "partial",
+			planning: "uncovered",
+			requirements: "uncovered",
+			design: "uncovered",
+			coding: "uncovered",
+			verification: "partial",
 		},
 	},
 ];
@@ -712,25 +746,40 @@ const coverageText = (status: CoverageStatus): string => {
 };
 
 const coverageTitle = (status: CoverageStatus): string => {
-	switch (status) {
-		case "covered":
-			return "已覆盖";
-		case "partial":
-			return "部分覆盖";
-		case "uncovered":
-			return "未覆盖";
-		case "na":
-			return "不适用";
-	}
+	return t(`compliance.do178c.coverage.${status}`);
 };
 
 const evidenceChainItems = [
-	{ from: "REQ-001", to: "CON-001-PRE-000", type: "需求→契约" },
-	{ from: "REQ-001", to: "filter_init()", type: "需求→代码" },
-	{ from: "CON-001-PRE-000", to: "assert(sample_rate > 0)", type: "契约→断言" },
-	{ from: "REQ-002", to: "CON-001-POST-000", type: "需求→契约" },
-	{ from: "CON-001-POST-000", to: "TC-003", type: "契约→测试" },
-	{ from: "TC-003", to: "BTC-001", type: "测试→边界用例" },
+	{
+		from: "REQ-001",
+		to: "CON-001-PRE-000",
+		typeKey: "compliance.do178c.evidence.types.reqContract",
+	},
+	{
+		from: "REQ-001",
+		to: "filter_init()",
+		typeKey: "compliance.do178c.evidence.types.reqCode",
+	},
+	{
+		from: "CON-001-PRE-000",
+		to: "assert(sample_rate > 0)",
+		typeKey: "compliance.do178c.evidence.types.contractAssert",
+	},
+	{
+		from: "REQ-002",
+		to: "CON-001-POST-000",
+		typeKey: "compliance.do178c.evidence.types.reqContract",
+	},
+	{
+		from: "CON-001-POST-000",
+		to: "TC-003",
+		typeKey: "compliance.do178c.evidence.types.contractTest",
+	},
+	{
+		from: "TC-003",
+		to: "BTC-001",
+		typeKey: "compliance.do178c.evidence.types.testBoundary",
+	},
 ];
 
 const levelBadgeVariant = (
@@ -796,10 +845,9 @@ const naCount = computed(() => {
 		<header class="page-header">
 			<div class="header-content">
 				<span class="eyebrow">COMPLIANCE AUDIT CENTER</span>
-				<h1 class="title">合规审计中心</h1>
+				<h1 class="title">{{ $t("compliance.title") }}</h1>
 				<p class="description">
-					整合 MISRA 规则、契约验证、形式化验证与 DO-178C
-					合规四大审计视图，实现航空软件全流程合规追溯
+					{{ $t("compliance.description") }}
 				</p>
 			</div>
 		</header>
@@ -808,19 +856,19 @@ const naCount = computed(() => {
 			<TabsList class="tabs-list">
 				<TabsTrigger value="misra" class="tab-trigger">
 					<Shield :size="16" />
-					MISRA 规则实验室
+					{{ $t("compliance.tabs.misra") }}
 				</TabsTrigger>
 				<TabsTrigger value="contract" class="tab-trigger">
 					<FileText :size="16" />
-					契约验证
+					{{ $t("compliance.tabs.contract") }}
 				</TabsTrigger>
 				<TabsTrigger value="formal" class="tab-trigger">
 					<CheckCircle2 :size="16" />
-					形式化验证
+					{{ $t("compliance.tabs.formal") }}
 				</TabsTrigger>
 				<TabsTrigger value="do178c" class="tab-trigger">
 					<ShieldCheck :size="16" />
-					DO-178C 合规
+					{{ $t("compliance.tabs.do178c") }}
 				</TabsTrigger>
 			</TabsList>
 
@@ -852,7 +900,7 @@ const naCount = computed(() => {
 
 					<div class="current-standard text-muted-foreground flex items-center gap-2">
 						<span>{{ misraCurrentStandardName }}</span>
-						<SourceBadge source="observed" label="规则库" />
+						<SourceBadge source="observed" :label="$t('compliance.sourceBadges.ruleLibrary')" />
 					</div>
 
 					<div class="search-bar">
@@ -861,7 +909,7 @@ const naCount = computed(() => {
 							<Input
 								v-model="misraQuery"
 								class="search-input"
-								:placeholder="misraCurrentConfig.placeholder"
+								:placeholder="$t(misraCurrentConfig.placeholderKey)"
 								@keydown.enter="onMisraSearch"
 							/>
 							<button
@@ -877,7 +925,11 @@ const naCount = computed(() => {
 							:disabled="!misraQuery.trim() || misraLoading"
 							@click="onMisraSearch"
 						>
-							{{ misraLoading ? "搜索中..." : "搜索" }}
+							{{
+								misraLoading
+									? $t("compliance.search.searching")
+									: $t("compliance.search.search")
+							}}
 						</Button>
 					</div>
 
@@ -890,23 +942,23 @@ const naCount = computed(() => {
 							class="text-muted-foreground/40"
 						/>
 						<p class="text-muted-foreground">
-							{{ misraCurrentConfig.emptyHint }}
+							{{ $t(misraCurrentConfig.emptyHintKey) }}
 						</p>
 						<div class="hint-tags">
 							<span
-								v-for="tag in misraCurrentConfig.hintTags"
-								:key="tag"
+								v-for="tagKey in misraCurrentConfig.hintTagKeys"
+								:key="tagKey"
 								class="hint-tag"
-								@click="onMisraHintTag(tag)"
+								@click="onMisraHintTag($t(tagKey))"
 							>
-								{{ tag }}
+								{{ $t(tagKey) }}
 							</span>
 						</div>
 					</div>
 
 					<div v-else-if="misraLoading" class="empty-state">
 						<div class="loading-spinner" />
-						<p>正在搜索...</p>
+						<p>{{ $t("compliance.search.loading") }}</p>
 					</div>
 
 					<div
@@ -917,12 +969,12 @@ const naCount = computed(() => {
 							:size="48"
 							class="text-muted-foreground/40"
 						/>
-						<p class="text-muted-foreground">未找到匹配的规则</p>
+						<p class="text-muted-foreground">{{ $t("compliance.search.noResults") }}</p>
 					</div>
 
 					<div v-else class="results-list">
 						<div class="results-count text-muted-foreground">
-							找到 {{ misraResults.length }} 条规则
+							{{ $t("compliance.search.count", { count: misraResults.length }) }}
 						</div>
 						<Card
 							v-for="rule in misraResults"
@@ -966,7 +1018,7 @@ const naCount = computed(() => {
 										v-if="rule.bad_example"
 										class="example-block bad"
 									>
-										<div class="example-label">违规示例</div>
+										<div class="example-label">{{ $t("compliance.rules.badExample") }}</div>
 										<pre class="example-code">
 {{ rule.bad_example }}</pre
 										>
@@ -975,7 +1027,7 @@ const naCount = computed(() => {
 										v-if="rule.good_example"
 										class="example-block good"
 									>
-										<div class="example-label">合规示例</div>
+										<div class="example-label">{{ $t("compliance.rules.goodExample") }}</div>
 										<pre class="example-code">
 {{ rule.good_example }}</pre
 										>
@@ -991,8 +1043,8 @@ const naCount = computed(() => {
 			<TabsContent value="contract" class="tab-content">
 				<div class="contract-view">
 					<div class="flex items-center gap-2 mb-4">
-						<span class="text-sm font-semibold">契约验证结果</span>
-						<SourceBadge source="observed" label="形式化验证" />
+						<span class="text-sm font-semibold">{{ $t("compliance.contract.title") }}</span>
+						<SourceBadge source="observed" :label="$t('compliance.sourceBadges.formalVerification')" />
 					</div>
 					<div class="stats-row">
 						<Card class="stat-card pass">
@@ -1000,7 +1052,7 @@ const naCount = computed(() => {
 								<CheckCircle2 :size="24" class="stat-icon" />
 								<div class="stat-info">
 									<span class="stat-value">{{ contractPassed }}</span>
-									<span class="stat-label">通过</span>
+									<span class="stat-label">{{ $t("compliance.contract.stats.passed") }}</span>
 								</div>
 							</CardContent>
 						</Card>
@@ -1009,7 +1061,7 @@ const naCount = computed(() => {
 								<Clock :size="24" class="stat-icon" />
 								<div class="stat-info">
 									<span class="stat-value">{{ contractPending }}</span>
-									<span class="stat-label">待审</span>
+									<span class="stat-label">{{ $t("compliance.contract.stats.pending") }}</span>
 								</div>
 							</CardContent>
 						</Card>
@@ -1018,7 +1070,7 @@ const naCount = computed(() => {
 								<XCircle :size="24" class="stat-icon" />
 								<div class="stat-info">
 									<span class="stat-value">{{ contractFailed }}</span>
-									<span class="stat-label">失败</span>
+									<span class="stat-label">{{ $t("compliance.contract.stats.failed") }}</span>
 								</div>
 							</CardContent>
 						</Card>
@@ -1036,7 +1088,7 @@ const naCount = computed(() => {
 										class="section-title"
 										:style="{ borderLeftColor: contractSectionColor(section.key) }"
 									>
-										<span>{{ section.title }}</span>
+										<span>{{ $t(section.titleKey) }}</span>
 										<Badge variant="secondary" class="section-count">
 											{{
 												section.items.filter((i) => i.passed)
@@ -1069,7 +1121,11 @@ const naCount = computed(() => {
 												"
 												class="item-status"
 											>
-												{{ item.passed ? "通过" : "失败" }}
+												{{
+													item.passed
+														? $t("compliance.contract.status.passed")
+														: $t("compliance.contract.status.failed")
+												}}
 											</Badge>
 										</div>
 										<div
@@ -1082,13 +1138,13 @@ const naCount = computed(() => {
 											v-if="!item.passed && item.failure_reason"
 											class="failure-reason"
 										>
-											<div class="reason-label">❌ 失败原因：</div>
+											<div class="reason-label">{{ $t("compliance.contract.failureReason") }}</div>
 											<div class="reason-text">
 												{{ item.failure_reason }}
 											</div>
 										</div>
 										<div class="assert-code">
-											<span class="assert-label">assert:</span>
+											<span class="assert-label">{{ $t("compliance.contract.assertLabel") }}</span>
 											<code class="assert-expr">
 												{{ item.assert_code }}
 											</code>
@@ -1109,11 +1165,11 @@ const naCount = computed(() => {
 							<div class="flex items-center justify-between">
 								<div>
 									<CardTitle class="section-heading flex items-center gap-2">
-										<span>Z3 约束一致性检查</span>
-										<SourceBadge source="observed" label="SMT求解" />
+										<span>{{ $t("compliance.formal.z3.title") }}</span>
+										<SourceBadge source="observed" :label="$t('compliance.sourceBadges.smtSolving')" />
 									</CardTitle>
 									<CardDescription>
-										基于 SMT 求解器的约束满足性验证
+										{{ $t("compliance.formal.z3.description") }}
 									</CardDescription>
 								</div>
 							</div>
@@ -1122,11 +1178,11 @@ const naCount = computed(() => {
 							<table class="data-table">
 								<thead>
 									<tr>
-										<th>检查点</th>
-										<th>状态</th>
-										<th>工具</th>
-										<th>耗时</th>
-										<th>详情</th>
+										<th>{{ $t("compliance.formal.columns.checkpoint") }}</th>
+										<th>{{ $t("compliance.formal.columns.status") }}</th>
+										<th>{{ $t("compliance.formal.columns.tool") }}</th>
+										<th>{{ $t("compliance.formal.columns.duration") }}</th>
+										<th>{{ $t("compliance.formal.columns.detail") }}</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -1149,7 +1205,7 @@ const naCount = computed(() => {
 												v-if="check.counter_example"
 												class="counter-example"
 											>
-												反例: {{ check.counter_example }}
+												{{ $t("compliance.formal.counterExample", { value: check.counter_example }) }}
 											</div>
 										</td>
 									</tr>
@@ -1161,21 +1217,21 @@ const naCount = computed(() => {
 					<Card class="formal-section">
 						<CardHeader>
 							<CardTitle class="section-heading">
-								边界测试用例生成
+								{{ $t("compliance.formal.boundary.title") }}
 							</CardTitle>
 							<CardDescription>
-								自动生成的边界条件测试用例
+								{{ $t("compliance.formal.boundary.description") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<table class="data-table">
 								<thead>
 									<tr>
-										<th>用例 ID</th>
-										<th>描述</th>
-										<th>输入</th>
-										<th>期望输出</th>
-										<th>状态</th>
+										<th>{{ $t("compliance.formal.columns.caseId") }}</th>
+										<th>{{ $t("compliance.formal.columns.description") }}</th>
+										<th>{{ $t("compliance.formal.columns.input") }}</th>
+										<th>{{ $t("compliance.formal.columns.expected") }}</th>
+										<th>{{ $t("compliance.formal.columns.status") }}</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -1203,7 +1259,11 @@ const naCount = computed(() => {
 														: 'destructive'
 												"
 											>
-												{{ tc.status === "passed" ? "通过" : "失败" }}
+												{{
+													tc.status === "passed"
+														? $t("compliance.contract.status.passed")
+														: $t("compliance.contract.status.failed")
+												}}
 											</Badge>
 										</td>
 									</tr>
@@ -1215,21 +1275,21 @@ const naCount = computed(() => {
 					<Card class="formal-section">
 						<CardHeader>
 							<CardTitle class="section-heading">
-								CBMC 有界模型检查
+								{{ $t("compliance.formal.cbmc.title") }}
 							</CardTitle>
 							<CardDescription>
-								基于有界模型检查器的路径穷尽验证
+								{{ $t("compliance.formal.cbmc.description") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
 							<table class="data-table">
 								<thead>
 									<tr>
-										<th>检查项</th>
-										<th>状态</th>
-										<th>展开深度</th>
-										<th>耗时</th>
-										<th>详情</th>
+										<th>{{ $t("compliance.formal.columns.check") }}</th>
+										<th>{{ $t("compliance.formal.columns.status") }}</th>
+										<th>{{ $t("compliance.formal.columns.unwind") }}</th>
+										<th>{{ $t("compliance.formal.columns.duration") }}</th>
+										<th>{{ $t("compliance.formal.columns.detail") }}</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -1264,7 +1324,7 @@ const naCount = computed(() => {
 								<div class="do-stat-icon covered">✓</div>
 								<div>
 									<div class="do-stat-value">{{ coveredCount }}</div>
-									<div class="do-stat-label text-muted-foreground">已覆盖</div>
+									<div class="do-stat-label text-muted-foreground">{{ $t("compliance.do178c.coverage.covered") }}</div>
 								</div>
 							</CardContent>
 						</Card>
@@ -1273,7 +1333,7 @@ const naCount = computed(() => {
 								<div class="do-stat-icon partial">◐</div>
 								<div>
 									<div class="do-stat-value">{{ partialCount }}</div>
-									<div class="do-stat-label text-muted-foreground">部分覆盖</div>
+									<div class="do-stat-label text-muted-foreground">{{ $t("compliance.do178c.coverage.partial") }}</div>
 								</div>
 							</CardContent>
 						</Card>
@@ -1282,7 +1342,7 @@ const naCount = computed(() => {
 								<div class="do-stat-icon uncovered">✗</div>
 								<div>
 									<div class="do-stat-value">{{ uncoveredCount }}</div>
-									<div class="do-stat-label text-muted-foreground">未覆盖</div>
+									<div class="do-stat-label text-muted-foreground">{{ $t("compliance.do178c.coverage.uncovered") }}</div>
 								</div>
 							</CardContent>
 						</Card>
@@ -1291,7 +1351,7 @@ const naCount = computed(() => {
 								<div class="do-stat-icon na">—</div>
 								<div>
 									<div class="do-stat-value">{{ naCount }}</div>
-									<div class="do-stat-label text-muted-foreground">不适用</div>
+									<div class="do-stat-label text-muted-foreground">{{ $t("compliance.do178c.coverage.na") }}</div>
 								</div>
 							</CardContent>
 						</Card>
@@ -1302,14 +1362,14 @@ const naCount = computed(() => {
 							<div class="matrix-header">
 								<div>
 									<CardTitle class="section-heading flex items-center gap-2">
-										<span>DO-178C 目标覆盖矩阵</span>
-										<SourceBadge source="observed" label="合规评估" />
+										<span>{{ $t("compliance.do178c.title") }}</span>
+										<SourceBadge source="observed" :label="$t('compliance.sourceBadges.complianceAssessment')" />
 									</CardTitle>
 									<CardDescription>
-										19 个软件级目标 × 5 个过程域
+										{{ $t("compliance.do178c.description") }}
 									</CardDescription>
 								</div>
-								<Button>生成合规报告</Button>
+								<Button>{{ $t("compliance.do178c.generateReport") }}</Button>
 							</div>
 						</CardHeader>
 						<CardContent>
@@ -1317,14 +1377,14 @@ const naCount = computed(() => {
 								<table class="coverage-matrix">
 									<thead>
 										<tr>
-											<th class="col-obj">目标</th>
-											<th class="col-level">级别</th>
+											<th class="col-obj">{{ $t("compliance.do178c.colObjective") }}</th>
+											<th class="col-level">{{ $t("compliance.do178c.colLevel") }}</th>
 											<th
 												v-for="area in processAreas"
 												:key="area"
 												class="col-area"
 											>
-												{{ area }}
+												{{ $t(processAreaLabelKey[area]) }}
 											</th>
 										</tr>
 									</thead>
@@ -1341,7 +1401,7 @@ const naCount = computed(() => {
 												<Badge
 													:variant="levelBadgeVariant(obj.level)"
 												>
-													Level {{ obj.level }}
+													{{ $t("compliance.do178c.level", { level: obj.level }) }}
 												</Badge>
 											</td>
 											<td
@@ -1361,19 +1421,19 @@ const naCount = computed(() => {
 							<div class="legend">
 								<span class="legend-item">
 									<span class="legend-swatch covered"></span>
-									已覆盖
+									{{ $t("compliance.do178c.coverage.covered") }}
 								</span>
 								<span class="legend-item">
 									<span class="legend-swatch partial"></span>
-									部分覆盖
+									{{ $t("compliance.do178c.coverage.partial") }}
 								</span>
 								<span class="legend-item">
 									<span class="legend-swatch uncovered"></span>
-									未覆盖
+									{{ $t("compliance.do178c.coverage.uncovered") }}
 								</span>
 								<span class="legend-item">
 									<span class="legend-swatch na"></span>
-									不适用
+									{{ $t("compliance.do178c.coverage.na") }}
 								</span>
 							</div>
 						</CardContent>
@@ -1381,9 +1441,9 @@ const naCount = computed(() => {
 
 					<Card class="evidence-card">
 						<CardHeader>
-							<CardTitle class="section-heading">证据链追溯</CardTitle>
+							<CardTitle class="section-heading">{{ $t("compliance.do178c.evidence.title") }}</CardTitle>
 							<CardDescription>
-								需求 → 契约 → 代码 → 测试的双向追溯
+								{{ $t("compliance.do178c.evidence.description") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
@@ -1397,7 +1457,7 @@ const naCount = computed(() => {
 									<span class="evidence-arrow">→</span>
 									<span class="evidence-to">{{ item.to }}</span>
 									<Badge variant="secondary" class="evidence-type">
-										{{ item.type }}
+										{{ $t(item.typeKey) }}
 									</Badge>
 								</div>
 							</div>

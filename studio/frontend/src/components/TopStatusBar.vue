@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter } from "vue-router";
+import { useLocale } from "@/i18n/useLocale";
 import { useExecutionStore } from "@/stores/executionStore";
 
 const execution = useExecutionStore();
+const router = useRouter();
+const { locale, toggleLocale } = useLocale();
 
 const nav = [
-	{ label: "仪表板", to: "/" },
-	{ label: "代码生成", to: "/generate" },
-	{ label: "任务管理", to: "/records" },
-	{ label: "合规审计", to: "/misra" },
-	{ label: "仿真实验室", to: "/lab" },
-	{ label: "组合验证", to: "/compose" },
-	{ label: "HITL审查", to: "/hitl" },
-	{ label: "文档中心", to: "/architecture" },
-	{ label: "系统设置", to: "/settings" },
+	{ labelKey: "nav.dashboard", to: "/" },
+	{ labelKey: "nav.generate", to: "/generate" },
+	{ labelKey: "nav.records", to: "/records" },
+	{ labelKey: "nav.misra", to: "/misra" },
+	{ labelKey: "nav.lab", to: "/lab" },
+	{ labelKey: "nav.compose", to: "/compose" },
+	{ labelKey: "nav.hitl", to: "/hitl" },
+	{ labelKey: "nav.anchor", to: "/anchor" },
+	{ labelKey: "nav.architecture", to: "/architecture" },
+	{ labelKey: "nav.settings", to: "/settings" },
 ];
 
 const profileLabel = computed(() => {
@@ -23,28 +28,44 @@ const profileLabel = computed(() => {
 
 const backendBadge = computed(() => {
 	const map = {
-		cloud: { text: "云模型", tone: "api" },
-		local: { text: "本地模型", tone: "local" },
+		cloud: { textKey: "backend.cloud", tone: "api" },
+		local: { textKey: "backend.local", tone: "local" },
 	} as const;
 	return map[execution.profileId];
 });
+
+async function onToggleLocale() {
+	const currentModule = router.currentRoute.value.meta.locale as
+		| Parameters<typeof toggleLocale>[0]
+		| undefined;
+	await toggleLocale(currentModule);
+}
 </script>
 
 <template>
   <header class="app-topbar">
-    <router-link to="/" class="brand" aria-label="SkyForge 首页">
+    <router-link to="/" class="brand" :aria-label="$t('nav.home')">
       <span class="brand-mark">SF</span>
-      <span><strong>SkyForge</strong><small>可信机载软件智能工坊</small></span>
+      <span><strong>SkyForge</strong><small>{{ $t("brand.tagline") }}</small></span>
     </router-link>
 
-    <nav aria-label="主导航">
-      <router-link v-for="item in nav" :key="item.to" :to="item.to">{{ item.label }}</router-link>
+    <nav :aria-label="$t('nav.main')">
+      <router-link v-for="item in nav" :key="item.to" :to="item.to">{{ $t(item.labelKey) }}</router-link>
     </nav>
 
     <div class="profile-indicator">
       <span class="source-dot" :class="execution.profile.source" />
       <span class="profile-text">{{ profileLabel }}</span>
-      <span class="llm-badge" :class="backendBadge.tone" :title="`当前执行来源：${execution.profile.label}`">{{ backendBadge.text }}</span>
+      <span class="llm-badge" :class="backendBadge.tone" :title="$t('backend.sourceTitle', { label: execution.profile.label })">{{ $t(backendBadge.textKey) }}</span>
+      <button
+        type="button"
+        class="lang-toggle"
+        :aria-label="$t('common.languageSwitch')"
+        :title="$t('common.languageSwitch')"
+        @click="onToggleLocale"
+      >
+        {{ locale === "zh-CN" ? "EN" : "中文" }}
+      </button>
     </div>
   </header>
 </template>
@@ -113,6 +134,19 @@ nav a.router-link-active {
 .llm-badge.mock { color: hsl(var(--warning)); background: hsl(var(--warning) / 0.12); border: 1px solid hsl(var(--warning) / 0.3); }
 .llm-badge.api { color: hsl(var(--primary)); background: hsl(var(--primary) / 0.12); border: 1px solid hsl(var(--primary) / 0.3); }
 .llm-badge.local { color: hsl(var(--success)); background: hsl(var(--success) / 0.12); border: 1px solid hsl(var(--success) / 0.3); }
+.lang-toggle {
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+  font-family: inherit;
+}
+.lang-toggle:hover { color: hsl(var(--foreground)); border-color: hsl(var(--primary)); }
 @media (max-width: 1280px) {
   .app-topbar{grid-template-columns:minmax(180px,1fr) auto minmax(180px,1fr)}
   .brand small{display:none}

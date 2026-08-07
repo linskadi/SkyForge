@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Brain, Code, FileText, Shield } from "@lucide/vue";
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Badge } from "@/components/ui/badge";
 /**
  * DecisionTrace - 决策追溯组件
@@ -12,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
  * - 输出结果
  */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const { t } = useI18n();
 
 interface AgentDecision {
 	agent: string;
@@ -53,12 +56,12 @@ const getAgentColor = (agent: string) => {
 		<CardHeader>
 			<CardTitle class="flex items-center gap-2 text-lg">
 				<Brain class="h-5 w-5" />
-				决策追溯
+				{{ t("decisionTrace.title") }}
 			</CardTitle>
 		</CardHeader>
 		<CardContent>
 			<div v-if="decisions.length === 0" class="text-center text-gray-500 py-8">
-				暂无决策记录
+				{{ t("decisionTrace.empty") }}
 			</div>
 			<div v-else class="space-y-3">
 				<div
@@ -83,7 +86,7 @@ const getAgentColor = (agent: string) => {
 							</div>
 						</div>
 						<Badge variant="outline">
-							{{ expandedIndex === index ? '收起' : '展开' }}
+							{{ expandedIndex === index ? t('decisionTrace.collapse') : t('decisionTrace.expand') }}
 						</Badge>
 					</div>
 					
@@ -91,19 +94,19 @@ const getAgentColor = (agent: string) => {
 					<div v-if="expandedIndex === index" class="p-4 border-t bg-gray-50">
 						<!-- Prompt -->
 						<div class="mb-4">
-							<div class="text-sm font-medium text-gray-700 mb-2">输入提示词</div>
+							<div class="text-sm font-medium text-gray-700 mb-2">{{ t("decisionTrace.prompt") }}</div>
 							<pre class="bg-white p-3 rounded text-xs overflow-auto max-h-40 border">{{ decision.prompt }}</pre>
 						</div>
 						
 						<!-- Reasoning -->
 						<div class="mb-4">
-							<div class="text-sm font-medium text-gray-700 mb-2">思考过程</div>
+							<div class="text-sm font-medium text-gray-700 mb-2">{{ t("decisionTrace.reasoning") }}</div>
 							<div class="bg-white p-3 rounded text-sm border whitespace-pre-wrap">{{ decision.reasoning }}</div>
 						</div>
 						
 						<!-- Output -->
 						<div>
-							<div class="text-sm font-medium text-gray-700 mb-2">输出结果</div>
+							<div class="text-sm font-medium text-gray-700 mb-2">{{ t("decisionTrace.output") }}</div>
 							<pre class="bg-white p-3 rounded text-xs overflow-auto max-h-60 border">{{ decision.output }}</pre>
 						</div>
 					</div>

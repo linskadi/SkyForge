@@ -12,10 +12,13 @@ import { Download, FileText, Loader2, Printer, Sparkles } from "@lucide/vue";
  *   - 打印按钮：window.print()
  */
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getApi } from "@/services/apiSwitcher";
 import type { GenerateResult, ReportResult } from "@/services/mockApi";
+
+const { t } = useI18n();
 
 interface Props {
 	/** 生成结果（用于填充报告内容） */
@@ -60,7 +63,7 @@ const onGenerate = async () => {
 		status.value = "done";
 	} catch (err) {
 		console.error("[ReportDownload] 生成报告失败：", err);
-		errorMsg.value = err instanceof Error ? err.message : "未知错误";
+		errorMsg.value = err instanceof Error ? err.message : t("common.failed");
 		status.value = "error";
 	}
 };
@@ -118,8 +121,8 @@ const passRateColor = computed(() => {
     <Card class="action-card">
       <CardHeader>
         <CardTitle class="card-title">
-          📄 DO-178C 报告生成
-          <span class="title-hint">（适航合规报告，可下载 / 打印）</span>
+          {{ $t("reportDownload.title") }}
+          <span class="title-hint">{{ $t("reportDownload.titleHint") }}</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -127,27 +130,27 @@ const passRateColor = computed(() => {
           <Button :disabled="!canGenerate" @click="onGenerate">
             <Loader2 v-if="status === 'generating'" class="animate-spin" />
             <Sparkles v-else />
-            生成 DO-178C 报告
+            {{ $t("reportDownload.generateBtn") }}
           </Button>
           <Button v-if="status === 'done' && report" variant="outline" @click="onDownload">
             <Download />
-            下载 HTML
+            {{ $t("reportDownload.downloadBtn") }}
           </Button>
           <Button v-if="status === 'done' && report" variant="outline" @click="onPrint">
             <Printer />
-            打印
+            {{ $t("reportDownload.printBtn") }}
           </Button>
           <span v-if="status === 'generating'" class="status-text generating">
-            正在生成报告...
+            {{ $t("reportDownload.generating") }}
           </span>
           <span v-else-if="status === 'done'" class="status-text done">
-            ✅ 报告已生成
+            {{ $t("reportDownload.done") }}
           </span>
           <span v-else-if="status === 'error'" class="status-text error">
             ❌ {{ errorMsg }}
           </span>
           <span v-else-if="!result" class="status-text muted">
-            请先生成代码后再生成报告
+            {{ $t("reportDownload.needResult") }}
           </span>
         </div>
       </CardContent>
@@ -159,7 +162,7 @@ const passRateColor = computed(() => {
         <div class="summary-icon">📋</div>
         <div class="summary-info">
           <div class="summary-value">{{ report.summary.traceability_entries }}</div>
-          <div class="summary-label">追溯矩阵条目</div>
+          <div class="summary-label">{{ $t("reportDownload.summaryTraceability") }}</div>
         </div>
       </div>
       <div class="summary-card">
@@ -168,7 +171,7 @@ const passRateColor = computed(() => {
           <div class="summary-value" :style="{ color: passRateColor }">
             {{ report.summary.passed_objectives }}/{{ report.summary.total_objectives }}
           </div>
-          <div class="summary-label">DO-178C 目标</div>
+          <div class="summary-label">{{ $t("reportDownload.summaryObjectives") }}</div>
           <div class="pass-bar">
             <div class="pass-bar-fill" :style="{ width: passRatePercent + '%', backgroundColor: passRateColor }" />
           </div>
@@ -178,14 +181,14 @@ const passRateColor = computed(() => {
         <div class="summary-icon">🧪</div>
         <div class="summary-info">
           <div class="summary-value">{{ report.summary.simulation_summary }}</div>
-          <div class="summary-label">仿真结果摘要</div>
+          <div class="summary-label">{{ $t("reportDownload.summarySimulation") }}</div>
         </div>
       </div>
       <div class="summary-card">
         <div class="summary-icon">⚠</div>
         <div class="summary-info">
           <div class="summary-value">{{ report.summary.misra_violations }}</div>
-          <div class="summary-label">MISRA 违规数</div>
+          <div class="summary-label">{{ $t("reportDownload.summaryMisra") }}</div>
         </div>
       </div>
     </div>
@@ -195,7 +198,7 @@ const passRateColor = computed(() => {
       <CardHeader>
         <CardTitle class="card-title">
           <FileText class="icon" />
-          报告预览
+          {{ $t("reportDownload.preview") }}
           <span class="title-hint">（{{ report.report_id }}）</span>
         </CardTitle>
       </CardHeader>
@@ -212,7 +215,7 @@ const passRateColor = computed(() => {
     <!-- 空状态提示 -->
     <div v-if="status === 'idle'" class="empty-tip">
       <FileText class="empty-icon" />
-      <p>点击"生成 DO-178C 报告"按钮开始</p>
+      <p>{{ $t("reportDownload.emptyTip") }}</p>
     </div>
   </div>
 </template>

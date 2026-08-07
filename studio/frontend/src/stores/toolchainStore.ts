@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
-import { getApi } from "@/services/apiSwitcher";
+import { i18n } from "@/i18n";
 
 export interface ToolchainTool {
 	name: string;
@@ -9,6 +9,19 @@ export interface ToolchainTool {
 	install_hint: string;
 	found: boolean;
 	version: string;
+}
+
+/**
+ * 翻译 data 层标签：键可解析时返回译文，
+ * 键缺失（t 返回键路径本身）时回退到调用方提供的默认字符串。
+ */
+function dataT(
+	key: string,
+	fallback: string,
+	params?: Record<string, unknown>,
+): string {
+	const resolved = i18n.global.t(key, params ?? {});
+	return resolved === key ? fallback : resolved;
 }
 
 export const useToolchainStore = defineStore("toolchain", () => {
@@ -25,15 +38,22 @@ export const useToolchainStore = defineStore("toolchain", () => {
 		loading.value = true;
 		error.value = null;
 		try {
-			const api = getApi();
 			const res = await fetch("/api/tools/registry");
 			if (res.ok) {
 				tools.value = await res.json();
 			} else {
-				throw new Error(`HTTP ${res.status}`);
+				throw new Error(
+					dataT("data.error.httpStatus", `HTTP ${res.status}`, {
+						status: res.status,
+						statusText: res.statusText,
+					}),
+				);
 			}
 		} catch (e) {
-			error.value = e instanceof Error ? e.message : "未知错误";
+			error.value =
+				e instanceof Error
+					? e.message
+					: dataT("data.error.unknown", "未知错误");
 			console.warn("[toolchainStore] 获取工具链状态失败:", e);
 		} finally {
 			loading.value = false;

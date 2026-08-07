@@ -19,6 +19,7 @@ import {
 	UserCheck,
 } from "@lucide/vue";
 import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import AgentTerminal from "@/components/AgentTerminal.vue";
 import CodeViewer from "@/components/CodeViewer.vue";
@@ -29,7 +30,6 @@ import FaultInjectPanel from "@/components/FaultInjectPanel.vue";
 import FormalVerificationResult from "@/components/FormalVerificationResult.vue";
 import RepairTimeline from "@/components/RepairTimeline.vue";
 import ReportDownload from "@/components/ReportDownload.vue";
-import ReviewConfirm from "@/components/ReviewConfirm.vue";
 import SimulationResultView from "@/components/SimulationResult.vue";
 import SourceBadge from "@/components/SourceBadge.vue";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,6 @@ import {
 	type Contract,
 	type ContractCheckResult as ContractCheckResultType,
 	type ContractCondition,
-	EXAMPLE_REQUIREMENTS,
 	type FaultParams,
 	type FaultType,
 	type GenerateResult,
@@ -57,6 +56,7 @@ import type { VerificationResult } from "@/types/verification";
 /** 路由实例（用于读取 query 参数，例如从 SCADE 上传跳转回来） */
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
 /** Provider 状态（用于决定 AgentTerminal 数据源：mock 模式显示假数据，local/api 模式连接真实 WebSocket） */
 const providerStore = useProviderStore();
@@ -138,8 +138,11 @@ const onToggleHITL = async () => {
 	} catch (err) {
 		console.error("[Generate] 切换 HITL 失败:", err);
 		toast({
-			title: "HITL 切换失败",
-			description: err instanceof Error ? err.message : "请检查后端服务",
+			title: t("generate.toast.hitlToggleFailed"),
+			description:
+				err instanceof Error
+					? err.message
+					: t("generate.toast.backendServiceHint"),
 			variant: "destructive",
 		});
 	} finally {
@@ -176,6 +179,17 @@ const canGenerate = computed(
 const fillExample = (text: string) => {
 	requirement.value = text;
 };
+
+/** 示例需求按钮（本地化文案，点击后填入需求文本框） */
+const exampleRequirements = [
+	{ labelKey: "generate.example.req1" },
+	{ labelKey: "generate.example.req2" },
+	{ labelKey: "generate.example.req3" },
+	{ labelKey: "generate.example.req4" },
+];
+
+const sampleLabel = (text: string): string =>
+	text.length > 24 ? `${text.slice(0, 24)}...` : text;
 
 /** 代码区点击 Tag 徽章：更新激活 Tag（联动需求/契约区） */
 const onCodeTagClick = (tag: string | null) => {
@@ -260,13 +274,15 @@ const onTerminalComplete = (payload?: StreamCompletePayload) => {
 			simResult.value = res.simulation_result;
 			status.value = "done";
 			toast({
-				title: "生成完成",
-				description: res.degraded ? "部分降级完成" : "全流程完成",
+				title: t("generate.toast.generated"),
+				description: res.degraded
+					? t("generate.toast.degradedDone")
+					: t("generate.toast.fullDone"),
 			});
 		} catch (err) {
 			console.error("[Generate] WS complete 结果解析失败:", err);
 			status.value = "error";
-			errorMsg.value = "结果解析失败";
+			errorMsg.value = t("generate.error.parseResultFailed");
 		}
 	}
 };
@@ -319,9 +335,9 @@ const onGenerate = async () => {
 			errorMsg.value =
 				err instanceof Error && err.message
 					? err.message
-					: "生成失败，请检查后端服务是否运行";
+					: t("generate.error.generateFailed");
 			toast({
-				title: "生成失败",
+				title: t("generate.toast.generateFailed"),
 				description: errorMsg.value,
 				variant: "destructive",
 			});
@@ -355,17 +371,6 @@ const onReset = () => {
 	decisions.value = [];
 	terminalRef.value?.stop?.();
 	terminalRef.value?.clear?.();
-};
-
-/** 审核确认处理 */
-const onReviewApprove = (comment: string) => {
-	console.log("[Review] 通过审核:", comment);
-	// 在实际实现中，这里会调用后端API记录审核结果
-};
-
-const onReviewReject = (comment: string) => {
-	console.log("[Review] 拒绝:", comment);
-	// 在实际实现中，这里会调用后端API记录审核结果
 };
 
 /** 故障注入：通过 apiSwitcher 调用 simulate 重新仿真（支持多故障叠加） */
@@ -412,7 +417,7 @@ const onVerify = async () => {
 			checks: [],
 			total_duration_ms: 0,
 			tool: "Mock",
-			error: err instanceof Error ? err.message : "未知错误",
+			error: err instanceof Error ? err.message : t("generate.error.unknown"),
 		};
 	} finally {
 		verifying.value = false;
@@ -486,30 +491,46 @@ const buildDecisions = (res: GenerateResult): AgentDecision[] => {
 	return [
 		{
 			agent: "REQ-Parser",
-			prompt: `请解析以下需求：\n${requirement.value}`,
-			reasoning: `已解析需求文本，长度 ${requirement.value.length} 字符；输出结构化需求对象。`,
+			prompt: t("generate.decision.parsePrompt", {
+				req: requirement.value,
+			}),
+			reasoning: t("generate.decision.parseReasoning", {
+				len: requirement.value.length,
+			}),
 			output: JSON.stringify({ requirement: requirement.value }, null, 2),
 			timestamp: Date.now() - 30000,
 		},
 		{
 			agent: "CON-Gen",
-			prompt: `基于需求生成DO-178C契约：\n${requirement.value}`,
-			reasoning: `生成契约 ${res.contract.component || "(未命名)"}：${contractFieldCount} 个条件子句（前置/后置/不变式/异常处理）。`,
+			prompt: t("generate.decision.contractPrompt", {
+				req: requirement.value,
+			}),
+			reasoning: t("generate.decision.contractReasoning", {
+				component: res.contract.component || t("generate.decision.unnamed"),
+				count: contractFieldCount,
+			}),
 			output: contractToYaml(res.contract),
 			timestamp: Date.now() - 20000,
 		},
 		{
 			agent: "CODE-Gen",
-			prompt: "依据需求和契约生成MISRA-C代码",
-			reasoning: `生成代码共 ${codeLineCount} 行；契约追溯注释按 [REQ-xxx] 标注。`,
+			prompt: t("generate.decision.codePrompt"),
+			reasoning: t("generate.decision.codeReasoning", {
+				lines: codeLineCount,
+			}),
 			output: res.code,
 			timestamp: Date.now() - 10000,
 		},
 		{
 			agent: "REPAIR",
-			prompt: `修复MISRA-C违规：${violationCount}条违规`,
-			reasoning: `检测到 ${violationCount} 条违规，已完成 ${repairCount} 轮修复迭代。`,
-			output: `修复了 ${repairCount} 处违规`,
+			prompt: t("generate.decision.repairPrompt", {
+				count: violationCount,
+			}),
+			reasoning: t("generate.decision.repairReasoning", {
+				violations: violationCount,
+				repairs: repairCount,
+			}),
+			output: t("generate.decision.repairOutput", { count: repairCount }),
 			timestamp: Date.now(),
 		},
 	];
@@ -633,12 +654,12 @@ watch(
       <header class="page-header">
         <div class="title-area">
           <div class="title-row">
-            <button class="back-btn" @click="router.push('/')" title="返回首页">
+            <button class="back-btn" @click="router.push('/')" :title="$t('generate.backHome')">
               <ArrowLeft class="icon" />
             </button>
-            <h1>代码生成</h1>
+            <h1>{{ $t("generate.pageTitle") }}</h1>
           </div>
-          <p>需求解析 → 契约生成 → 代码生成 → 修复 → 仿真 → HITL 人工审查 → 报告</p>
+          <p>{{ $t("generate.pipelineFlow") }}</p>
         </div>
       </header>
 
@@ -649,7 +670,7 @@ watch(
         <div class="generate-col col-left">
           <div class="col-header">
             <div class="col-number">1</div>
-            <h2 class="col-title">需求输入</h2>
+            <h2 class="col-title">{{ $t("generate.requirement.title") }}</h2>
           </div>
           <div class="col-body">
             <div class="flex items-center gap-2 mb-3">
@@ -668,22 +689,22 @@ watch(
             <textarea
               v-model="requirement"
               class="req-textarea"
-              placeholder="例如：实现一个低通滤波器，截止频率 10Hz，用于滤除传感器高频噪声..."
+              :placeholder="$t('generate.placeholder.req')"
               :disabled="status === 'generating'"
               rows="4"
             />
 
             <div class="flex flex-col gap-3 mt-3">
               <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-[10px] text-muted-foreground mr-1">示例:</span>
+                <span class="text-[10px] text-muted-foreground mr-1">{{ $t("generate.placeholder.example") }}</span>
                 <button
-                  v-for="(ex, idx) in EXAMPLE_REQUIREMENTS"
-                  :key="idx"
+                  v-for="ex in exampleRequirements"
+                  :key="ex.labelKey"
                   type="button"
                   class="example-btn"
                   :disabled="status === 'generating'"
-                  @click="fillExample(ex)"
-                >{{ ex.length > 24 ? ex.slice(0, 24) + '...' : ex }}</button>
+                  @click="fillExample($t(ex.labelKey))"
+                >{{ sampleLabel($t(ex.labelKey)) }}</button>
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <Button
@@ -692,17 +713,17 @@ watch(
                   variant="outline"
                   :disabled="hitlLoading || status === 'generating'"
                   :class="['hitl-toggle-btn', { active: hitlEnabled }]"
-                  :title="hitlEnabled ? 'HITL 已开启：pipeline 将在评审检查点暂停等待人工审查' : 'HITL 已关闭：pipeline 直接跑完全流程'"
+                  :title="hitlEnabled ? $t('generate.hitl.enabledTitle') : $t('generate.hitl.disabledTitle')"
                   @click="onToggleHITL"
                 >
                   <Loader2 v-if="hitlLoading" class="w-3.5 h-3.5 animate-spin" />
                   <UserCheck v-else class="w-3.5 h-3.5" />
-                  HITL {{ hitlEnabled ? '开' : '关' }}
+                  HITL {{ hitlEnabled ? $t('generate.hitl.on') : $t('generate.hitl.off') }}
                 </Button>
                 <Button size="sm" :disabled="!canGenerate" @click="onGenerate" class="generate-btn">
                   <Loader2 v-if="status === 'generating'" class="w-3.5 h-3.5 animate-spin" />
                   <Play v-else class="w-3.5 h-3.5" />
-                  {{ status === 'generating' ? '生成中...' : '开始生成' }}
+                  {{ status === 'generating' ? $t('generate.btn.generating') : $t('generate.btn.generate') }}
                 </Button>
                 <Button v-if="status !== 'idle'" size="sm" variant="outline" @click="onReset">
                   <RotateCcw class="w-3.5 h-3.5" />
@@ -723,16 +744,16 @@ watch(
                 'is-error': status === 'error',
               }"
             >2</div>
-            <h2 class="col-title">Agent 执行</h2>
+            <h2 class="col-title">{{ $t("generate.agent.title") }}</h2>
             <div class="col-header-spacer" />
             <span v-if="status === 'generating'" class="status-indicator status-active">
-              <span class="status-dot" /> 执行中
+              <span class="status-dot" /> {{ $t('generate.agent.statusRunning') }}
             </span>
             <span v-else-if="status === 'done'" class="status-indicator status-done">
-              <span class="status-dot" /> 完成
+              <span class="status-dot" /> {{ $t('generate.agent.statusDone') }}
             </span>
-            <span v-else-if="status === 'error'" class="status-indicator status-error">失败</span>
-            <span v-else class="status-indicator status-idle">等待启动</span>
+            <span v-else-if="status === 'error'" class="status-indicator status-error">{{ $t('generate.agent.statusFailed') }}</span>
+            <span v-else class="status-indicator status-idle">{{ $t('generate.agent.statusIdle') }}</span>
           </div>
           <div class="col-body">
             <div v-if="status !== 'idle'" class="terminal-wrapper">
@@ -748,8 +769,8 @@ watch(
             </div>
             <div v-else class="empty-state">
               <div class="empty-state-icon">▶</div>
-              <p class="empty-state-title">Pipeline 待命</p>
-              <p class="empty-state-desc">在左侧输入需求并点击「开始生成」</p>
+              <p class="empty-state-title">{{ $t("generate.empty.pipelineIdle") }}</p>
+              <p class="empty-state-desc">{{ $t("generate.empty.hint") }}</p>
             </div>
           </div>
         </div>
@@ -761,14 +782,14 @@ watch(
               class="col-number"
               :class="{ 'is-done': status === 'done' && result }"
             >3</div>
-            <h2 class="col-title">生成结果</h2>
+            <h2 class="col-title">{{ $t("generate.result.title") }}</h2>
             <div class="col-header-spacer" />
             <template v-if="status === 'done' && result">
-              <span class="text-[10px] text-muted-foreground">{{ result.code.length }} 字符</span>
+              <span class="text-[10px] text-muted-foreground">{{ $t('generate.result.charCount', { n: result.code.length }) }}</span>
               <span class="text-[10px] text-muted-foreground">·</span>
-              <span class="text-[10px] text-muted-foreground">{{ result.repair_history.length }} 次修复</span>
+              <span class="text-[10px] text-muted-foreground">{{ $t('generate.result.repairCount', { n: result.repair_history.length }) }}</span>
               <Button size="sm" variant="outline" @click="onDownloadCFile" class="h-7 text-[11px]">
-                <Download class="w-3 h-3 mr-1" /> 下载
+                <Download class="w-3 h-3 mr-1" /> {{ $t('generate.btn.download') }}
               </Button>
             </template>
           </div>
@@ -776,19 +797,19 @@ watch(
             <div v-if="status === 'done' && result" class="result-content">
               <!-- 降级模式警告横幅 -->
               <div v-if="result.degraded" class="degraded-banner border-amber-900/50">
-                <span class="degraded-title">⚠ 降级模式</span>
-                <span class="degraded-desc">LLM 不可用，Agent 已走降级（mock）路径。代码由模板生成，可能不反映真实需求。请检查 LLM 设置。</span>
+                <span class="degraded-title">{{ $t("generate.degraded.title") }}</span>
+                <span class="degraded-desc">{{ $t("generate.degraded.desc") }}</span>
               </div>
 
               <Tabs v-model="activeTab" class="result-tabs">
                 <TabsList class="tabs-list">
-                  <TabsTrigger value="result">代码</TabsTrigger>
-                  <TabsTrigger value="repair">修复 <span class="tab-count">{{ result.repair_history.length }}</span></TabsTrigger>
-                  <TabsTrigger value="contract">契约 <span class="tab-count" :class="result.contract_check_result.overall_passed ? 'ok' : 'fail'">{{ result.contract_check_result.passed_count }}/{{ result.contract_check_result.total_count }}</span></TabsTrigger>
-                  <TabsTrigger value="simulation">仿真 <span v-if="simResult" class="tab-count" :class="simResult.passed ? 'ok' : 'fail'">{{ simResult.passed ? '✓' : '✗' }}</span></TabsTrigger>
-                  <TabsTrigger value="verify">验证</TabsTrigger>
-                  <TabsTrigger value="report">报告</TabsTrigger>
-                  <TabsTrigger value="trace">追溯</TabsTrigger>
+                  <TabsTrigger value="result">{{ $t("generate.tab.code") }}</TabsTrigger>
+                  <TabsTrigger value="repair">{{ $t("generate.tab.repair") }} <span class="tab-count">{{ result.repair_history.length }}</span></TabsTrigger>
+                  <TabsTrigger value="contract">{{ $t("generate.tab.contract") }} <span class="tab-count" :class="result.contract_check_result.overall_passed ? 'ok' : 'fail'">{{ result.contract_check_result.passed_count }}/{{ result.contract_check_result.total_count }}</span></TabsTrigger>
+                  <TabsTrigger value="simulation">{{ $t("generate.tab.simulation") }} <span v-if="simResult" class="tab-count" :class="simResult.passed ? 'ok' : 'fail'">{{ simResult.passed ? '✓' : '✗' }}</span></TabsTrigger>
+                  <TabsTrigger value="verify">{{ $t("generate.tab.verify") }}</TabsTrigger>
+                  <TabsTrigger value="report">{{ $t("generate.tab.report") }}</TabsTrigger>
+                  <TabsTrigger value="trace">{{ $t("generate.tab.trace") }}</TabsTrigger>
                 </TabsList>
 
                 <!-- 代码 Tab -->
@@ -798,15 +819,15 @@ watch(
                       <CardHeader class="py-3">
                         <CardTitle class="text-xs font-semibold flex items-center justify-between">
                           <div class="flex items-center gap-2">
-                            <span>代码 <span class="text-muted-foreground font-normal">（含追溯徽章）</span></span>
-                            <SourceBadge source="observed" label="实时生成" />
+                            <span>{{ $t('generate.tab.code') }} <span class="text-muted-foreground font-normal">{{ $t('generate.code.withTrace') }}</span></span>
+                            <SourceBadge source="observed" :label="$t('generate.source.live')" />
                           </div>
                           <div class="flex items-center gap-1">
-                            <button @click="onCopyCode" class="icon-action" :title="copiedCode ? '已复制' : '复制'">
+                            <button @click="onCopyCode" class="icon-action" :title="copiedCode ? $t('generate.btn.copied') : $t('generate.btn.copy')">
                               <Check v-if="copiedCode" class="w-3 h-3 text-emerald-500" />
                               <Copy v-else class="w-3 h-3" />
                             </button>
-                            <button @click="onDownloadCFile" class="icon-action" title="下载">
+                            <button @click="onDownloadCFile" class="icon-action" :title="$t('generate.btn.download')">
                               <Download class="w-3 h-3" />
                             </button>
                           </div>
@@ -827,8 +848,8 @@ watch(
                       <Card class="result-card">
                         <CardHeader class="py-3">
                           <CardTitle class="text-xs font-semibold flex items-center gap-2">
-                            <span>契约</span>
-                            <SourceBadge source="observed" label="契约生成" />
+                            <span>{{ $t('generate.tab.contract') }}</span>
+                            <SourceBadge source="observed" :label="$t('generate.source.contract')" />
                           </CardTitle>
                         </CardHeader>
                         <CardContent class="pt-0">
@@ -844,8 +865,8 @@ watch(
                         <CardHeader class="py-3">
                           <CardTitle class="text-xs font-semibold flex items-center justify-between">
                             <div class="flex items-center gap-2">
-                              <span>MISRA 校验</span>
-                              <SourceBadge source="observed" label="静态分析" />
+                              <span>{{ $t('generate.misra.title') }}</span>
+                              <SourceBadge source="observed" :label="$t('generate.source.staticAnalysis')" />
                             </div>
                             <span class="text-[10px] font-normal">
                               <span class="text-destructive">Err {{ violationStats.error }}</span>
@@ -866,7 +887,7 @@ watch(
                               <div class="text-muted-foreground">{{ v.message }}</div>
                             </div>
                           </div>
-                          <div v-else class="violation-empty">无 MISRA 违规</div>
+                          <div v-else class="violation-empty">{{ $t("generate.misra.noViolations") }}</div>
                         </CardContent>
                       </Card>
                     </div>
@@ -898,8 +919,8 @@ watch(
                     <Card class="result-card">
                       <CardHeader class="py-3">
                         <CardTitle class="text-xs font-semibold flex items-center gap-2">
-                          <span>仿真结果</span>
-                          <SourceBadge source="simulated" label="数字孪生" />
+                          <span>{{ $t('generate.simulation.title') }}</span>
+                          <SourceBadge source="simulated" :label="$t('generate.source.digitalTwin')" />
                         </CardTitle>
                       </CardHeader>
                       <CardContent class="pt-0">
@@ -915,7 +936,7 @@ watch(
                     <Card class="result-card">
                       <CardHeader class="py-3">
                         <CardTitle class="text-xs font-semibold flex items-center gap-2">
-                          <span>形式化验证</span>
+                          <span>{{ $t('generate.verify.title') }}</span>
                           <SourceBadge source="observed" label="Z3+CBMC" />
                         </CardTitle>
                       </CardHeader>
@@ -924,9 +945,9 @@ watch(
                           <Button :disabled="verifying" @click="onVerify" size="sm">
                             <Loader2 v-if="verifying" class="w-3.5 h-3.5 animate-spin" />
                             <ShieldCheck v-else class="w-3.5 h-3.5" />
-                            {{ verifyResult ? '重新验证' : '开始验证' }}
+                            {{ verifyResult ? $t('generate.btn.verifyAgain') : $t('generate.btn.startVerify') }}
                           </Button>
-                          <span class="text-[10px] text-muted-foreground">Z3 SMT + CBMC 有界模型检查</span>
+                          <span class="text-[10px] text-muted-foreground">{{ $t("generate.verify.subtitle") }}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -951,7 +972,7 @@ watch(
               <div class="flex items-center justify-between gap-3">
                 <span>{{ errorMsg }}</span>
                 <Button size="sm" variant="outline" :disabled="!canGenerate" @click="onGenerate" class="shrink-0 error-retry-btn">
-                  <RotateCcw class="w-3.5 h-3.5 mr-1" /> 重试
+                  <RotateCcw class="w-3.5 h-3.5 mr-1" /> {{ $t('generate.btn.retry') }}
                 </Button>
               </div>
             </div>
@@ -959,8 +980,8 @@ watch(
             <!-- 空状态 -->
             <div v-else class="empty-state">
               <div class="empty-state-icon">◆</div>
-              <p class="empty-state-title">暂无结果</p>
-              <p class="empty-state-desc">Pipeline 完成后将在此展示生成结果</p>
+              <p class="empty-state-title">{{ $t("generate.empty.noResult") }}</p>
+              <p class="empty-state-desc">{{ $t("generate.empty.resultHint") }}</p>
             </div>
           </div>
         </div>

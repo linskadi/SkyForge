@@ -17,6 +17,7 @@ import {
 	Wrench,
 } from "@lucide/vue";
 import { type Component, computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import CodeViewer from "@/components/CodeViewer.vue";
 import SimulationResultView from "@/components/SimulationResult.vue";
@@ -48,6 +49,7 @@ import {
 } from "@/utils/contractTemplates";
 
 const router = useRouter();
+const { t } = useI18n();
 
 const compAName = ref<string>("LowPassFilter");
 const compACode = ref<string>(PRESET_LP_CODE);
@@ -65,27 +67,27 @@ const templateOpen = ref<boolean>(false);
 
 const connectionOptions: Array<{
 	value: ComposeConnection;
-	label: string;
+	labelKey: string;
 	icon: Component;
-	desc: string;
+	descKey: string;
 }> = [
 	{
 		value: "sequential",
-		label: "顺序组合",
+		labelKey: "compose.connection.sequential",
 		icon: GitBranch,
-		desc: "A → B（A 的输出作为 B 的输入）",
+		descKey: "compose.connection.sequentialDesc",
 	},
 	{
 		value: "parallel",
-		label: "并行组合",
+		labelKey: "compose.connection.parallel",
 		icon: GitFork,
-		desc: "A ∥ B（同时运行，输出合并）",
+		descKey: "compose.connection.parallelDesc",
 	},
 	{
 		value: "feedback",
-		label: "反馈组合",
+		labelKey: "compose.connection.feedback",
 		icon: RotateCcw,
-		desc: "A → B → A（B 的输出反馈到 A）",
+		descKey: "compose.connection.feedbackDesc",
 	},
 ];
 
@@ -120,7 +122,8 @@ const onCompose = async () => {
 		compatibilityResult.value = res.compatibility;
 		status.value = "done";
 	} catch (err) {
-		errorMsg.value = err instanceof Error ? err.message : "组合失败";
+		errorMsg.value =
+			err instanceof Error ? err.message : t("compose.error.composeFailed");
 		status.value = "error";
 	}
 };
@@ -135,7 +138,8 @@ const onCheckCompatibility = async () => {
 			connection.value,
 		);
 	} catch (err) {
-		errorMsg.value = err instanceof Error ? err.message : "兼容性检查失败";
+		errorMsg.value =
+			err instanceof Error ? err.message : t("compose.error.checkFailed");
 	} finally {
 		checkingCompat.value = false;
 	}
@@ -172,11 +176,6 @@ const compatPassPercent = computed(() => {
 	return total_count === 0
 		? 100
 		: Math.round((passed_count / total_count) * 100);
-});
-
-const compatColor = computed(() => {
-	if (!compatibilityResult.value) return "#6b7280";
-	return compatibilityResult.value.overall_compatible ? "#15803d" : "#f59e0b";
 });
 
 const copiedComposed = ref<boolean>(false);
@@ -281,28 +280,28 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
     <header class="page-header">
       <div class="title-area">
         <div class="title-row">
-          <button class="back-btn" @click="router.push('/')" title="返回首页">
+          <button class="back-btn" @click="router.push('/')" :title="$t('compose.backHome')">
             <ArrowLeft class="icon" />
           </button>
           <h1 class="page-title">
             <Layers class="title-icon" />
-            组件组合验证
+            {{ $t("compose.title") }}
           </h1>
         </div>
-        <p class="subtitle">验证两个组件的契约兼容性，生成组合后的 C 代码和仿真结果</p>
+        <p class="subtitle">{{ $t("compose.subtitle") }}</p>
       </div>
       <div class="header-actions">
         <Sheet v-model:open="templateOpen">
           <SheetTrigger as-child>
             <Button variant="outline" size="sm">
-              <Library /> 模板库
+              <Library /> {{ $t("compose.templateLibrary") }}
             </Button>
           </SheetTrigger>
           <SheetContent class="template-drawer" side="right">
             <SheetHeader>
               <SheetTitle class="flex items-center gap-2">
                 <Library class="w-4 h-4" />
-                契约模板库
+                {{ $t("compose.templateLibraryTitle") }}
               </SheetTitle>
             </SheetHeader>
             <div class="template-list">
@@ -313,25 +312,25 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
                     <div class="tpl-name">{{ tpl.name }}</div>
                     <div class="tpl-category">{{ tpl.categoryLabel }}</div>
                   </div>
-                  <span class="tpl-safety" :title="`安全等级 ${tpl.safetyLevel}`">{{ tpl.safetyLevel }}</span>
+                  <span class="tpl-safety" :title="$t('compose.template.safetyLevel', { level: tpl.safetyLevel })">{{ tpl.safetyLevel }}</span>
                 </div>
                 <p class="tpl-desc">{{ tpl.description }}</p>
                 <div class="tpl-signature">
-                  <div class="sig-row"><span class="sig-label">输入</span><code class="sig-value">{{ formatSignals(tpl.inputs) }}</code></div>
-                  <div class="sig-row"><span class="sig-label">输出</span><code class="sig-value">{{ formatSignals(tpl.outputs) }}</code></div>
-                  <div class="sig-row"><span class="sig-label">范围</span><code class="sig-value">{{ formatRange(tpl.outputs[0]?.range) }}</code></div>
-                  <div class="sig-row"><span class="sig-label">约束</span><span class="sig-value-text">{{ tpl.invariants[0]?.description || '—' }}</span></div>
+                  <div class="sig-row"><span class="sig-label">{{ $t("compose.template.input") }}</span><code class="sig-value">{{ formatSignals(tpl.inputs) }}</code></div>
+                  <div class="sig-row"><span class="sig-label">{{ $t("compose.template.output") }}</span><code class="sig-value">{{ formatSignals(tpl.outputs) }}</code></div>
+                  <div class="sig-row"><span class="sig-label">{{ $t("compose.template.range") }}</span><code class="sig-value">{{ formatRange(tpl.outputs[0]?.range) }}</code></div>
+                  <div class="sig-row"><span class="sig-label">{{ $t("compose.template.constraint") }}</span><span class="sig-value-text">{{ tpl.invariants[0]?.description || '—' }}</span></div>
                 </div>
                 <div class="flex gap-2">
                   <Button size="sm" variant="outline" class="flex-1 text-xs"
                     :class="{ 'border-purple-500 bg-purple-50': isTemplateAppliedTo('A', tpl) }"
                     @click="applyTemplate('A', tpl)">
-                    <ArrowRight class="w-3 h-3" /> 填入 A
+                    <ArrowRight class="w-3 h-3" /> {{ $t("compose.template.fillA") }}
                   </Button>
                   <Button size="sm" variant="outline" class="flex-1 text-xs"
                     :class="{ 'border-emerald-500 bg-emerald-50': isTemplateAppliedTo('B', tpl) }"
                     @click="applyTemplate('B', tpl)">
-                    <ArrowRight class="w-3 h-3" /> 填入 B
+                    <ArrowRight class="w-3 h-3" /> {{ $t("compose.template.fillB") }}
                   </Button>
                 </div>
               </div>
@@ -339,7 +338,7 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
           </SheetContent>
         </Sheet>
         <Button variant="outline" size="sm" @click="loadPreset">
-          <Play /> 加载预设
+          <Play /> {{ $t("compose.loadPreset") }}
         </Button>
       </div>
     </header>
@@ -356,23 +355,23 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
             @click="connection = opt.value"
           >
             <component :is="opt.icon" class="opt-icon" />
-            <span class="opt-label">{{ opt.label }}</span>
+            <span class="opt-label">{{ $t(opt.labelKey) }}</span>
           </button>
         </div>
         <div class="connection-desc">
-          {{ connectionOptions.find(o => o.value === connection)?.desc }}
+          {{ $t(connectionOptions.find(o => o.value === connection)?.descKey ?? "") }}
         </div>
         <div class="action-buttons">
           <Button :disabled="!canCompose" @click="onCompose" class="compose-btn">
             <Loader2 v-if="status === 'composing'" class="animate-spin" />
-            <Layers v-else /> 组合验证
+            <Layers v-else /> {{ $t("compose.btn.compose") }}
           </Button>
           <Button variant="outline" :disabled="checkingCompat" @click="onCheckCompatibility">
             <Loader2 v-if="checkingCompat" class="animate-spin" />
-            <GitBranch v-else /> 仅检查兼容性
+            <GitBranch v-else /> {{ $t("compose.btn.checkOnly") }}
           </Button>
           <Button v-if="status !== 'idle'" variant="ghost" @click="onReset">
-            <RotateCcw /> 重置
+            <RotateCcw /> {{ $t("compose.btn.reset") }}
           </Button>
         </div>
         <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
@@ -384,16 +383,16 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
         <CardHeader>
           <CardTitle class="card-title">
             <span class="comp-badge a">A</span>
-            <input v-model="compAName" class="comp-name-input" placeholder="组件 A 名称" />
+            <input v-model="compAName" class="comp-name-input" :placeholder="$t('compose.placeholder.compAName')" />
           </CardTitle>
         </CardHeader>
         <CardContent class="card-content-scroll">
           <div class="editor-section">
-            <div class="section-label">C 代码</div>
+            <div class="section-label">{{ $t("compose.section.cCode") }}</div>
             <textarea v-model="compACode" class="code-editor" rows="28" spellcheck="false" />
           </div>
           <div class="editor-section">
-            <div class="section-label">契约 YAML</div>
+            <div class="section-label">{{ $t("compose.section.contractYaml") }}</div>
             <textarea v-model="compAContract" class="yaml-editor" rows="20" spellcheck="false" />
           </div>
         </CardContent>
@@ -403,16 +402,16 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
         <CardHeader>
           <CardTitle class="card-title">
             <span class="comp-badge b">B</span>
-            <input v-model="compBName" class="comp-name-input" placeholder="组件 B 名称" />
+            <input v-model="compBName" class="comp-name-input" :placeholder="$t('compose.placeholder.compBName')" />
           </CardTitle>
         </CardHeader>
         <CardContent class="card-content-scroll">
           <div class="editor-section">
-            <div class="section-label">C 代码</div>
+            <div class="section-label">{{ $t("compose.section.cCode") }}</div>
             <textarea v-model="compBCode" class="code-editor" rows="28" spellcheck="false" />
           </div>
           <div class="editor-section">
-            <div class="section-label">契约 YAML</div>
+            <div class="section-label">{{ $t("compose.section.contractYaml") }}</div>
             <textarea v-model="compBContract" class="yaml-editor" rows="20" spellcheck="false" />
           </div>
         </CardContent>
@@ -424,17 +423,17 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
         <Card v-if="compatibilityResult" class="result-card compat-card">
           <CardHeader>
             <CardTitle class="card-title">
-              兼容性检查结果
+              {{ $t("compose.compat.title") }}
               <span class="title-hint">
                 {{ compatibilityResult.component_a }} → {{ compatibilityResult.component_b }}
-                （{{ connectionOptions.find(o => o.value === compatibilityResult?.connection)?.label }}）
+                （{{ $t(connectionOptions.find(o => o.value === compatibilityResult?.connection)?.labelKey ?? "") }}）
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent class="result-content">
             <div class="compat-overview" :class="compatibilityResult.overall_compatible ? 'pass' : 'fail'">
               <div class="flex items-baseline gap-3">
-                <span class="text-base font-bold">{{ compatibilityResult.overall_compatible ? "兼容" : "部分不兼容" }}</span>
+                <span class="text-base font-bold">{{ compatibilityResult.overall_compatible ? $t("compose.compat.compatible") : $t("compose.compat.partialIncompatible") }}</span>
                 <span class="font-mono text-lg font-extrabold compat-score">
                   {{ compatibilityResult.passed_count }}/{{ compatibilityResult.total_count }}
                 </span>
@@ -445,8 +444,8 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
               </div>
             </div>
             <div class="flex gap-2 mb-3">
-              <span class="compat-badge pass">通过 {{ compatStats.pass }}</span>
-              <span v-if="compatStats.fail > 0" class="compat-badge fail">失败 {{ compatStats.fail }}</span>
+              <span class="compat-badge pass">{{ $t("compose.compat.passCount", { count: compatStats.pass }) }}</span>
+              <span v-if="compatStats.fail > 0" class="compat-badge fail">{{ $t("compose.compat.failCount", { count: compatStats.fail }) }}</span>
             </div>
             <div class="checks-list">
               <div v-for="check in compatibilityResult.checks" :key="check.id" class="check-item" :class="check.passed ? 'pass' : 'fail'">
@@ -461,8 +460,8 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
 
             <div class="interface-match-section">
               <div class="section-header">
-                <span class="section-title">接口契约匹配</span>
-                <span class="section-subtitle">组件 A 输出 → 组件 B 输入</span>
+                <span class="section-title">{{ $t("compose.compat.interfaceMatch") }}</span>
+                <span class="section-subtitle">{{ $t("compose.compat.subtitle") }}</span>
               </div>
               <div class="signal-match-list">
                 <div
@@ -480,13 +479,13 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
                   </div>
                   <div class="signal-details">
                     <div class="signal-detail-row">
-                      <span class="detail-label">类型</span>
+                      <span class="detail-label">{{ $t("compose.compat.type") }}</span>
                       <code class="detail-value">{{ sig.typeA }}</code>
                       <span class="detail-sep" />
                       <code class="detail-value">{{ sig.typeB }}</code>
                     </div>
                     <div class="signal-detail-row">
-                      <span class="detail-label">范围</span>
+                      <span class="detail-label">{{ $t("compose.compat.range") }}</span>
                       <code class="detail-value">{{ sig.rangeA }}</code>
                       <span class="detail-sep" />
                       <code class="detail-value">{{ sig.rangeB }}</code>
@@ -504,7 +503,7 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
         <Card v-if="composeResult" class="result-card code-result-card">
           <CardHeader>
             <CardTitle class="card-title">
-              组合后代码
+              {{ $t("compose.result.codeTitle") }}
               <span class="title-hint">{{ composeResult.component_a }} + {{ composeResult.component_b }}</span>
               <button type="button" class="action-btn" @click="onCopyComposedCode">
                 <Check v-if="copiedComposed" class="w-3.5 h-3.5 text-emerald-600" />
@@ -519,14 +518,14 @@ const interfaceSignalMatches = computed<SignalMatch[]>(() => {
       </div>
 
       <Card v-if="composeResult && simResult" class="result-card sim-card">
-        <CardHeader><CardTitle class="card-title">组合仿真结果</CardTitle></CardHeader>
+        <CardHeader><CardTitle class="card-title">{{ $t("compose.result.simTitle") }}</CardTitle></CardHeader>
         <CardContent><SimulationResultView :result="simResult" /></CardContent>
       </Card>
     </div>
 
     <div v-if="status === 'idle' && !compatibilityResult" class="empty-tip">
       <Layers class="w-8 h-8 text-muted-foreground" />
-      <p class="text-sm">选择连接方式，点击"组合验证"开始</p>
+      <p class="text-sm">{{ $t("compose.emptyTip") }}</p>
     </div>
   </div>
 </template>

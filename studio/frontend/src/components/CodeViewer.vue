@@ -13,6 +13,7 @@
  * - 通过 tagClick emit 通知父组件代码中点击的 Tag（联动需求/契约区）
  */
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { type InlineToken, parseInlineTags } from "@/utils/tagParser";
 
 interface Props {
@@ -98,12 +99,27 @@ const onTagClick = (tag: string) => {
 
 /** 是否有任何可点击徽章（用于空状态判断） */
 const hasCode = computed(() => props.code.length > 0);
+
+/** 徽章 title：启用高亮追溯时提示点击联动，否则提示开启追溯 */
+const badgeTitle = (type: "req" | "con" | "tst", tag: string): string => {
+	const { t } = useI18n();
+	if (props.highlightEnabled) {
+		return t("codeViewer.highlightClickTip", { tag });
+	}
+	const tipKey =
+		type === "req"
+			? "codeViewer.reqTip"
+			: type === "con"
+				? "codeViewer.conTip"
+				: "codeViewer.tstTip";
+	return t(tipKey, { tag });
+};
 </script>
 
 <template>
   <div class="code-viewer">
     <div v-if="!hasCode" class="empty-hint">
-      暂无代码
+      {{ $t("codeViewer.empty") }}
     </div>
     <pre v-else class="code-block"><code><div
         v-for="(tokens, idx) in lineTokens"
@@ -120,7 +136,7 @@ const hasCode = computed(() => props.code.length > 0);
                 active: effectiveTag === token.value,
                 clickable: highlightEnabled
               }"
-              :title="highlightEnabled ? `点击高亮 ${token.value} 关联代码行（双向追溯）` : `需求标签 ${token.value}（开启高亮追溯可启用联动）`"
+              :title="badgeTitle('req', token.value)"
               @click="onTagClick(token.value)"
             >[{{ token.value }}]</span><span
               v-else-if="token.type === 'misra'"
@@ -133,7 +149,7 @@ const hasCode = computed(() => props.code.length > 0);
                 active: effectiveTag === token.value,
                 clickable: highlightEnabled
               }"
-              :title="highlightEnabled ? `点击高亮 ${token.value} 关联代码行（双向追溯）` : `契约条件 ${token.value}`"
+              :title="badgeTitle('con', token.value)"
               @click="onTagClick(token.value)"
             >[{{ token.value }}]</span><span
               v-else-if="token.type === 'tst'"
@@ -142,17 +158,17 @@ const hasCode = computed(() => props.code.length > 0);
                 active: effectiveTag === token.value,
                 clickable: highlightEnabled
               }"
-              :title="highlightEnabled ? `点击高亮 ${token.value} 关联代码行（双向追溯）` : `测试标签 ${token.value}`"
+              :title="badgeTitle('tst', token.value)"
               @click="onTagClick(token.value)"
             >[{{ token.value }}]</span></template></span></div></code></pre>
 
     <div v-if="hasCode" class="legend">
-      <span class="legend-item"><span class="dot req-dot" /> REQ 需求标签</span>
-      <span class="legend-item"><span class="dot misra-dot" /> MISRA 规则（hover 查看说明）</span>
-      <span class="legend-item"><span class="dot con-dot" /> CON 契约条件</span>
-      <span class="legend-item"><span class="dot tst-dot" /> TST 测试标签</span>
+      <span class="legend-item"><span class="dot req-dot" /> {{ $t("codeViewer.legendReq") }}</span>
+      <span class="legend-item"><span class="dot misra-dot" /> {{ $t("codeViewer.legendMisra") }}</span>
+      <span class="legend-item"><span class="dot con-dot" /> {{ $t("codeViewer.legendCon") }}</span>
+      <span class="legend-item"><span class="dot tst-dot" /> {{ $t("codeViewer.legendTst") }}</span>
       <span v-if="highlightEnabled && effectiveTag" class="legend-item active-legend">
-        当前高亮：{{ effectiveTag }} ({{ highlightedLines.size }} 行)
+        {{ $t("codeViewer.highlightLines", { tag: effectiveTag, count: highlightedLines.size }) }}
       </span>
     </div>
   </div>

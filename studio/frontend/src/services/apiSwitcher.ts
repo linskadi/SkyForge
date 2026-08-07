@@ -1,7 +1,6 @@
 import { computed, type DeepReadonly, reactive, readonly, toRefs } from "vue";
 import { useExecutionStore } from "@/stores/executionStore";
 import type { ApiClient, ComposeInput } from "./apiProtocol";
-import { mockApiClient } from "./mockApi";
 import { realApiClient } from "./realApi";
 
 const state = reactive({
@@ -16,7 +15,7 @@ export const useRealAPI = computed(() => {
 	return true;
 });
 
-export function setUseRealAPI(val: boolean): void {
+export function setUseRealAPI(_val: boolean): void {
 	const execution = useExecutionStore();
 	execution.setProfile("cloud");
 	state.connected = false;

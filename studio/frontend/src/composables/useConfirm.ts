@@ -19,6 +19,7 @@
  * ```
  */
 import { ref } from "vue";
+import { i18n } from "@/i18n";
 
 /** 确认弹窗共享状态 */
 interface ConfirmState {
@@ -40,13 +41,18 @@ interface ConfirmState {
 
 const DEFAULT_STATE: ConfirmState = {
 	open: false,
-	title: "确认操作",
+	title: "",
 	message: "",
-	confirmText: "确定",
-	cancelText: "取消",
+	confirmText: "",
+	cancelText: "",
 	alertMode: false,
 	variant: "default",
 };
+
+function t(key: string): string {
+	const value = i18n.global.t(key);
+	return typeof value === "string" ? value : "";
+}
 
 /** 全局单例 state（所有 useConfirm 调用共享） */
 const state = ref<ConfirmState>({ ...DEFAULT_STATE });
@@ -85,10 +91,10 @@ function confirm(
 	}
 	state.value = {
 		open: true,
-		title: options.title ?? "确认操作",
+		title: options.title ?? t("confirm.defaultTitle"),
 		message,
-		confirmText: options.confirmText ?? "确定",
-		cancelText: options.cancelText ?? "取消",
+		confirmText: options.confirmText ?? t("confirm.confirm"),
+		cancelText: options.cancelText ?? t("confirm.cancel"),
 		alertMode: false,
 		variant: options.variant ?? "default",
 	};
@@ -115,9 +121,9 @@ function alert(
 	}
 	state.value = {
 		open: true,
-		title: options.title ?? "提示",
+		title: options.title ?? t("confirm.alertTitle"),
 		message,
-		confirmText: options.confirmText ?? "知道了",
+		confirmText: options.confirmText ?? t("confirm.ok"),
 		cancelText: "",
 		alertMode: true,
 		variant: "default",

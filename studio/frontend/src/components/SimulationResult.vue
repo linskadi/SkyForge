@@ -12,9 +12,12 @@ import { AlertOctagon, CheckCircle2, Clock, XCircle } from "@lucide/vue";
  * 参考文档第 6 章数字孪生、6.4.1 契约断言、6.6 沙盒隔离。
  */
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import type { AgentType, LogLevel, SimulationResult } from "@/services/mockApi";
 import { agentColorMap, levelColorMap } from "@/utils/colors";
 import WaveformChart from "./WaveformChart.vue";
+
+const { t } = useI18n();
 
 interface Props {
 	/** 仿真结果数据 */
@@ -64,42 +67,42 @@ const statCards = computed(() => {
 	};
 	return [
 		{
-			label: "仿真步数",
+			label: t("simulationResult.statSteps"),
 			value: fmt(s.total_steps),
 			unit: "steps",
 			color: "hsl(220, 70%, 45%)",
 			icon: "📊",
 		},
 		{
-			label: "输入范围",
+			label: t("simulationResult.statInputRange"),
 			value: fmtRange(s.input_range),
 			unit: "uint16",
 			color: "hsl(215, 80%, 55%)",
 			icon: "📥",
 		},
 		{
-			label: "输出范围",
+			label: t("simulationResult.statOutputRange"),
 			value: fmtRange(s.output_range),
 			unit: "uint16",
 			color: "#059669",
 			icon: "📤",
 		},
 		{
-			label: "输出最大值",
+			label: t("simulationResult.statOutputMax"),
 			value: fmt(s.output_max),
 			unit: "max",
 			color: "#dc2626",
 			icon: "📈",
 		},
 		{
-			label: "输出最小值",
+			label: t("simulationResult.statOutputMin"),
 			value: fmt(s.output_min),
 			unit: "min",
 			color: "#0891b2",
 			icon: "📉",
 		},
 		{
-			label: "输出均值",
+			label: t("simulationResult.statOutputMean"),
 			value: fmt(s.output_mean),
 			unit: "mean",
 			color: "#c2410c",
@@ -110,22 +113,24 @@ const statCards = computed(() => {
 
 /** 故障类型显示名（覆盖全部 12 种故障） */
 const faultDisplayName = computed(() => {
-	const map: Record<string, string> = {
-		bias: "传感器偏置 (Bias)",
-		signal_loss: "信号丢失 (Signal Loss)",
-		noise: "高频噪声 (Noise)",
-		stuck: "卡死故障 (Stuck)",
-		step: "阶跃突变 (Step)",
-		saturation: "饱和截断 (Saturation)",
-		intermittent: "间歇性故障 (Intermittent)",
-		drift: "渐变漂移 (Drift)",
-		timeout: "丢帧/延迟 (Timeout)",
-		glitch: "跳变毛刺 (Glitch)",
-		stuck_zero: "零输出 (Stuck-at-Zero)",
-		polarity: "符号反转 (Polarity)",
-	};
+	const faultIds = [
+		"bias",
+		"signal_loss",
+		"noise",
+		"stuck",
+		"step",
+		"saturation",
+		"intermittent",
+		"drift",
+		"timeout",
+		"glitch",
+		"stuck_zero",
+		"polarity",
+	] as const;
 	return props.result.fault_type
-		? (map[props.result.fault_type] ?? props.result.fault_type)
+		? (faultIds as readonly string[]).includes(props.result.fault_type)
+			? t(`faultInject.type.${props.result.fault_type}.name`)
+			: props.result.fault_type
 		: null;
 });
 </script>
@@ -142,24 +147,24 @@ const faultDisplayName = computed(() => {
         />
         <div class="status-text">
           <div class="status-title">
-            <template v-if="loading">⏳ 仿真运行中...</template>
-            <template v-else-if="result.passed">✅ 仿真通过</template>
-            <template v-else>❌ 契约违约（core dump）</template>
+            <template v-if="loading">{{ $t("simulationResult.loadingTitle") }}</template>
+            <template v-else-if="result.passed">{{ $t("simulationResult.passedTitle") }}</template>
+            <template v-else>{{ $t("simulationResult.failedTitle") }}</template>
           </div>
           <div class="status-sub">
-            <template v-if="loading">正在执行数字孪生仿真...</template>
+            <template v-if="loading">{{ $t("simulationResult.loadingSub") }}</template>
             <template v-else>
-              {{ result.total_steps }} 步仿真
-              <template v-if="faultDisplayName"> · 故障：{{ faultDisplayName }}</template>
+              {{ $t("simulationResult.stepsSub", { count: result.total_steps }) }}
+              <template v-if="faultDisplayName">{{ $t("simulationResult.faultSub", { name: faultDisplayName }) }}</template>
             </template>
           </div>
         </div>
       </div>
       <div v-if="!loading && result.passed" class="status-right">
-        <span class="status-badge pass">6/6 契约通过</span>
+        <span class="status-badge pass">{{ $t("simulationResult.contractsPassed") }}</span>
       </div>
       <div v-else-if="!loading && !result.passed" class="status-right">
-        <span class="status-badge fail">CORE DUMP</span>
+        <span class="status-badge fail">{{ $t("simulationResult.coreDump") }}</span>
       </div>
     </div>
 
@@ -167,20 +172,20 @@ const faultDisplayName = computed(() => {
     <div v-if="!loading && !result.passed && result.contract_violation" class="violation-card">
       <div class="violation-header">
         <AlertOctagon class="violation-icon" />
-        <span class="violation-title">契约违约详情</span>
+        <span class="violation-title">{{ $t("simulationResult.violationTitle") }}</span>
         <span class="violation-contract-id">{{ result.contract_violation.contract_id }}</span>
       </div>
       <div class="violation-body">
         <div class="violation-row">
-          <span class="row-label">违约时间步：</span>
+          <span class="row-label">{{ $t("simulationResult.violationTimestep") }}</span>
           <code class="row-value">step {{ result.contract_violation.timestep }}</code>
         </div>
         <div class="violation-row">
-          <span class="row-label">触发断言：</span>
+          <span class="row-label">{{ $t("simulationResult.violationAssertion") }}</span>
           <code class="row-value assert-code">{{ result.contract_violation.assertion }}</code>
         </div>
         <div class="violation-row">
-          <span class="row-label">实际值：</span>
+          <span class="row-label">{{ $t("simulationResult.violationActual") }}</span>
           <code class="row-value">{{ result.contract_violation.actual_value }}</code>
         </div>
         <div class="violation-message">
@@ -209,12 +214,12 @@ const faultDisplayName = computed(() => {
     <!-- 故障注入对比区域（当有故障类型时显示） -->
     <div v-if="!loading && result.fault_type" class="fault-comparison">
       <div class="fault-comparison-header">
-        <span class="fault-comparison-title">故障注入对比</span>
+        <span class="fault-comparison-title">{{ $t("simulationResult.faultCompareTitle") }}</span>
         <span class="fault-type-badge">{{ faultDisplayName }}</span>
       </div>
       <div class="fault-comparison-charts">
         <div class="fault-chart-panel">
-          <div class="fault-chart-label">故障波形</div>
+          <div class="fault-chart-label">{{ $t("simulationResult.faultChartLabel") }}</div>
           <WaveformChart
             :input-data="result.input_waveform"
             :output-data="result.output_waveform"
@@ -223,7 +228,7 @@ const faultDisplayName = computed(() => {
           />
         </div>
         <div class="fault-chart-panel">
-          <div class="fault-chart-label">正常基线</div>
+          <div class="fault-chart-label">{{ $t("simulationResult.baselineChartLabel") }}</div>
           <WaveformChart
             v-if="baselineWaveform"
             :input-data="baselineWaveform.input"
@@ -231,7 +236,7 @@ const faultDisplayName = computed(() => {
             :height="260"
           />
           <div v-else class="no-baseline-placeholder">
-            无基线数据
+            {{ $t("simulationResult.noBaseline") }}
           </div>
         </div>
       </div>
@@ -256,11 +261,11 @@ const faultDisplayName = computed(() => {
           <span class="light yellow" />
           <span class="light green" />
         </div>
-        <div class="terminal-title">🖥️ 仿真终端输出</div>
+        <div class="terminal-title">{{ $t("simulationResult.terminalTitle") }}</div>
         <span v-if="faultDisplayName" class="fault-tag">{{ faultDisplayName }}</span>
       </div>
       <div class="terminal-body">
-        <div v-if="!result.logs?.length && !loading" class="empty-hint">等待仿真日志...</div>
+        <div v-if="!result.logs?.length && !loading" class="empty-hint">{{ $t("simulationResult.waitingLogs") }}</div>
         <div v-for="(log, i) in result.logs ?? []" :key="i" class="log-line">
           <span v-if="log.thought.includes('[FAULT]')" class="log-fault-badge">FAULT</span>
           <span class="log-badge" :style="badgeStyle(log.agent)">{{ log.agent }}</span>

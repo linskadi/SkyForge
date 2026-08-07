@@ -33,7 +33,7 @@ const onConClick = (id: string) => {
 };
 
 interface Section {
-	title: string;
+	titleKey: string;
 	key: keyof Pick<
 		Contract,
 		"preconditions" | "postconditions" | "invariants" | "fault_handling"
@@ -44,25 +44,25 @@ interface Section {
 
 const sections: Section[] = [
 	{
-		title: "前置条件 Preconditions",
+		titleKey: "contractViewer.preconditions",
 		key: "preconditions",
 		color: "#0EA5E9",
 		icon: "📥",
 	},
 	{
-		title: "后置条件 Postconditions",
+		titleKey: "contractViewer.postconditions",
 		key: "postconditions",
 		color: "#15803d",
 		icon: "📤",
 	},
 	{
-		title: "不变式 Invariants",
+		titleKey: "contractViewer.invariants",
 		key: "invariants",
 		color: "#b45309",
 		icon: "🔒",
 	},
 	{
-		title: "故障处理 Fault Handling",
+		titleKey: "contractViewer.faultHandling",
 		key: "fault_handling",
 		color: "#dc2626",
 		icon: "⚠",
@@ -141,7 +141,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 
 <template>
   <div v-if="!contract" class="empty">
-    暂无契约
+    {{ $t("contractViewer.empty") }}
   </div>
   <div v-else class="contract-viewer">
     <!-- 契约元信息 -->
@@ -182,11 +182,11 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
       <div v-for="section in sections" :key="section.key" class="condition-section">
         <div class="section-title" :style="{ borderLeftColor: section.color }">
           <span class="section-icon">{{ section.icon }}</span>
-          <span>{{ section.title }}</span>
+          <span>{{ $t(section.titleKey) }}</span>
           <span class="count">{{ contract[section.key].length }}</span>
         </div>
         <div v-if="contract[section.key].length === 0" class="empty-section">
-          （无）
+          {{ $t("contractViewer.emptySection") }}
         </div>
         <div
           v-for="cond in contract[section.key]"
@@ -199,7 +199,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
               class="con-badge"
               :class="{ active: activeTag === cond.id }"
               :style="{ backgroundColor: section.color }"
-              :title="`点击高亮代码中 ${cond.id} 关联行（双向追溯）`"
+              :title="$t('contractViewer.badgeTitle', { tag: cond.id })"
               @click="onConClick(cond.id)"
             >{{ cond.id }}</span>
             <code class="cond-expr">
@@ -222,7 +222,7 @@ const yamlHtml = computed(() => renderYaml(yamlText.value));
 
     <!-- 原始 YAML -->
     <details class="yaml-block">
-      <summary>📄 查看原始 YAML</summary>
+      <summary>{{ $t("contractViewer.yamlView") }}</summary>
       <pre class="yaml-pre" v-html="yamlHtml" />
     </details>
   </div>

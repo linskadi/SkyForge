@@ -16,6 +16,7 @@ import { CanvasRenderer } from "echarts/renderers";
  */
 import { computed, ref } from "vue";
 import VChart from "vue-echarts";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 
 use([
@@ -90,6 +91,7 @@ type WaveformSeries = {
 
 /** ECharts 配置 */
 const option = computed(() => {
+	const { t } = useI18n();
 	const total = props.inputData.length;
 	const xData = Array.from({ length: total }, (_, i) => i);
 
@@ -116,14 +118,14 @@ const option = computed(() => {
 			}
 		: undefined;
 
-	const legendData = ["输入波形", "输出波形"];
+	const legendData = [t("waveform.legendInput"), t("waveform.legendOutput")];
 	if (props.baselineData) {
-		legendData.push("正常基线");
+		legendData.push(t("waveform.legendBaseline"));
 	}
 
 	const seriesList: WaveformSeries[] = [
 		{
-			name: "输入波形",
+			name: t("waveform.legendInput"),
 			type: "line",
 			data: props.inputData,
 			lineStyle: { color: "#0EA5E9", width: 2 },
@@ -146,7 +148,7 @@ const option = computed(() => {
 			animation: false,
 		},
 		{
-			name: "输出波形",
+			name: t("waveform.legendOutput"),
 			type: "line",
 			data: props.outputData,
 			lineStyle: { color: "#22c55e", width: 2 },
@@ -171,7 +173,7 @@ const option = computed(() => {
 
 	if (props.baselineData) {
 		seriesList.push({
-			name: "正常基线",
+			name: t("waveform.legendBaseline"),
 			type: "line",
 			data: props.baselineData,
 			lineStyle: { color: "#94a3b8", width: 2, type: "dashed" },
@@ -202,7 +204,7 @@ const option = computed(() => {
 				if (props.faultRange) {
 					const idx = params[0].dataIndex;
 					if (idx >= props.faultRange.start && idx <= props.faultRange.end) {
-						html += `<div style="color:#f44747;margin-top:4px">⚠ 故障区间</div>`;
+						html += `<div style="color:#f44747;margin-top:4px">⚠ ${t("waveform.legendFault")}</div>`;
 					}
 				}
 				return html;
@@ -226,7 +228,7 @@ const option = computed(() => {
 		xAxis: {
 			type: "category",
 			data: xData,
-			name: "时间步 (step)",
+			name: t("waveform.xAxisName"),
 			nameLocation: "center",
 			nameGap: 28,
 			nameTextStyle: { color: "#6b7280", fontSize: 11 },
@@ -320,32 +322,32 @@ const exportPNG = () => {
       <div class="legend">
         <span class="legend-item">
           <span class="legend-line input" />
-          输入波形
+          {{ $t("waveform.legendInput") }}
         </span>
         <span class="legend-item">
           <span class="legend-line output" />
-          输出波形
+          {{ $t("waveform.legendOutput") }}
         </span>
         <span v-if="baselineData" class="legend-item">
           <span class="legend-line baseline" />
-          正常基线
+          {{ $t("waveform.legendBaseline") }}
         </span>
         <span v-if="faultRange" class="legend-item">
           <span class="legend-line fault" />
-          故障区间
+          {{ $t("waveform.legendFault") }}
         </span>
       </div>
       <div class="toolbar-actions">
-        <Button variant="outline" size="sm" @click="zoomIn" title="放大">
+        <Button variant="outline" size="sm" @click="zoomIn" :title="$t('waveform.zoomIn')">
           <ZoomIn class="w-3.5 h-3.5" />
         </Button>
-        <Button variant="outline" size="sm" @click="zoomOut" title="缩小">
+        <Button variant="outline" size="sm" @click="zoomOut" :title="$t('waveform.zoomOut')">
           <ZoomOut class="w-3.5 h-3.5" />
         </Button>
-        <Button variant="outline" size="sm" @click="resetView" title="重置视图">
+        <Button variant="outline" size="sm" @click="resetView" :title="$t('waveform.resetView')">
           <RotateCcw class="w-3.5 h-3.5" />
         </Button>
-        <Button variant="outline" size="sm" @click="exportPNG" title="导出 PNG">
+        <Button variant="outline" size="sm" @click="exportPNG" :title="$t('waveform.exportPng')">
           <Download class="w-3.5 h-3.5" />
         </Button>
       </div>
@@ -359,7 +361,7 @@ const exportPNG = () => {
     />
     <!-- 操作提示 -->
     <div class="chart-hint">
-      鼠标滚轮缩放 · 拖拽平移 · 悬浮查看数据 · 工具栏可导出 PNG
+      {{ $t("waveform.hint") }}
     </div>
   </div>
 </template>

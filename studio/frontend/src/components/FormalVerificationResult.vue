@@ -9,9 +9,13 @@ import {
 	XCircle,
 } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const { t } = useI18n();
+
 /**
  * FormalVerificationResult 形式化验证结果组件（Task 5.5）
  *
@@ -89,21 +93,21 @@ const statusConfig = computed(() => {
 	const map = {
 		passed: {
 			icon: CheckCircle2,
-			label: "✅ 形式化验证通过",
+			label: t("formalVerify.statusPassed"),
 			color: "#10b981",
 			bg: "linear-gradient(to right, #f0fdf4, #ecfdf5)",
 			border: "#10b981",
 		},
 		failed: {
 			icon: XCircle,
-			label: "❌ 形式化验证失败",
+			label: t("formalVerify.statusFailed"),
 			color: "#dc2626",
 			bg: "linear-gradient(to right, #fef2f2, #fff7ed)",
 			border: "#f59e0b",
 		},
 		skipped: {
 			icon: MinusCircle,
-			label: "⏸ 形式化验证已跳过",
+			label: t("formalVerify.statusSkipped"),
 			color: "#6b7280",
 			bg: "linear-gradient(to right, #f9fafb, #f3f4f6)",
 			border: "#9ca3af",
@@ -145,8 +149,8 @@ const onStart = () => emit("start-verify");
     <Card v-if="loading" class="result-card">
       <CardHeader>
         <CardTitle class="card-title">
-          🔬 形式化验证进行中
-          <span class="title-hint">（Z3 SMT Solver + CBMC 有界模型检查）</span>
+          {{ $t("formalVerify.loadingTitle") }}
+          <span class="title-hint">{{ $t("formalVerify.titleHint") }}</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -163,23 +167,22 @@ const onStart = () => emit("start-verify");
     <Card v-else-if="!result" class="result-card empty-card">
       <CardHeader>
         <CardTitle class="card-title">
-          🔬 形式化验证
-          <span class="title-hint">（Z3 SMT Solver + CBMC 有界模型检查）</span>
+          {{ $t("formalVerify.title") }}
+          <span class="title-hint">{{ $t("formalVerify.titleHint") }}</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div class="empty-state">
           <AlertTriangle class="empty-icon" />
           <p class="empty-text">
-            点击上方按钮开始验证
+            {{ $t("formalVerify.emptyText") }}
           </p>
           <p class="empty-hint">
-            将契约的前置/后置/不变式转换为 Z3 SMT 约束，验证逻辑一致性，
-            并（可选）调用 CBMC 对生成的 C 代码进行有界模型检查。
+            {{ $t("formalVerify.emptyHint") }}
           </p>
           <Button variant="outline" @click="onStart">
             <Play />
-            开始形式化验证
+            {{ $t("formalVerify.startBtn") }}
           </Button>
         </div>
       </CardContent>
@@ -189,8 +192,8 @@ const onStart = () => emit("start-verify");
     <Card v-else class="result-card">
       <CardHeader>
         <CardTitle class="card-title">
-          🔬 形式化验证结果
-          <span class="title-hint">（Z3 SMT Solver + CBMC 有界模型检查）</span>
+          {{ $t("formalVerify.resultTitle") }}
+          <span class="title-hint">{{ $t("formalVerify.titleHint") }}</span>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -209,18 +212,18 @@ const onStart = () => emit("start-verify");
               {{ statusConfig.label }}
             </div>
             <div class="status-meta">
-              Tool: <strong>{{ result.tool }}</strong>
-              · 总耗时: <strong>{{ totalDurationSec }}s</strong>
+              {{ $t("formalVerify.metaTool") }} <strong>{{ result.tool }}</strong>
+              · {{ $t("formalVerify.metaDuration", { seconds: totalDurationSec }) }}
             </div>
           </div>
         </div>
 
         <!-- 统计徽章 -->
         <div class="summary-badges">
-          <span class="badge pass">✓ Passed × {{ result.summary.passed }}</span>
-          <span class="badge fail">✗ Failed × {{ result.summary.failed }}</span>
-          <span class="badge skip">- Skipped × {{ result.summary.skipped }}</span>
-          <span class="badge total">Total × {{ result.summary.total }}</span>
+          <span class="badge pass">{{ $t("formalVerify.badgePassed", { count: result.summary.passed }) }}</span>
+          <span class="badge fail">{{ $t("formalVerify.badgeFailed", { count: result.summary.failed }) }}</span>
+          <span class="badge skip">{{ $t("formalVerify.badgeSkipped", { count: result.summary.skipped }) }}</span>
+          <span class="badge total">{{ $t("formalVerify.badgeTotal", { count: result.summary.total }) }}</span>
         </div>
 
         <!-- 错误信息（如契约文件不存在） -->
@@ -264,7 +267,7 @@ const onStart = () => emit("start-verify");
               class="counter-example"
             >
               <div class="ce-label">
-                {{ check.status === "failed" ? "❌ 反例 (Counter-example):" : "ℹ 说明:" }}
+                {{ check.status === "failed" ? $t("formalVerify.ceFailedLabel") : $t("formalVerify.ceSkippedLabel") }}
               </div>
               <pre class="ce-text">{{ check.counter_example }}</pre>
             </div>
@@ -275,8 +278,7 @@ const onStart = () => emit("start-verify");
         <div class="tool-footer">
           <span class="tool-tag">{{ result.tool }}</span>
           <span class="tool-desc">
-            Z3 SMT Solver 验证约束一致性 · CBMC 执行有界模型检查 ·
-            工具不可用时自动降级为 SKIPPED
+            {{ $t("formalVerify.toolDesc") }}
           </span>
         </div>
       </CardContent>

@@ -8,11 +8,13 @@ import {
 	X,
 } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { getApi } from "@/services/apiSwitcher";
 import type { MisraRule, RuleStandard } from "@/types/domain";
 
 const router = useRouter();
+const { t } = useI18n();
 
 const query = ref<string>("");
 const results = ref<MisraRule[]>([]);
@@ -25,31 +27,46 @@ const standards = ref<RuleStandard[]>([]);
 const currentStandardId = ref<string>("misra_c_2012");
 const standardsLoading = ref<boolean>(false);
 
-// 各规则集的展示配置（placeholder / hint-tags / 标签）
+// 各规则集的展示配置（placeholder / hint-tags / 标签的 i18n key）
 interface StandardDisplayConfig {
-	/** 搜索框 placeholder */
-	placeholder: string;
-	/** 空状态提示语 */
-	emptyHint: string;
-	/** 快捷搜索标签 */
-	hintTags: string[];
+	/** 搜索框 placeholder key */
+	placeholderKey: string;
+	/** 空状态提示语 key */
+	emptyHintKey: string;
+	/** 快捷搜索标签 key 列表 */
+	hintTagKeys: string[];
 }
 
 const STANDARD_DISPLAY_CONFIG: Record<string, StandardDisplayConfig> = {
 	misra_c_2012: {
-		placeholder: "搜索 MISRA-C 规则 ID、标题或描述...",
-		emptyHint: "输入关键词搜索 MISRA-C:2012 规则",
-		hintTags: ["Rule 8.1", "初始化", "指针", "Required"],
+		placeholderKey: "misra.search.placeholderC",
+		emptyHintKey: "misra.search.emptyC",
+		hintTagKeys: [
+			"misra.search.tagRule81",
+			"misra.search.tagInit",
+			"misra.search.tagPointer",
+			"misra.search.tagRequired",
+		],
 	},
 	jsf_av_cpp: {
-		placeholder: "搜索 MISRA-C++ / JSF AV C++ 规则...",
-		emptyHint: "输入关键词搜索 C++ 编码标准规则",
-		hintTags: ["new/delete", "异常", "RAII", "Mandatory"],
+		placeholderKey: "misra.search.placeholderCpp",
+		emptyHintKey: "misra.search.emptyCpp",
+		hintTagKeys: [
+			"misra.search.tagNewDelete",
+			"misra.search.tagException",
+			"misra.search.tagRaii",
+			"misra.search.tagMandatory",
+		],
 	},
 	python_safety: {
-		placeholder: "搜索 Python 军工规范规则...",
-		emptyHint: "输入关键词搜索 Python 军工软件编程规范",
-		hintTags: ["eval", "exec", "global", "强制"],
+		placeholderKey: "misra.search.placeholderPython",
+		emptyHintKey: "misra.search.emptyPython",
+		hintTagKeys: [
+			"misra.search.tagEval",
+			"misra.search.tagExec",
+			"misra.search.tagGlobal",
+			"misra.search.tagForce",
+		],
 	},
 };
 
@@ -65,15 +82,19 @@ const currentDisplayConfig = computed<StandardDisplayConfig>(() => {
 const currentStandardName = computed<string>(() => {
 	const std = standards.value.find((s) => s.id === currentStandardId.value);
 	if (std) {
-		const langLabel =
+		const langLabel = t(
 			std.language === "c"
-				? "C 语言"
+				? "misra.lang.c"
 				: std.language === "cpp"
-					? "C++ 语言"
-					: "Python 语言";
-		return `${std.name} (${langLabel})`;
+					? "misra.lang.cpp"
+					: "misra.lang.python",
+		);
+		return t("misra.standardFormat", { name: std.name, lang: langLabel });
 	}
-	return "MISRA-C:2012 (C 语言)";
+	return t("misra.standardFormat", {
+		name: "MISRA-C:2012",
+		lang: t("misra.lang.c"),
+	});
 });
 
 const categoryColors: Record<
@@ -177,8 +198,8 @@ const onSwitchStandard = (standardId: string) => {
 };
 
 // 点击快捷标签搜索
-const onHintTagClick = (tag: string) => {
-	query.value = tag;
+const onHintTagClick = (tagKey: string) => {
+	query.value = t(tagKey);
 	onSearch();
 };
 
@@ -243,15 +264,15 @@ onMounted(async () => {
     <header class="page-header">
       <div class="title-area">
         <div class="title-row">
-          <button class="back-btn" @click="router.push('/')" title="返回首页">
+          <button class="back-btn" @click="router.push('/')" :title="$t('misra.backHome')">
             <ArrowLeft class="icon" />
           </button>
           <h1 class="page-title">
             <Search class="title-icon" />
-            规则实验室
+            {{ $t("misra.title") }}
           </h1>
         </div>
-        <p class="subtitle">搜索和浏览多种编程语言的编码标准规则</p>
+        <p class="subtitle">{{ $t("misra.subtitle") }}</p>
       </div>
     </header>
 
@@ -277,7 +298,7 @@ onMounted(async () => {
         <input
           v-model="query"
           class="search-input"
-          :placeholder="currentDisplayConfig.placeholder"
+          :placeholder="$t(currentDisplayConfig.placeholderKey)"
           @keydown.enter="onSearch"
         />
         <button v-if="query" class="clear-btn" @click="clearSearch">
@@ -285,35 +306,35 @@ onMounted(async () => {
         </button>
       </div>
       <button class="search-btn" :disabled="!query.trim() || loading" @click="onSearch">
-        {{ loading ? '搜索中...' : '搜索' }}
+        {{ loading ? $t('misra.search.searching') : $t('misra.search.search') }}
       </button>
     </div>
 
     <div v-if="!searched" class="empty-state">
       <Search class="w-12 h-12 text-muted-foreground/40" />
-      <p class="text-muted-foreground">{{ currentDisplayConfig.emptyHint }}</p>
+      <p class="text-muted-foreground">{{ $t(currentDisplayConfig.emptyHintKey) }}</p>
       <div class="hint-tags">
         <span
-          v-for="tag in currentDisplayConfig.hintTags"
-          :key="tag"
+          v-for="tagKey in currentDisplayConfig.hintTagKeys"
+          :key="tagKey"
           class="hint-tag"
-          @click="onHintTagClick(tag)"
-        >{{ tag }}</span>
+          @click="onHintTagClick(tagKey)"
+        >{{ $t(tagKey) }}</span>
       </div>
     </div>
 
     <div v-else-if="loading" class="loading-state">
       <div class="loading-spinner" />
-      <p>正在搜索...</p>
+      <p>{{ $t("misra.search.loading") }}</p>
     </div>
 
     <div v-else-if="results.length === 0" class="empty-state">
       <Search class="w-12 h-12 text-muted-foreground/40" />
-      <p class="text-muted-foreground">未找到匹配的规则</p>
+      <p class="text-muted-foreground">{{ $t("misra.search.noResults") }}</p>
     </div>
 
     <div v-else class="results-list">
-      <div class="results-count">找到 {{ results.length }} 条规则</div>
+      <div class="results-count">{{ $t("misra.results.count", { count: results.length }) }}</div>
       <div v-for="rule in results" :key="rule.rule_id" class="rule-card" @click="toggleExpand(rule.rule_id)">
         <div class="rule-header">
           <div class="rule-id-badge">{{ rule.rule_id }}</div>
@@ -328,11 +349,11 @@ onMounted(async () => {
 
         <div v-if="expandedRule === rule.rule_id" class="rule-detail" @click.stop>
           <div v-if="rule.bad_example" class="example-block bad">
-            <div class="example-label">违规示例</div>
+            <div class="example-label">{{ $t("misra.results.badExample") }}</div>
             <pre class="example-code">{{ rule.bad_example }}</pre>
           </div>
           <div v-if="rule.good_example" class="example-block good">
-            <div class="example-label">合规示例</div>
+            <div class="example-label">{{ $t("misra.results.goodExample") }}</div>
             <pre class="example-code">{{ rule.good_example }}</pre>
           </div>
         </div>

@@ -35,6 +35,7 @@ import {
  * 点击"注入故障"后依次叠加所有选中的故障。
  */
 import { computed, reactive } from "vue";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -94,121 +95,132 @@ const enabledCount = computed(
 			.length,
 );
 
+/** 分组显示标签（渲染时 $t） */
+const groupLabels: Record<string, string> = {
+	sensor: "faultInject.group.sensor",
+	signal: "faultInject.group.signalQuality",
+	comm: "faultInject.group.commTiming",
+	degradation: "faultInject.group.degradation",
+};
+
 /** 故障类型配置列表 */
-const faultConfigs = computed(() => [
-	// ===== 基础故障 =====
-	{
-		type: "bias" as ExtFaultType,
-		icon: Gauge,
-		title: "传感器偏置",
-		enTitle: "Bias",
-		desc: "输入叠加固定偏置值，模拟传感器零点漂移",
-		color: "#0EA5E9",
-		group: "传感器",
-	},
-	{
-		type: "signal_loss" as ExtFaultType,
-		icon: SignalZero,
-		title: "信号丢失",
-		enTitle: "Signal Loss",
-		desc: "指定区间内输入强制为 0，模拟断线/开路",
-		color: "#ea580c",
-		group: "传感器",
-	},
-	{
-		type: "noise" as ExtFaultType,
-		icon: Waves,
-		title: "高频噪声",
-		enTitle: "Noise",
-		desc: "输入叠加随机噪声，模拟电磁干扰 (EMI)",
-		color: "#8B5CF6",
-		group: "信号质量",
-	},
-	{
-		type: "stuck" as ExtFaultType,
-		icon: Lock,
-		title: "卡死故障",
-		enTitle: "Stuck-at",
-		desc: "输入卡在固定值，模拟传感器机械卡死",
-		color: "#dc2626",
-		group: "传感器",
-	},
-	{
-		type: "step" as ExtFaultType,
-		icon: TrendingUp,
-		title: "阶跃突变",
-		enTitle: "Step Change",
-		desc: "指定时间步输入突变，模拟工况快速切换",
-		color: "#0891b2",
-		group: "信号质量",
-	},
-	// ===== 信号质量故障 =====
-	{
-		type: "saturation" as ExtFaultType,
-		icon: ArrowUpDown,
-		title: "饱和截断",
-		enTitle: "Saturation",
-		desc: "超出上下限的值被截断，模拟 ADC 量程限幅",
-		color: "#b45309",
-		group: "信号质量",
-	},
-	{
-		type: "glitch" as ExtFaultType,
-		icon: Siren,
-		title: "跳变毛刺",
-		enTitle: "Glitch",
-		desc: "随机时刻出现瞬时尖峰脉冲，模拟闩锁效应",
-		color: "#e11d48",
-		group: "信号质量",
-	},
-	// ===== 通信/时序故障 =====
-	{
-		type: "intermittent" as ExtFaultType,
-		icon: ToggleLeft,
-		title: "间歇性故障",
-		enTitle: "Intermittent",
-		desc: "周期性输出正常/异常值，模拟接触不良",
-		color: "#059669",
-		group: "通信时序",
-	},
-	{
-		type: "timeout" as ExtFaultType,
-		icon: Clock,
-		title: "丢帧 / 延迟",
-		enTitle: "Timeout",
-		desc: "指定时间点后信号冻结，模拟总线超时丢帧",
-		color: "#7c2d12",
-		group: "通信时序",
-	},
-	// ===== 偏移/退化故障 =====
-	{
-		type: "drift" as ExtFaultType,
-		icon: AlertTriangle,
-		title: "渐变漂移",
-		enTitle: "Drift",
-		desc: "信号随时间线性偏移，模拟元器件老化退化",
-		color: "#9333ea",
-		group: "退化",
-	},
-	{
-		type: "stuck_zero" as ExtFaultType,
-		icon: CircleDot,
-		title: "零输出",
-		enTitle: "Stuck-at-Zero",
-		desc: "指定时间点后输出恒为 0，模拟传感器完全失效",
-		color: "#64748b",
-		group: "退化",
-	},
-	{
-		type: "polarity" as ExtFaultType,
-		icon: ToggleLeft,
-		title: "符号反转",
-		enTitle: "Polarity Reversal",
-		desc: "信号取反，模拟线缆接反或极性错误",
-		color: "#0d9488",
-		group: "退化",
-	},
-]);
+const faultConfigs = computed(() => {
+	const { t } = useI18n();
+	return [
+		// ===== 基础故障 =====
+		{
+			type: "bias" as ExtFaultType,
+			icon: Gauge,
+			title: t("faultInject.type.bias.name"),
+			enTitle: t("faultInject.type.bias.enName"),
+			desc: t("faultInject.type.bias.desc"),
+			color: "#0EA5E9",
+			group: "sensor",
+		},
+		{
+			type: "signal_loss" as ExtFaultType,
+			icon: SignalZero,
+			title: t("faultInject.type.signal_loss.name"),
+			enTitle: t("faultInject.type.signal_loss.enName"),
+			desc: t("faultInject.type.signal_loss.desc"),
+			color: "#ea580c",
+			group: "sensor",
+		},
+		{
+			type: "noise" as ExtFaultType,
+			icon: Waves,
+			title: t("faultInject.type.noise.name"),
+			enTitle: t("faultInject.type.noise.enName"),
+			desc: t("faultInject.type.noise.desc"),
+			color: "#8B5CF6",
+			group: "signal",
+		},
+		{
+			type: "stuck" as ExtFaultType,
+			icon: Lock,
+			title: t("faultInject.type.stuck.name"),
+			enTitle: t("faultInject.type.stuck.enName"),
+			desc: t("faultInject.type.stuck.desc"),
+			color: "#dc2626",
+			group: "sensor",
+		},
+		{
+			type: "step" as ExtFaultType,
+			icon: TrendingUp,
+			title: t("faultInject.type.step.name"),
+			enTitle: t("faultInject.type.step.enName"),
+			desc: t("faultInject.type.step.desc"),
+			color: "#0891b2",
+			group: "signal",
+		},
+		// ===== 信号质量故障 =====
+		{
+			type: "saturation" as ExtFaultType,
+			icon: ArrowUpDown,
+			title: t("faultInject.type.saturation.name"),
+			enTitle: t("faultInject.type.saturation.enName"),
+			desc: t("faultInject.type.saturation.desc"),
+			color: "#b45309",
+			group: "signal",
+		},
+		{
+			type: "glitch" as ExtFaultType,
+			icon: Siren,
+			title: t("faultInject.type.glitch.name"),
+			enTitle: t("faultInject.type.glitch.enName"),
+			desc: t("faultInject.type.glitch.desc"),
+			color: "#e11d48",
+			group: "signal",
+		},
+		// ===== 通信/时序故障 =====
+		{
+			type: "intermittent" as ExtFaultType,
+			icon: ToggleLeft,
+			title: t("faultInject.type.intermittent.name"),
+			enTitle: t("faultInject.type.intermittent.enName"),
+			desc: t("faultInject.type.intermittent.desc"),
+			color: "#059669",
+			group: "comm",
+		},
+		{
+			type: "timeout" as ExtFaultType,
+			icon: Clock,
+			title: t("faultInject.type.timeout.name"),
+			enTitle: t("faultInject.type.timeout.enName"),
+			desc: t("faultInject.type.timeout.desc"),
+			color: "#7c2d12",
+			group: "comm",
+		},
+		// ===== 偏移/退化故障 =====
+		{
+			type: "drift" as ExtFaultType,
+			icon: AlertTriangle,
+			title: t("faultInject.type.drift.name"),
+			enTitle: t("faultInject.type.drift.enName"),
+			desc: t("faultInject.type.drift.desc"),
+			color: "#9333ea",
+			group: "degradation",
+		},
+		{
+			type: "stuck_zero" as ExtFaultType,
+			icon: CircleDot,
+			title: t("faultInject.type.stuck_zero.name"),
+			enTitle: t("faultInject.type.stuck_zero.enName"),
+			desc: t("faultInject.type.stuck_zero.desc"),
+			color: "#64748b",
+			group: "degradation",
+		},
+		{
+			type: "polarity" as ExtFaultType,
+			icon: ToggleLeft,
+			title: t("faultInject.type.polarity.name"),
+			enTitle: t("faultInject.type.polarity.enName"),
+			desc: t("faultInject.type.polarity.desc"),
+			color: "#0d9488",
+			group: "degradation",
+		},
+	];
+});
 
 /** 按分组排列 */
 const groupedFaults = computed(() => {
@@ -260,12 +272,12 @@ const onReset = () => {
 <template>
   <Card class="fault-panel">
     <CardHeader>
-      <CardTitle class="panel-title">🎛️ 故障注入面板</CardTitle>
+      <CardTitle class="panel-title">{{ $t("faultInject.title") }}</CardTitle>
     </CardHeader>
     <CardContent>
       <!-- 按分组显示故障卡片 -->
       <div v-for="(items, group) in groupedFaults" :key="group" class="fault-group">
-        <div class="group-label">{{ group }}</div>
+        <div class="group-label">{{ $t(groupLabels[group] ?? group) }}</div>
         <div class="fault-grid">
           <div
             v-for="cfg in items"
@@ -295,7 +307,7 @@ const onReset = () => {
               <!-- Bias -->
               <template v-if="cfg.type === 'bias'">
                 <div class="param-row">
-                  <Label class="param-label">偏置值</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.biasValue") }}</Label>
                   <input type="range" class="param-slider" min="1000" max="50000" step="1000"
                     v-model.number="faults.bias.params.bias_value" :style="{ accentColor: cfg.color }" />
                   <span class="param-value">+{{ faults.bias.params.bias_value }}</span>
@@ -305,17 +317,17 @@ const onReset = () => {
               <!-- Signal Loss -->
               <template v-else-if="cfg.type === 'signal_loss'">
                 <div class="param-row">
-                  <Label class="param-label">持续时间</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.duration") }}</Label>
                   <input type="range" class="param-slider" min="5" max="100" step="5"
                     v-model.number="faults.signal_loss.params.loss_duration" :style="{ accentColor: cfg.color }" />
-                  <span class="param-value">{{ faults.signal_loss.params.loss_duration }} 步</span>
+                  <span class="param-value">{{ $t("faultInject.unit.steps", { count: faults.signal_loss.params.loss_duration }) }}</span>
                 </div>
               </template>
 
               <!-- Noise -->
               <template v-else-if="cfg.type === 'noise'">
                 <div class="param-row">
-                  <Label class="param-label">噪声幅度</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.noiseAmplitude") }}</Label>
                   <input type="range" class="param-slider" min="500" max="15000" step="500"
                     v-model.number="faults.noise.params.noise_amplitude" :style="{ accentColor: cfg.color }" />
                   <span class="param-value">±{{ faults.noise.params.noise_amplitude }}</span>
@@ -325,7 +337,7 @@ const onReset = () => {
               <!-- Stuck -->
               <template v-else-if="cfg.type === 'stuck'">
                 <div class="param-row">
-                  <Label class="param-label">卡死值</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.stuckValue") }}</Label>
                   <Input type="number" class="param-input" min="0" max="65535"
                     v-model.number="faults.stuck.params.stuck_value" />
                   <span class="param-value">uint16</span>
@@ -335,13 +347,13 @@ const onReset = () => {
               <!-- Step -->
               <template v-else-if="cfg.type === 'step'">
                 <div class="param-row">
-                  <Label class="param-label">突变时间步</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.stepTime") }}</Label>
                   <Input type="number" class="param-input" min="0" max="199"
                     v-model.number="faults.step.params.step_time" />
                   <span class="param-value">step</span>
                 </div>
                 <div class="param-row">
-                  <Label class="param-label">突变值</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.stepValue") }}</Label>
                   <Input type="number" class="param-input" min="0" max="65535"
                     v-model.number="faults.step.params.step_value" />
                   <span class="param-value">uint16</span>
@@ -351,13 +363,13 @@ const onReset = () => {
               <!-- Saturation -->
               <template v-else-if="cfg.type === 'saturation'">
                 <div class="param-row">
-                  <Label class="param-label">上限</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.upperLimit") }}</Label>
                   <Input type="number" class="param-input" min="0" max="65535"
                     v-model.number="faults.saturation.params.upper_limit" />
                   <span class="param-value">uint16</span>
                 </div>
                 <div class="param-row">
-                  <Label class="param-label">下限</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.lowerLimit") }}</Label>
                   <Input type="number" class="param-input" min="0" max="65535"
                     v-model.number="faults.saturation.params.lower_limit" />
                   <span class="param-value">uint16</span>
@@ -367,49 +379,49 @@ const onReset = () => {
               <!-- Intermittent -->
               <template v-else-if="cfg.type === 'intermittent'">
                 <div class="param-row">
-                  <Label class="param-label">故障周期</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.interval") }}</Label>
                   <input type="range" class="param-slider" min="5" max="60" step="5"
                     v-model.number="faults.intermittent.params.interval" :style="{ accentColor: cfg.color }" />
-                  <span class="param-value">{{ faults.intermittent.params.interval }} 步</span>
+                  <span class="param-value">{{ $t("faultInject.unit.steps", { count: faults.intermittent.params.interval }) }}</span>
                 </div>
                 <div class="param-row">
-                  <Label class="param-label">故障持续</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.faultDuration") }}</Label>
                   <input type="range" class="param-slider" min="1" max="20" step="1"
                     v-model.number="faults.intermittent.params.duration" :style="{ accentColor: cfg.color }" />
-                  <span class="param-value">{{ faults.intermittent.params.duration }} 步</span>
+                  <span class="param-value">{{ $t("faultInject.unit.steps", { count: faults.intermittent.params.duration }) }}</span>
                 </div>
               </template>
 
               <!-- Drift -->
               <template v-else-if="cfg.type === 'drift'">
                 <div class="param-row">
-                  <Label class="param-label">漂移速率</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.driftRate") }}</Label>
                   <input type="range" class="param-slider" min="100" max="3000" step="100"
                     v-model.number="faults.drift.params.drift_rate" :style="{ accentColor: cfg.color }" />
-                  <span class="param-value">+{{ faults.drift.params.drift_rate }}/步</span>
+                  <span class="param-value">{{ $t("faultInject.unit.perStep", { count: faults.drift.params.drift_rate }) }}</span>
                 </div>
               </template>
 
               <!-- Timeout -->
               <template v-else-if="cfg.type === 'timeout'">
                 <div class="param-row">
-                  <Label class="param-label">冻结起始步</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.freezeStart") }}</Label>
                   <input type="range" class="param-slider" min="10" max="190" step="10"
                     v-model.number="faults.timeout.params.timeout_start" :style="{ accentColor: cfg.color }" />
-                  <span class="param-value">step {{ faults.timeout.params.timeout_start }}</span>
+                  <span class="param-value">{{ $t("faultInject.unit.step", { step: faults.timeout.params.timeout_start }) }}</span>
                 </div>
               </template>
 
               <!-- Glitch -->
               <template v-else-if="cfg.type === 'glitch'">
                 <div class="param-row">
-                  <Label class="param-label">毛刺幅度</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.glitchMagnitude") }}</Label>
                   <input type="range" class="param-slider" min="5000" max="60000" step="1000"
                     v-model.number="faults.glitch.params.glitch_magnitude" :style="{ accentColor: cfg.color }" />
                   <span class="param-value">±{{ faults.glitch.params.glitch_magnitude }}</span>
                 </div>
                 <div class="param-row">
-                  <Label class="param-label">毛刺次数</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.glitchCount") }}</Label>
                   <input type="range" class="param-slider" min="1" max="20" step="1"
                     v-model.number="faults.glitch.params.glitch_count" :style="{ accentColor: cfg.color }" />
                   <span class="param-value">×{{ faults.glitch.params.glitch_count }}</span>
@@ -419,16 +431,16 @@ const onReset = () => {
               <!-- Stuck-at-Zero -->
               <template v-else-if="cfg.type === 'stuck_zero'">
                 <div class="param-row">
-                  <Label class="param-label">失效起始步</Label>
+                  <Label class="param-label">{{ $t("faultInject.param.failureStart") }}</Label>
                   <input type="range" class="param-slider" min="10" max="190" step="10"
                     v-model.number="faults.stuck_zero.params.stuck_start" :style="{ accentColor: cfg.color }" />
-                  <span class="param-value">step {{ faults.stuck_zero.params.stuck_start }}</span>
+                  <span class="param-value">{{ $t("faultInject.unit.step", { step: faults.stuck_zero.params.stuck_start }) }}</span>
                 </div>
               </template>
 
               <!-- Polarity — 无参数 -->
               <template v-else-if="cfg.type === 'polarity'">
-                <div class="no-params">启用后信号自动取反（× -1）</div>
+                <div class="no-params">{{ $t("faultInject.noParams") }}</div>
               </template>
             </div>
           </div>
@@ -439,18 +451,18 @@ const onReset = () => {
       <div class="action-bar">
         <Button :disabled="enabledCount === 0" @click="onInject">
           <Zap class="w-4 h-4" />
-          注入故障
+          {{ $t("faultInject.inject") }}
           <span v-if="enabledCount > 1" class="inject-count">×{{ enabledCount }}</span>
         </Button>
         <Button variant="outline" @click="onReset">
           <RotateCcw class="w-4 h-4" />
-          重置参数
+          {{ $t("faultInject.reset") }}
         </Button>
         <span v-if="enabledCount > 0" class="hint-text">
-          已选择 {{ enabledCount }} 种故障
+          {{ $t("faultInject.selectedCount", { count: enabledCount }) }}
         </span>
         <span v-else class="hint-text">
-          可同时选择多种故障类型
+          {{ $t("faultInject.multiHint") }}
         </span>
       </div>
     </CardContent>

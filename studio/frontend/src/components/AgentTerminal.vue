@@ -418,18 +418,18 @@ onBeforeUnmount(() => {
         <span class="light green" />
       </div>
       <div class="terminal-title">
-        SkyForge Agent Console
+        {{ $t("agentTerminal.title") }}
       </div>
       <div class="header-actions">
         <span v-if="useMock" class="mock-badge">MOCK</span>
-        <button class="clear-btn" type="button" title="清空日志" @click="clearLogs">清空</button>
+        <button class="clear-btn" type="button" :title="$t('agentTerminal.clearTitle')" @click="clearLogs">{{ $t("agentTerminal.clear") }}</button>
       </div>
     </div>
 
     <!-- 终端日志主体（虚拟滚动） -->
     <div ref="logContainerRef" class="terminal-body">
       <div v-if="!logs.length" class="empty-hint">
-        等待 Agent 思考日志流入...
+        {{ $t("agentTerminal.empty") }}
       </div>
       <div
         :style="{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }"

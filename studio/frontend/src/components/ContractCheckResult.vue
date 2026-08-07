@@ -77,10 +77,10 @@ const sectionIcon = (key: string): string => {
         />
         <div class="overview-text">
           <div class="overview-title">
-            {{ result.overall_passed ? "✅ 契约校验通过" : "❌ 契约校验未通过" }}
+            {{ result.overall_passed ? $t("contractCheck.overviewPassed") : $t("contractCheck.overviewFailed") }}
           </div>
           <div class="overview-sub">
-            组件：{{ result.component }}
+            {{ $t("contractCheck.componentLabel", { component: result.component }) }}
           </div>
         </div>
       </div>
@@ -89,7 +89,7 @@ const sectionIcon = (key: string): string => {
           {{ passRate }}
         </div>
         <div class="pass-label">
-          通过率
+          {{ $t("contractCheck.passRate") }}
         </div>
         <div class="pass-bar">
           <div class="pass-bar-fill" :style="{ width: passPercent + '%' }" />
@@ -141,7 +141,7 @@ const sectionIcon = (key: string): string => {
           </div>
           <div v-if="!item.passed && expandedFailures.has(item.id)" class="failure-reason">
             <div class="reason-label">
-              ❌ 失败原因：
+              {{ $t("contractCheck.failureReason") }}
             </div>
             <div class="reason-text">
               {{ item.failure_reason }}
@@ -160,7 +160,7 @@ const sectionIcon = (key: string): string => {
       <div class="code-header" @click="showAssertCode = !showAssertCode">
         <Code2 class="code-icon" />
         <span class="code-title">
-          自动生成的 assert 代码（注入 test_harness.c）
+          {{ $t("contractCheck.generatedCode") }}
         </span>
         <component
           :is="showAssertCode ? ChevronDown : ChevronRight"

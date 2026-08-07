@@ -37,10 +37,32 @@ export const useTaskHistoryStore = defineStore("taskHistory", () => {
 		saveHistory(history.value);
 	}
 
+	function addTask(id: string, profile: "cloud" | "local") {
+		const existing = history.value.find((e) => e.id === id);
+		if (existing) return;
+		history.value.push({
+			id,
+			timestamp: Date.now(),
+			profile,
+			code: "",
+		});
+		saveHistory(history.value);
+	}
+
+	function updateTask(id: string) {
+		const entry = history.value.find((e) => e.id === id);
+		if (entry) {
+			entry.timestamp = Date.now();
+			saveHistory(history.value);
+		}
+	}
+
 	return {
 		history,
 		sortedHistory,
 		addEntry,
 		clearHistory,
+		addTask,
+		updateTask,
 	};
 });

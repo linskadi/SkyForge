@@ -14,6 +14,7 @@
  *    mock / real 切换由 apiSwitcher 统一根据 executionStore.profileId 路由。
  */
 
+import { i18n } from "@/i18n";
 import type { LLMMode } from "@/stores/providerStore";
 import type {
 	CompatibilityResult,
@@ -48,6 +49,19 @@ import { API_BASE_URL, getJSON, postJSON, request } from "./client";
 type RawResponse = any;
 
 /**
+ * 翻译 data 层标签：键可解析时返回译文，
+ * 键缺失（t 返回键路径本身）时回退到调用方提供的默认字符串。
+ */
+function dataT(
+	key: string,
+	fallback: string,
+	params?: Record<string, unknown>,
+): string {
+	const resolved = i18n.global.t(key, params ?? {});
+	return resolved === key ? fallback : resolved;
+}
+
+/**
  * LLM 长耗时操作超时（毫秒）
  *
  * 本地 LLM（如 qwen3:8b）生成代码需要 60-180s，使用默认 30s 会触发
@@ -80,22 +94,22 @@ function transformContractCheckResult(
 	// 扁平结构（真实 API）→ 转换为嵌套
 	const sections = [
 		{
-			title: "前置条件",
+			title: "data.contract.preconditions",
 			key: "preconditions" as const,
 			items: raw?.preconditions ?? [],
 		},
 		{
-			title: "后置条件",
+			title: "data.contract.postconditions",
 			key: "postconditions" as const,
 			items: raw?.postconditions ?? [],
 		},
 		{
-			title: "不变式",
+			title: "data.contract.invariants",
 			key: "invariants" as const,
 			items: raw?.invariants ?? [],
 		},
 		{
-			title: "故障处理",
+			title: "data.contract.faultHandling",
 			key: "fault_handling" as const,
 			items: raw?.fault_handling ?? [],
 		},
@@ -339,7 +353,7 @@ function transformCompatibilityResponse(
 				: [
 						{
 							id: "COMPAT-001",
-							check: "兼容性检查",
+							check: "data.compat.defaultCheck",
 							passed: raw.compatible ?? raw.overall_compatible ?? true,
 						},
 					],
@@ -356,8 +370,21 @@ function transformPendingResponse(raw: RawResponse): HITLApproval[] {
 	return raw.pending ?? raw ?? [];
 }
 
-/** HITL 检查点中文名映射（与 HITLPanel.vue checkpointIconMap 对齐） */
+/**
+ * HITL 检查点名称映射（与 HITLPanel.vue checkpointIconMap 对齐）。
+ *
+ * 值为 i18n 键 `data.checkpoint.<id>`；消费侧通过 `dataT` 翻译，
+ * 键缺失时回退到 `HITL_CHECKPOINT_NAMES_ZH` 中的原始中文名。
+ */
 const HITL_CHECKPOINT_NAMES: Record<HITLCheckpointType, string> = {
+	requirement_review: "data.checkpoint.requirement_review",
+	contract_review: "data.checkpoint.contract_review",
+	code_review: "data.checkpoint.code_review",
+	final_review: "data.checkpoint.final_review",
+};
+
+/** HITL 检查点的原始中文名，作为 i18n 键无法解析时的回退值。 */
+const HITL_CHECKPOINT_NAMES_ZH: Record<HITLCheckpointType, string> = {
 	requirement_review: "需求审查",
 	contract_review: "契约审查",
 	code_review: "代码审查",
@@ -383,8 +410,11 @@ function transformHITLHistoryResponse(raw: RawResponse): HITLHistoryItem[] {
 		return {
 			request_id: item.request_id ?? "",
 			checkpoint,
-			checkpoint_name:
-				HITL_CHECKPOINT_NAMES[checkpoint] ?? item.checkpoint ?? "",
+			checkpoint_name: dataT(
+				HITL_CHECKPOINT_NAMES[checkpoint],
+				HITL_CHECKPOINT_NAMES_ZH[checkpoint] ?? item.checkpoint ?? "",
+				{},
+			),
 			content_preview: "",
 			submitted_at: 0,
 			deadline: 0,
@@ -412,13 +442,13 @@ function transformReportResponse(raw: RawResponse): ReportResult {
 		report_id: `DO178C-REPORT-${Date.now()}`,
 		html: raw.report_html ?? raw.html ?? "",
 		summary: {
-			title: "DO-178C 报告",
+			title: dataT("data.report.titlePlain", "DO-178C 报告"),
 			generated_at: Date.now(),
 			traceability_entries: matrix.length,
 			total_objectives: totalObj,
 			passed_objectives: passedObj,
 			pass_rate: totalObj > 0 ? passedObj / totalObj : 0,
-			simulation_summary: "详见报告内容",
+			simulation_summary: dataT("data.report.summarySeeReport", "详见报告内容"),
 			misra_violations: 0,
 		},
 	};

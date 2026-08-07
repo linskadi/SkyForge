@@ -6,12 +6,9 @@ import {
 	BookOpen,
 	CheckCircle2,
 	ChevronDown,
-	ChevronUp,
-	Code2,
 	Cog,
 	FileCode,
 	FileText,
-	FlaskConical,
 	Gauge,
 	Layers,
 	PlayCircle,
@@ -21,7 +18,9 @@ import {
 	Terminal,
 	Wrench,
 } from "@lucide/vue";
+import type { Component } from "vue";
 import { onMounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,6 +33,8 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const { t } = useI18n();
+
 const isMounted = ref(false);
 onMounted(() => {
 	isMounted.value = true;
@@ -41,9 +42,9 @@ onMounted(() => {
 
 interface LayerCard {
 	level: string;
-	nameZh: string;
+	nameKey: string;
 	nameEn: string;
-	responsibility: string;
+	responsibilityKey: string;
 	entry: string;
 	gradient: string;
 	borderGradient: string;
@@ -56,9 +57,9 @@ const router = useRouter();
 const layers: LayerCard[] = [
 	{
 		level: "L5",
-		nameZh: "编排层",
+		nameKey: "architecture.layers.orchestration.title",
 		nameEn: "Orchestration",
-		responsibility: "串联各层职责，调度 pipeline 全流程并生成可信证据包。",
+		responsibilityKey: "architecture.layers.orchestration.responsibility",
 		entry: "pipeline.py",
 		gradient: "#f8fafc",
 		borderGradient: "linear-gradient(135deg, #0b3555 0%, #1a8bdd 100%)",
@@ -67,10 +68,9 @@ const layers: LayerCard[] = [
 	},
 	{
 		level: "L4",
-		nameZh: "Agent 策略层",
+		nameKey: "architecture.layers.agentStrategy.title",
 		nameEn: "Agent Strategy",
-		responsibility:
-			"多 Agent 负责需求解析、LLR / 契约 / 代码生成、修复与 MISRA 适配。",
+		responsibilityKey: "architecture.layers.agentStrategy.responsibility",
 		entry: "agents/code_generator.py",
 		gradient: "#f8fafc",
 		borderGradient: "linear-gradient(135deg, #0c4470 0%, #1a8bdd 100%)",
@@ -85,10 +85,9 @@ const layers: LayerCard[] = [
 	},
 	{
 		level: "L3",
-		nameZh: "验证工具链层",
+		nameKey: "architecture.layers.verifierChain.title",
 		nameEn: "Verifier Chain",
-		responsibility:
-			"Z3 / CBMC / Cppcheck / GCC 等形式化与静态分析工具的可插拔链。",
+		responsibilityKey: "architecture.layers.verifierChain.responsibility",
 		entry: "tools/z3_verifier.py",
 		gradient: "#f8fafc",
 		borderGradient: "linear-gradient(135deg, #0e5a91 0%, #1a8bdd 100%)",
@@ -103,10 +102,9 @@ const layers: LayerCard[] = [
 	},
 	{
 		level: "L2",
-		nameZh: "仿真验证层（SIL/PIL/HIL）",
+		nameKey: "architecture.layers.simulation.title",
 		nameEn: "Simulation & Verification",
-		responsibility:
-			"覆盖纯软件仿真（SIL）、QEMU 处理器仿真（PIL）与真实硬件在环（HIL），支持故障注入与 ARINC 653 分区调度。",
+		responsibilityKey: "architecture.layers.simulation.responsibility",
 		entry: "digital_twin/simulation_engine.py",
 		gradient: "#f8fafc",
 		borderGradient: "linear-gradient(135deg, #1170b3 0%, #1a8bdd 100%)",
@@ -121,10 +119,9 @@ const layers: LayerCard[] = [
 	},
 	{
 		level: "L1",
-		nameZh: "LLM 客户端层",
+		nameKey: "architecture.layers.llmClient.title",
 		nameEn: "LLM Client",
-		responsibility:
-			"统一 LLM 接口：Mock / 云 API / 本地 OpenAI 兼容客户端与路由。",
+		responsibilityKey: "architecture.layers.llmClient.responsibility",
 		entry: "llm/router.py",
 		gradient: "#f8fafc",
 		borderGradient: "linear-gradient(135deg, #1170b3 0%, #30b5f4 100%)",
@@ -139,9 +136,9 @@ const layers: LayerCard[] = [
 	},
 	{
 		level: "L0",
-		nameZh: "基础设施协议层",
+		nameKey: "architecture.layers.protocols.title",
 		nameEn: "Protocols",
-		responsibility: "协议 / 抽象基类 / 模式守卫与执行契约，定义上层交互面。",
+		responsibilityKey: "architecture.layers.protocols.responsibility",
 		entry: "core/protocols.py",
 		gradient: "#f8fafc",
 		borderGradient: "linear-gradient(135deg, #1a8bdd 0%, #63d4ff 100%)",
@@ -164,10 +161,10 @@ function toggleLayer(level: string) {
 
 interface PipelineStage {
 	id: number;
-	nameZh: string;
+	nameKey: string;
 	nameEn: string;
-	input: string;
-	output: string;
+	inputKey: string;
+	outputKey: string;
 	agents: string[];
 	tools: string[];
 }
@@ -175,194 +172,195 @@ interface PipelineStage {
 const pipelineStages: PipelineStage[] = [
 	{
 		id: 1,
-		nameZh: "需求接收",
+		nameKey: "architecture.pipeline.stages.reception.name",
 		nameEn: "Requirement Reception",
-		input: "用户自然语言需求 / SCADE Lustre 模型",
-		output: "标准化需求文档",
+		inputKey: "architecture.pipeline.stages.reception.input",
+		outputKey: "architecture.pipeline.stages.reception.output",
 		agents: ["requirement_parser"],
-		tools: ["SCADE 解析器"],
+		tools: ["architecture.pipeline.tools.scadeParser"],
 	},
 	{
 		id: 2,
-		nameZh: "需求解析",
+		nameKey: "architecture.pipeline.stages.parsing.name",
 		nameEn: "Requirement Parsing",
-		input: "标准化需求文档",
-		output: "结构化 HLR / LLR 需求",
+		inputKey: "architecture.pipeline.stages.parsing.input",
+		outputKey: "architecture.pipeline.stages.parsing.output",
 		agents: ["requirement_parser", "llr_generator"],
-		tools: ["RAG 知识库"],
+		tools: ["architecture.pipeline.tools.ragKnowledge"],
 	},
 	{
 		id: 3,
-		nameZh: "架构设计",
+		nameKey: "architecture.pipeline.stages.design.name",
 		nameEn: "Architecture Design",
-		input: "结构化需求",
-		output: "模块架构图与接口定义",
+		inputKey: "architecture.pipeline.stages.design.input",
+		outputKey: "architecture.pipeline.stages.design.output",
 		agents: ["architecture_designer"],
-		tools: ["组合验证器"],
+		tools: ["architecture.pipeline.tools.comboVerifier"],
 	},
 	{
 		id: 4,
-		nameZh: "契约生成",
+		nameKey: "architecture.pipeline.stages.contracts.name",
 		nameEn: "Contract Generation",
-		input: "架构设计 + 需求",
-		output: "YAML 契约文件（前置/后置/不变式）",
+		inputKey: "architecture.pipeline.stages.contracts.input",
+		outputKey: "architecture.pipeline.stages.contracts.output",
 		agents: ["contract_generator"],
 		tools: ["Z3 SMT"],
 	},
 	{
 		id: 5,
-		nameZh: "代码生成",
+		nameKey: "architecture.pipeline.stages.codegen.name",
 		nameEn: "Code Generation",
-		input: "契约 + 架构",
-		output: "C/C++/Python 源代码",
+		inputKey: "architecture.pipeline.stages.codegen.input",
+		outputKey: "architecture.pipeline.stages.codegen.output",
 		agents: ["code_generator", "code_generator_multi"],
-		tools: ["MISRA 规则库"],
+		tools: ["architecture.pipeline.tools.misraRuleLibrary"],
 	},
 	{
 		id: 6,
-		nameZh: "MISRA 适配",
+		nameKey: "architecture.pipeline.stages.misra.name",
 		nameEn: "MISRA Adaptation",
-		input: "生成的源代码",
-		output: "符合编码标准的代码",
+		inputKey: "architecture.pipeline.stages.misra.input",
+		outputKey: "architecture.pipeline.stages.misra.output",
 		agents: ["misra_fixes", "misra_cpp_fixes", "python_fixes"],
 		tools: ["Cppcheck", "MISRA addon"],
 	},
 	{
 		id: 7,
-		nameZh: "静态分析",
+		nameKey: "architecture.pipeline.stages.static.name",
 		nameEn: "Static Analysis",
-		input: "适配后的代码",
-		output: "静态分析报告",
+		inputKey: "architecture.pipeline.stages.static.input",
+		outputKey: "architecture.pipeline.stages.static.output",
 		agents: ["code_repairer"],
 		tools: ["Cppcheck", "GCC -Wall"],
 	},
 	{
 		id: 8,
-		nameZh: "契约检查",
+		nameKey: "architecture.pipeline.stages.contractCheck.name",
 		nameEn: "Contract Checking",
-		input: "代码 + 契约文件",
-		output: "契约验证报告",
+		inputKey: "architecture.pipeline.stages.contractCheck.input",
+		outputKey: "architecture.pipeline.stages.contractCheck.output",
 		agents: [],
 		tools: ["contract_checker", "Z3"],
 	},
 	{
 		id: 9,
-		nameZh: "仿真验证",
+		nameKey: "architecture.pipeline.stages.simulation.name",
 		nameEn: "Simulation",
-		input: "验证通过的代码",
-		output: "数字孪生仿真结果 + 覆盖率数据",
+		inputKey: "architecture.pipeline.stages.simulation.input",
+		outputKey: "architecture.pipeline.stages.simulation.output",
 		agents: [],
 		tools: ["QEMU", "VirtualMCU", "FaultInjector"],
 	},
 	{
 		id: 10,
-		nameZh: "形式化验证",
+		nameKey: "architecture.pipeline.stages.formal.name",
 		nameEn: "Formal Verification",
-		input: "代码 + 契约",
-		output: "形式化验证证明",
+		inputKey: "architecture.pipeline.stages.formal.input",
+		outputKey: "architecture.pipeline.stages.formal.output",
 		agents: [],
 		tools: ["CBMC", "Z3 SMT"],
 	},
 	{
 		id: 11,
-		nameZh: "HITL 审查",
+		nameKey: "architecture.pipeline.stages.hitl.name",
 		nameEn: "Human-in-the-Loop",
-		input: "验证产物 + 风险评估",
-		output: "人工审批结论",
+		inputKey: "architecture.pipeline.stages.hitl.input",
+		outputKey: "architecture.pipeline.stages.hitl.output",
 		agents: [],
-		tools: ["HITL 工作台"],
+		tools: ["architecture.pipeline.tools.hitlWorkbench"],
 	},
 	{
 		id: 12,
-		nameZh: "证据包生成",
+		nameKey: "architecture.pipeline.stages.evidence.name",
 		nameEn: "Evidence Package",
-		input: "所有阶段产物",
-		output: "DO-178C 合规证据包（PDF/HTML）",
+		inputKey: "architecture.pipeline.stages.evidence.input",
+		outputKey: "architecture.pipeline.stages.evidence.output",
 		agents: [],
-		tools: ["report_generator", "PSAC 生成器"],
+		tools: ["report_generator", "architecture.pipeline.tools.psacGenerator"],
 	},
 ];
 
+function toolLabel(tool: string): string {
+	return tool.startsWith("architecture.") ? t(tool) : tool;
+}
+
 interface QuickStep {
 	id: number;
-	title: string;
-	description: string;
-	icon: any;
-	action: string;
+	titleKey: string;
+	descriptionKey: string;
+	icon: Component;
+	actionKey: string;
 	route: string;
 }
 
 const quickSteps: QuickStep[] = [
 	{
 		id: 1,
-		title: "选择运行来源",
-		description: "从 cloud（云模型）或 local（本地模型）中选择适合的执行模式。",
+		titleKey: "architecture.quickstart.steps.source.title",
+		descriptionKey: "architecture.quickstart.steps.source.description",
 		icon: Gauge,
-		action: "前往系统设置",
+		actionKey: "architecture.quickstart.steps.source.action",
 		route: "/settings",
 	},
 	{
 		id: 2,
-		title: "配置模型连接",
-		description:
-			"配置云 API 地址、密钥或本地 Ollama/LM Studio 端点，确保 LLM 服务可用。",
+		titleKey: "architecture.quickstart.steps.model.title",
+		descriptionKey: "architecture.quickstart.steps.model.description",
 		icon: Cog,
-		action: "配置模型",
+		actionKey: "architecture.quickstart.steps.model.action",
 		route: "/settings",
 	},
 	{
 		id: 3,
-		title: "创建第一个代码生成任务",
-		description:
-			"在代码生成页面输入自然语言需求，选择编程语言，启动全流水线任务。",
+		titleKey: "architecture.quickstart.steps.firstTask.title",
+		descriptionKey: "architecture.quickstart.steps.firstTask.description",
 		icon: PlayCircle,
-		action: "开始生成",
+		actionKey: "architecture.quickstart.steps.firstTask.action",
 		route: "/generate",
 	},
 	{
 		id: 4,
-		title: "查看运行结果",
-		description: "在运行记录中查看任务状态、生成的代码、验证报告与覆盖率数据。",
+		titleKey: "architecture.quickstart.steps.results.title",
+		descriptionKey: "architecture.quickstart.steps.results.description",
 		icon: FileText,
-		action: "查看记录",
+		actionKey: "architecture.quickstart.steps.results.action",
 		route: "/records",
 	},
 	{
 		id: 5,
-		title: "理解验证证据",
-		description:
-			"学习如何阅读 DO-178C 合规报告、追溯矩阵、MISRA 检查结果与形式化验证证明。",
+		titleKey: "architecture.quickstart.steps.evidence.title",
+		descriptionKey: "architecture.quickstart.steps.evidence.description",
 		icon: ShieldCheck,
-		action: "了解更多",
+		actionKey: "architecture.quickstart.steps.evidence.action",
 		route: "/lab",
 	},
 ];
 
 interface FaqItem {
-	q: string;
-	a: string;
+	qKey: string;
+	aKey: string;
 }
 
 const faqItems: FaqItem[] = [
 	{
-		q: "SkyForge 支持哪些编程语言？",
-		a: "当前支持 C（MISRA-C:2012）、C++（MISRA C++ / JSF AV C++）和 Python（军工安全标准）三种语言的代码生成与验证。",
+		qKey: "architecture.faq.item1.q",
+		aKey: "architecture.faq.item1.a",
 	},
 	{
-		q: "什么是两种执行模式 Profile？",
-		a: "cloud 模式连接云 LLM 服务，执行真实推理；local 模式使用本地部署的 Ollama/LM Studio，数据不出内网。mock 模式仅在无后端时用于开发调试。",
+		qKey: "architecture.faq.item2.q",
+		aKey: "architecture.faq.item2.a",
 	},
 	{
-		q: "MISRA 违规会自动修复吗？",
-		a: "会。SkyForge 内置 57 条 MISRA-C 自动修复规则，Cppcheck 扫描发现的违规会由 code_repairer Agent 自动修复并重新验证。",
+		qKey: "architecture.faq.item3.q",
+		aKey: "architecture.faq.item3.a",
 	},
 	{
-		q: "形式化验证使用哪些工具？",
-		a: "使用 Z3 SMT 求解器进行契约验证，CBMC 进行有界模型检查。两者构成 VerifierChain 可插拔验证链。",
+		qKey: "architecture.faq.item4.q",
+		aKey: "architecture.faq.item4.a",
 	},
 	{
-		q: "HITL 人工审查如何工作？",
-		a: "在需求、契约和代码三个关键检查点，系统会根据风险评估决定是否需要人工审批。可在系统设置中启用或禁用 HITL。",
+		qKey: "architecture.faq.item5.q",
+		aKey: "architecture.faq.item5.a",
 	},
 ];
 
@@ -372,174 +370,197 @@ function toggleFaq(id: number) {
 	expandedFaq.value = expandedFaq.value === id ? null : id;
 }
 
+interface StandardCategory {
+	nameKey: string;
+	ruleKeys: string[];
+}
+
 interface CodingStandard {
 	id: string;
-	name: string;
+	nameKey: string;
 	version: string;
-	description: string;
-	categories: { name: string; rules: string[] }[];
-	scenarios: string[];
-	references: string[];
+	descriptionKey: string;
+	categories: StandardCategory[];
+	scenarioKeys: string[];
+	referenceKeys: string[];
 }
 
 const codingStandards: CodingStandard[] = [
 	{
 		id: "misra-c",
-		name: "MISRA-C",
+		nameKey: "architecture.standards.misraC.name",
 		version: "2012",
-		description:
-			"MISRA C 是由汽车工业软件可靠性协会（MISRA）发布的 C 语言编码规范，旨在提高嵌入式系统的安全性和可靠性。SkyForge 实现了 10 条红线规则和 56 个修复器。",
+		descriptionKey: "architecture.standards.misraC.description",
 		categories: [
 			{
-				name: "环境与编译",
-				rules: [
-					"Rule 1.1: 不使用未定义/未指定/实现定义的行为",
-					"Rule 1.2: 不得出现违反标准 C 的代码",
-					"Rule 2.1: 项目不得包含无法到达的代码",
+				nameKey: "architecture.standards.misraC.categories.environment.name",
+				ruleKeys: [
+					"architecture.standards.misraC.categories.environment.r1",
+					"architecture.standards.misraC.categories.environment.r2",
+					"architecture.standards.misraC.categories.environment.r3",
 				],
 			},
 			{
-				name: "类型安全",
-				rules: [
-					"Rule 8.13: 指针参数应声明为指向 const 的指针",
-					"Rule 10.1: 运算符的操作数值不得有不适当的底层类型",
-					"Rule 11.1: 不得进行指针和整数类型之间的转换",
+				nameKey: "architecture.standards.misraC.categories.typeSafety.name",
+				ruleKeys: [
+					"architecture.standards.misraC.categories.typeSafety.r1",
+					"architecture.standards.misraC.categories.typeSafety.r2",
+					"architecture.standards.misraC.categories.typeSafety.r3",
 				],
 			},
 			{
-				name: "内存与资源",
-				rules: [
-					"Rule 17.6: 不得使用 malloc 族的动态内存分配",
-					"Rule 21.3: 不得使用标准库的内存管理函数",
+				nameKey: "architecture.standards.misraC.categories.memory.name",
+				ruleKeys: [
+					"architecture.standards.misraC.categories.memory.r1",
+					"architecture.standards.misraC.categories.memory.r2",
 				],
 			},
 			{
-				name: "控制流",
-				rules: [
-					"Rule 14.4: if/else if/else 后必须有 else 分支",
-					"Rule 15.1: goto 语句不得使用",
-					"Rule 16.3: switch 语句必须有 default 分支",
+				nameKey: "architecture.standards.misraC.categories.controlFlow.name",
+				ruleKeys: [
+					"architecture.standards.misraC.categories.controlFlow.r1",
+					"architecture.standards.misraC.categories.controlFlow.r2",
+					"architecture.standards.misraC.categories.controlFlow.r3",
 				],
 			},
 		],
-		scenarios: ["航空电子", "汽车电子", "医疗设备", "工业控制"],
-		references: [
-			"MISRA-C:2012 官方规范",
-			"Cppcheck MISRA addon",
-			"ISO 26262 (ASIL D)",
+		scenarioKeys: [
+			"architecture.standards.misraC.scenarios.s1",
+			"architecture.standards.misraC.scenarios.s2",
+			"architecture.standards.misraC.scenarios.s3",
+			"architecture.standards.misraC.scenarios.s4",
+		],
+		referenceKeys: [
+			"architecture.standards.misraC.references.r1",
+			"architecture.standards.misraC.references.r2",
+			"architecture.standards.misraC.references.r3",
 		],
 	},
 	{
 		id: "misra-cpp-jsf",
-		name: "MISRA C++ / JSF AV C++",
+		nameKey: "architecture.standards.misraCpp.name",
 		version: "2023",
-		description:
-			"MISRA C++ 是 C++ 语言的安全编码规范，JSF AV C++ 是联合攻击战斗机项目的 C++ 编码标准。SkyForge 实现了 5 条 JSF AV C++ 红线规则。",
+		descriptionKey: "architecture.standards.misraCpp.description",
 		categories: [
 			{
-				name: "类型安全",
-				rules: [
-					"AV Rule 4: 所有变量在声明时必须初始化",
-					"AV Rule 8: 不使用原生数组，使用 std::array 或 std::vector",
+				nameKey: "architecture.standards.misraCpp.categories.typeSafety.name",
+				ruleKeys: [
+					"architecture.standards.misraCpp.categories.typeSafety.r1",
+					"architecture.standards.misraCpp.categories.typeSafety.r2",
 				],
 			},
 			{
-				name: "内存管理",
-				rules: [
-					"AV Rule 15: 使用 RAII 管理资源",
-					"AV Rule 16: 不使用裸 new/delete，使用智能指针",
+				nameKey: "architecture.standards.misraCpp.categories.memory.name",
+				ruleKeys: [
+					"architecture.standards.misraCpp.categories.memory.r1",
+					"architecture.standards.misraCpp.categories.memory.r2",
 				],
 			},
 			{
-				name: "异常安全",
-				rules: [
-					"AV Rule 39: 析构函数不得抛出异常",
-					"AV Rule 42: 提供强异常安全保证",
+				nameKey: "architecture.standards.misraCpp.categories.exceptions.name",
+				ruleKeys: [
+					"architecture.standards.misraCpp.categories.exceptions.r1",
+					"architecture.standards.misraCpp.categories.exceptions.r2",
 				],
 			},
 		],
-		scenarios: ["航空航天", "国防军工", "高可靠性嵌入式系统"],
-		references: [
-			"MISRA C++:2023",
-			"JSF AV C++ Coding Standards",
-			"AUTOSAR C++14",
+		scenarioKeys: [
+			"architecture.standards.misraCpp.scenarios.s1",
+			"architecture.standards.misraCpp.scenarios.s2",
+			"architecture.standards.misraCpp.scenarios.s3",
+		],
+		referenceKeys: [
+			"architecture.standards.misraCpp.references.r1",
+			"architecture.standards.misraCpp.references.r2",
+			"architecture.standards.misraCpp.references.r3",
 		],
 	},
 	{
 		id: "python-safety",
-		name: "Python 军工安全标准",
+		nameKey: "architecture.standards.pythonSafety.name",
 		version: "1.0",
-		description:
-			"面向军工和航空领域的 Python 安全编码标准，确保 Python 代码在安全关键环境中的可靠性。SkyForge 实现了 3 条红线规则和 4 个修复器。",
+		descriptionKey: "architecture.standards.pythonSafety.description",
 		categories: [
 			{
-				name: "类型安全",
-				rules: [
-					"Rule 1: 所有函数必须添加类型注解",
-					"Rule 2: 不使用 eval() 和 exec()",
+				nameKey:
+					"architecture.standards.pythonSafety.categories.typeSafety.name",
+				ruleKeys: [
+					"architecture.standards.pythonSafety.categories.typeSafety.r1",
+					"architecture.standards.pythonSafety.categories.typeSafety.r2",
 				],
 			},
 			{
-				name: "安全",
-				rules: [
-					"Rule 3: 不使用 pickle 进行数据序列化",
-					"Rule 4: 所有输入必须经过验证和清理",
+				nameKey: "architecture.standards.pythonSafety.categories.security.name",
+				ruleKeys: [
+					"architecture.standards.pythonSafety.categories.security.r1",
+					"architecture.standards.pythonSafety.categories.security.r2",
 				],
 			},
 			{
-				name: "可靠性",
-				rules: [
-					"Rule 5: 使用 logging 替代 print 输出",
-					"Rule 6: 所有资源使用上下文管理器 (with 语句)",
+				nameKey:
+					"architecture.standards.pythonSafety.categories.reliability.name",
+				ruleKeys: [
+					"architecture.standards.pythonSafety.categories.reliability.r1",
+					"architecture.standards.pythonSafety.categories.reliability.r2",
 				],
 			},
 		],
-		scenarios: ["军工数据分析", "航空地面系统", "仿真测试脚本"],
-		references: ["Python PEP 484 (类型提示)", "OWASP Python 安全指南"],
+		scenarioKeys: [
+			"architecture.standards.pythonSafety.scenarios.s1",
+			"architecture.standards.pythonSafety.scenarios.s2",
+			"architecture.standards.pythonSafety.scenarios.s3",
+		],
+		referenceKeys: [
+			"architecture.standards.pythonSafety.references.r1",
+			"architecture.standards.pythonSafety.references.r2",
+		],
 	},
 	{
 		id: "do178c",
-		name: "DO-178C 合规指南",
+		nameKey: "architecture.standards.do178c.name",
 		version: "DAL A/B/C/D",
-		description:
-			"DO-178C 是航空机载软件的适航审定标准，定义了软件从计划到生产的完整生命周期过程要求。SkyForge 提供工程辅助证据，不替代适航鉴定。",
+		descriptionKey: "architecture.standards.do178c.description",
 		categories: [
 			{
-				name: "核心目标 (19 项可判定目标)",
-				rules: [
-					"OBJ-1 ~ OBJ-5: 需求过程（问题报告、追溯、HLR/LLR）",
-					"OBJ-6 ~ OBJ-9: 设计与编码（架构、源代码、低级需求）",
-					"OBJ-10 ~ OBJ-14: 验证过程（独立验证、覆盖分析）",
-					"OBJ-15 ~ OBJ-19: 配置与质量（配置管理、质量保证、工具鉴定）",
+				nameKey: "architecture.standards.do178c.categories.objectives.name",
+				ruleKeys: [
+					"architecture.standards.do178c.categories.objectives.r1",
+					"architecture.standards.do178c.categories.objectives.r2",
+					"architecture.standards.do178c.categories.objectives.r3",
+					"architecture.standards.do178c.categories.objectives.r4",
 				],
 			},
 			{
-				name: "DAL 等级覆盖要求",
-				rules: [
-					"DAL A (灾难性): MC/DC 覆盖 + 全部 19 项目标",
-					"DAL B (危险): 判定覆盖 + 19 项目标",
-					"DAL C (重大): 语句覆盖 + 17 项目标",
-					"DAL D (轻微): 基础验证 + 11 项目标",
+				nameKey: "architecture.standards.do178c.categories.dalLevels.name",
+				ruleKeys: [
+					"architecture.standards.do178c.categories.dalLevels.r1",
+					"architecture.standards.do178c.categories.dalLevels.r2",
+					"architecture.standards.do178c.categories.dalLevels.r3",
+					"architecture.standards.do178c.categories.dalLevels.r4",
 				],
 			},
 			{
-				name: "证据包内容",
-				rules: [
-					"PSAC (软件适航计划)",
-					"SDP (软件开发计划)",
-					"SVP (软件验证计划)",
-					"需求追溯矩阵",
-					"覆盖率分析报告",
-					"MISRA 合规报告",
-					"形式化验证证明",
+				nameKey: "architecture.standards.do178c.categories.evidence.name",
+				ruleKeys: [
+					"architecture.standards.do178c.categories.evidence.r1",
+					"architecture.standards.do178c.categories.evidence.r2",
+					"architecture.standards.do178c.categories.evidence.r3",
+					"architecture.standards.do178c.categories.evidence.r4",
+					"architecture.standards.do178c.categories.evidence.r5",
+					"architecture.standards.do178c.categories.evidence.r6",
+					"architecture.standards.do178c.categories.evidence.r7",
 				],
 			},
 		],
-		scenarios: ["机载软件 DAL A/B/C/D", "民用航空适航审定", "军用航空软件合规"],
-		references: [
-			"RTCA DO-178C / EUROCAE ED-12C",
-			"DO-330 (工具鉴定)",
-			"AC 20-115D (COTS 指南)",
+		scenarioKeys: [
+			"architecture.standards.do178c.scenarios.s1",
+			"architecture.standards.do178c.scenarios.s2",
+			"architecture.standards.do178c.scenarios.s3",
+		],
+		referenceKeys: [
+			"architecture.standards.do178c.references.r1",
+			"architecture.standards.do178c.references.r2",
+			"architecture.standards.do178c.references.r3",
 		],
 	},
 ];
@@ -569,16 +590,16 @@ function navigateTo(route: string) {
 							Architecture & Documentation
 						</p>
 						<h1 class="text-2xl sm:text-3xl font-semibold text-foreground">
-							架构与文档中心
+							{{ t("architecture.title") }}
 						</h1>
 						<p class="text-muted-foreground mt-1 text-sm">
-							深入了解 SkyForge 六层引擎架构、12 阶段 Pipeline 与完整文档
+							{{ t("architecture.subtitle") }}
 						</p>
 					</div>
 				</div>
 				<Button variant="outline" size="sm" @click="backToHome">
 					<ArrowLeft :size="16" class="mr-2" />
-					返回主页
+					{{ t("architecture.backHome") }}
 				</Button>
 			</header>
 
@@ -586,19 +607,19 @@ function navigateTo(route: string) {
 				<TabsList class="w-full grid grid-cols-2 sm:grid-cols-4 mb-8">
 					<TabsTrigger value="layers">
 						<Layers :size="16" class="mr-2" />
-						六层架构
+						{{ t("architecture.tabs.layers") }}
 					</TabsTrigger>
 					<TabsTrigger value="pipeline">
 						<Gauge :size="16" class="mr-2" />
-						Pipeline
+						{{ t("architecture.tabs.pipeline") }}
 					</TabsTrigger>
 					<TabsTrigger value="quickstart">
 						<PlayCircle :size="16" class="mr-2" />
-						快速上手
+						{{ t("architecture.tabs.quickstart") }}
 					</TabsTrigger>
 					<TabsTrigger value="standards">
 						<ShieldCheck :size="16" class="mr-2" />
-						编码标准
+						{{ t("architecture.tabs.standards") }}
 					</TabsTrigger>
 				</TabsList>
 
@@ -621,7 +642,7 @@ function navigateTo(route: string) {
 										<div class="flex-1 min-w-0">
 											<div class="flex items-center gap-3 flex-wrap">
 												<h3 class="text-lg font-semibold">
-													{{ layer.nameZh }}
+													{{ t(layer.nameKey) }}
 												</h3>
 												<span class="text-muted-foreground text-sm">
 													{{ layer.nameEn }}
@@ -632,7 +653,7 @@ function navigateTo(route: string) {
 												</Badge>
 											</div>
 											<p class="text-muted-foreground mt-2 text-sm leading-relaxed">
-												{{ layer.responsibility }}
+												{{ t(layer.responsibilityKey) }}
 											</p>
 
 											<div
@@ -643,7 +664,7 @@ function navigateTo(route: string) {
 													<span
 														class="text-xs font-medium text-muted-foreground uppercase"
 													>
-														主入口
+														{{ t("architecture.layerLabels.mainEntry") }}
 													</span>
 													<code
 														class="bg-muted rounded-md px-2 py-1 font-mono text-xs"
@@ -655,7 +676,7 @@ function navigateTo(route: string) {
 													<span
 														class="text-xs font-medium text-muted-foreground uppercase block mb-2"
 													>
-														关键文件
+														{{ t("architecture.layerLabels.keyFiles") }}
 													</span>
 													<ul class="flex flex-wrap gap-2">
 														<li v-for="f in layer.keyFiles" :key="f">
@@ -697,10 +718,10 @@ function navigateTo(route: string) {
 						<CardHeader>
 							<CardTitle class="flex items-center gap-2">
 								<Gauge :size="20" class="text-primary" />
-								12 阶段 Pipeline 流程
+								{{ t("architecture.pipeline.title") }}
 							</CardTitle>
 							<CardDescription>
-								从需求接收至证据包生成的完整流水线，串联六层架构能力
+								{{ t("architecture.pipeline.description") }}
 							</CardDescription>
 						</CardHeader>
 						<CardContent>
@@ -731,7 +752,7 @@ function navigateTo(route: string) {
 													>
 														<div>
 															<h4 class="font-semibold text-base">
-																{{ stage.nameZh }}
+																{{ t(stage.nameKey) }}
 															</h4>
 															<p
 																class="text-xs text-muted-foreground mt-0.5"
@@ -743,7 +764,7 @@ function navigateTo(route: string) {
 															variant="outline"
 															class="shrink-0"
 														>
-															Stage {{ stage.id }}/12
+															{{ t("architecture.pipeline.stage", { id: stage.id }) }}
 														</Badge>
 													</div>
 
@@ -752,18 +773,18 @@ function navigateTo(route: string) {
 															<p
 																class="text-xs font-medium text-muted-foreground uppercase"
 															>
-																输入
+																{{ t("architecture.pipeline.input") }}
 															</p>
-															<p class="text-sm">{{ stage.input }}</p>
+															<p class="text-sm">{{ t(stage.inputKey) }}</p>
 														</div>
 														<div class="space-y-1">
 															<p
 																class="text-xs font-medium text-muted-foreground uppercase"
 															>
-																输出
+																{{ t("architecture.pipeline.output") }}
 															</p>
 															<p class="text-sm">
-																{{ stage.output }}
+																{{ t(stage.outputKey) }}
 															</p>
 														</div>
 													</div>
@@ -799,7 +820,7 @@ function navigateTo(route: string) {
 																class="text-xs text-muted-foreground flex items-center gap-1"
 															>
 																<Wrench :size="12" />
-																工具:
+																{{ t("architecture.pipeline.toolsLabel") }}
 															</span>
 															<Badge
 																v-for="tool in stage.tools"
@@ -807,7 +828,7 @@ function navigateTo(route: string) {
 																variant="outline"
 																class="text-xs"
 															>
-																{{ tool }}
+																{{ toolLabel(tool) }}
 															</Badge>
 														</div>
 													</div>
@@ -839,10 +860,10 @@ function navigateTo(route: string) {
 								<CardHeader>
 									<CardTitle class="flex items-center gap-2">
 										<BookOpen :size="20" class="text-primary" />
-										分步骤指南
+										{{ t("architecture.quickstart.title") }}
 									</CardTitle>
 									<CardDescription>
-										跟随以下 5 个步骤，快速上手 SkyForge 全流程
+										{{ t("architecture.quickstart.description") }}
 									</CardDescription>
 								</CardHeader>
 								<CardContent class="space-y-4">
@@ -876,12 +897,12 @@ function navigateTo(route: string) {
 																>
 																	Step {{ step.id }}:
 																</span>
-																{{ step.title }}
+																{{ t(step.titleKey) }}
 															</h4>
 															<p
 																class="text-sm text-muted-foreground mt-1.5"
 															>
-																{{ step.description }}
+																{{ t(step.descriptionKey) }}
 															</p>
 														</div>
 													</div>
@@ -891,7 +912,7 @@ function navigateTo(route: string) {
 														class="mt-3 -ml-2"
 														@click="navigateTo(step.route)"
 													>
-														{{ step.action }}
+														{{ t(step.actionKey) }}
 														<ArrowRight
 															:size="14"
 															class="ml-1.5"
@@ -910,7 +931,7 @@ function navigateTo(route: string) {
 								<CardHeader>
 									<CardTitle class="flex items-center gap-2 text-base">
 										<Terminal :size="18" class="text-primary" />
-										一键启动命令
+										{{ t("architecture.quickstart.quickStartTitle") }}
 									</CardTitle>
 								</CardHeader>
 								<CardContent>
@@ -932,35 +953,35 @@ sh start.sh
 								<CardHeader>
 									<CardTitle class="flex items-center gap-2 text-base">
 										<Search :size="18" class="text-primary" />
-										常见问题 FAQ
+										{{ t("architecture.quickstart.faqTitle") }}
 									</CardTitle>
 								</CardHeader>
 								<CardContent class="space-y-2">
 									<div
-										v-for="item in faqItems"
-										:key="item.q"
+										v-for="(item, index) in faqItems"
+										:key="item.qKey"
 										class="border border-border rounded-lg overflow-hidden"
 									>
 										<button
 											class="w-full p-3 text-left flex items-start justify-between gap-3 hover:bg-muted/50 transition-colors"
-											@click="toggleFaq(faqItems.indexOf(item))"
+											@click="toggleFaq(index)"
 										>
 											<span class="text-sm font-medium">
-												{{ item.q }}
+												{{ t(item.qKey) }}
 											</span>
 											<ChevronDown
 												:size="16"
 												class="shrink-0 text-muted-foreground transition-transform mt-0.5"
 												:class="{
-													'rotate-180': expandedFaq === faqItems.indexOf(item),
+													'rotate-180': expandedFaq === index,
 												}"
 											/>
 										</button>
 										<div
-											v-if="expandedFaq === faqItems.indexOf(item)"
+											v-if="expandedFaq === index"
 											class="px-3 pb-3 text-sm text-muted-foreground border-t border-border pt-3"
 										>
-											{{ item.a }}
+											{{ t(item.aKey) }}
 										</div>
 									</div>
 								</CardContent>
@@ -990,10 +1011,10 @@ sh start.sh
 													:size="22"
 													class="text-primary"
 												/>
-												{{ std.name }}
+												{{ t(std.nameKey) }}
 											</CardTitle>
 											<CardDescription class="mt-1">
-												版本: {{ std.version }}
+												{{ t("architecture.standards.version", { version: std.version }) }}
 											</CardDescription>
 										</div>
 										<Badge variant="secondary">
@@ -1001,13 +1022,13 @@ sh start.sh
 										</Badge>
 									</div>
 									<p class="text-sm text-muted-foreground mt-3 leading-relaxed">
-										{{ std.description }}
+										{{ t(std.descriptionKey) }}
 									</p>
 								</CardHeader>
 								<CardContent class="space-y-5 pt-0">
 									<div
 										v-for="cat in std.categories"
-										:key="cat.name"
+										:key="cat.nameKey"
 									>
 										<h5
 											class="text-sm font-semibold text-foreground mb-2 flex items-center gap-2"
@@ -1015,11 +1036,11 @@ sh start.sh
 											<span
 												class="w-1.5 h-1.5 rounded-full bg-primary"
 											></span>
-											{{ cat.name }}
+											{{ t(cat.nameKey) }}
 										</h5>
 										<ul class="space-y-1.5 pl-3.5">
 											<li
-												v-for="(rule, ruleIdx) in cat.rules"
+												v-for="(ruleKey, ruleIdx) in cat.ruleKeys"
 												:key="ruleIdx"
 												class="text-sm text-muted-foreground flex items-start gap-2"
 											>
@@ -1027,7 +1048,7 @@ sh start.sh
 													:size="14"
 													class="text-primary mt-0.5 shrink-0"
 												/>
-												<span>{{ rule }}</span>
+												<span>{{ t(ruleKey) }}</span>
 											</li>
 										</ul>
 									</div>
@@ -1037,16 +1058,16 @@ sh start.sh
 											<p
 												class="text-xs font-medium text-muted-foreground uppercase mb-1.5"
 											>
-												适用场景
+												{{ t("architecture.standards.scenarios") }}
 											</p>
 											<div class="flex flex-wrap gap-1.5">
 												<Badge
-													v-for="s in std.scenarios"
+													v-for="s in std.scenarioKeys"
 													:key="s"
 													variant="outline"
 													class="text-xs"
 												>
-													{{ s }}
+													{{ t(s) }}
 												</Badge>
 											</div>
 										</div>
@@ -1054,15 +1075,15 @@ sh start.sh
 											<p
 												class="text-xs font-medium text-muted-foreground uppercase mb-1.5"
 											>
-												参考链接
+												{{ t("architecture.standards.references") }}
 											</p>
 											<ul class="space-y-0.5">
 												<li
-													v-for="ref in std.references"
-													:key="ref"
+													v-for="refKey in std.referenceKeys"
+													:key="refKey"
 													class="text-xs text-muted-foreground"
 												>
-													• {{ ref }}
+													• {{ t(refKey) }}
 												</li>
 											</ul>
 										</div>

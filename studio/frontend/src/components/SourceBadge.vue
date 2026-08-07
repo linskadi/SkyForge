@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { cn } from "@/lib/utils";
 
 type SourceType = "observed" | "simulated" | "unavailable" | "failed";
@@ -15,18 +16,29 @@ const props = withDefaults(defineProps<Props>(), {
 	class: "",
 });
 
+const { t } = useI18n();
+
 const sourceConfig: Record<
 	SourceType,
-	{ defaultLabel: string; variant: string }
+	{ defaultLabelKey: string; variant: string }
 > = {
-	observed: { defaultLabel: "实测", variant: "source-observed" },
-	simulated: { defaultLabel: "模拟", variant: "source-simulated" },
-	unavailable: { defaultLabel: "暂无", variant: "source-unavailable" },
-	failed: { defaultLabel: "失败", variant: "source-failed" },
+	observed: {
+		defaultLabelKey: "sourceBadge.observed",
+		variant: "source-observed",
+	},
+	simulated: {
+		defaultLabelKey: "sourceBadge.simulated",
+		variant: "source-simulated",
+	},
+	unavailable: {
+		defaultLabelKey: "sourceBadge.unavailable",
+		variant: "source-unavailable",
+	},
+	failed: { defaultLabelKey: "sourceBadge.failed", variant: "source-failed" },
 };
 
 const displayLabel = computed(
-	() => props.label ?? sourceConfig[props.source].defaultLabel,
+	() => props.label ?? t(sourceConfig[props.source].defaultLabelKey),
 );
 
 const variantClass = computed(() => sourceConfig[props.source].variant);

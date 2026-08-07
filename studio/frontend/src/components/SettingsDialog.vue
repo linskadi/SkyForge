@@ -17,6 +17,7 @@
 
 import { CheckCircle2, Eye, EyeOff, Loader2, XCircle, Zap } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -60,13 +61,14 @@ const open = computed<boolean>({
 const providerStore = useProviderStore();
 const executionStore = useExecutionStore();
 const { toast } = useToast();
+const { t } = useI18n();
 
 // ---- 模式选项 ----
-const modes: { key: LLMMode; label: string }[] = [
-	{ key: "mock", label: "模拟模式" },
-	{ key: "api", label: "云 API" },
-	{ key: "local", label: "本地模型" },
-];
+const modes = computed<{ key: LLMMode; label: string }[]>(() => [
+	{ key: "mock", label: t("settings.mode.mock") },
+	{ key: "api", label: t("settings.mode.api") },
+	{ key: "local", label: t("settings.mode.local") },
+]);
 
 // ---- 表单字段 ----
 const activeMode = ref<LLMMode>(props.initialMode ?? providerStore.derivedMode);
@@ -268,7 +270,7 @@ async function handleTest() {
 		testResult.value = {
 			ok: false,
 			latency_ms: 0,
-			message: err instanceof Error ? err.message : "测试失败",
+			message: err instanceof Error ? err.message : t("settings.testFailed"),
 		};
 		testStatus.value = "fail";
 	}
@@ -284,11 +286,7 @@ async function handleSave() {
 		await saveLLMConfig(config);
 		// 2. 写入 execution profile（同时联动 providerStore.derivedMode）
 		executionStore.setProfile(
-			config.mode === "mock"
-				? "demo"
-				: config.mode === "local"
-					? "local"
-					: "cloud",
+			config.mode === "mock" || config.mode === "local" ? "local" : "cloud",
 		);
 		// 3. 同步 selectedProvider
 		//    - API 模式：openai / anthropic
@@ -301,16 +299,17 @@ async function handleSave() {
 			providerStore.setProvider(localProviderId);
 		}
 		toast({
-			title: "配置已保存",
-			description: "LLM 设置已成功更新",
+			title: t("settings.saveSuccess"),
+			description: t("settings.llmSavedDesc"),
 		});
 		// 通知顶栏状态指示灯立即刷新（TopStatusBar 监听此事件）
 		window.dispatchEvent(new Event("skyforge-llm-config-changed"));
 		open.value = false;
 	} catch (err) {
 		toast({
-			title: "保存失败",
-			description: err instanceof Error ? err.message : "未知错误",
+			title: t("settings.saveFailed"),
+			description:
+				err instanceof Error ? err.message : t("settings.unknownError"),
 			variant: "destructive",
 		});
 	} finally {
@@ -323,8 +322,8 @@ async function handleSave() {
   <Dialog v-model:open="open">
     <DialogContent class="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto">
       <DialogHeader>
-        <DialogTitle>LLM 设置</DialogTitle>
-        <DialogDescription>配置后端模型连接；模拟数据仅在无后端时使用</DialogDescription>
+        <DialogTitle>{{ t("settings.dialogTitle") }}</DialogTitle>
+        <DialogDescription>{{ t("settings.dialogDesc") }}</DialogDescription>
       </DialogHeader>
 
       <!-- 模式分段按钮（自定义 button，非 shadcn Tabs） -->
@@ -348,7 +347,7 @@ async function handleSave() {
       <!-- Mock 选项卡 -->
       <div v-if="activeMode === 'mock'" class="space-y-2 py-2">
         <p class="text-sm text-muted-foreground">
-          前端模拟数据，不调用任何 LLM 服务。适用于开发调试。
+          {{ t("settings.mockDesc") }}
         </p>
       </div>
 
@@ -356,35 +355,35 @@ async function handleSave() {
       <div v-else-if="activeMode === 'api'" class="space-y-4 py-2">
         <!-- Provider 选择 -->
         <div class="space-y-2">
-          <Label>Provider</Label>
+          <Label>{{ t("settings.model.providerLabel") }}</Label>
           <Select v-model="apiProviderSelect">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="选择 Provider" />
+              <SelectValue :placeholder="t('settings.model.providerPlaceholder')" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="deepseek">DeepSeek</SelectItem>
-              <SelectItem value="qwen">通义千问（兼容 API）</SelectItem>
-              <SelectItem value="openai">OpenAI</SelectItem>
-              <SelectItem value="anthropic">Anthropic</SelectItem>
-              <SelectItem value="custom">自定义 OpenAI 兼容服务</SelectItem>
+              <SelectItem value="deepseek">{{ t("settings.provider.deepseek.label") }}</SelectItem>
+              <SelectItem value="qwen">{{ t("settings.provider.qwen.label") }}</SelectItem>
+              <SelectItem value="openai">{{ t("settings.provider.openai.label") }}</SelectItem>
+              <SelectItem value="anthropic">{{ t("settings.provider.anthropic.label") }}</SelectItem>
+              <SelectItem value="custom">{{ t("settings.provider.custom.label") }}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <!-- API Key 输入（带显示/隐藏） -->
         <div class="space-y-2">
-          <Label for="llm-api-key">API Key</Label>
+          <Label for="llm-api-key">{{ t("settings.model.apiKeyLabel") }}</Label>
           <div class="relative">
             <Input
               id="llm-api-key"
               v-model="apiKey"
               :type="showApiKey ? 'text' : 'password'"
-              :placeholder="storedApiKeyMask ? `已配置 ${storedApiKeyMask}；留空表示不修改` : '输入 API Key；留空表示不修改'"
+              :placeholder="storedApiKeyMask ? t('settings.model.apiKeyPlaceholderSet', { mask: storedApiKeyMask }) : t('settings.model.apiKeyPlaceholder')"
               class="pr-10"
             />
             <button
               type="button"
-              :aria-label="showApiKey ? '隐藏 API Key' : '显示 API Key'"
+              :aria-label="showApiKey ? t('settings.model.hideApiKey') : t('settings.model.showApiKey')"
               class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               @click="showApiKey = !showApiKey"
             >
@@ -392,24 +391,24 @@ async function handleSave() {
               <EyeOff v-else class="w-4 h-4" />
             </button>
           </div>
-          <p class="text-xs text-muted-foreground">密钥通过 HTTPS/本机 HTTP 提交给后端，不写入 localStorage；留空会沿用已配置密钥。</p>
+          <p class="text-xs text-muted-foreground">{{ t("settings.model.apiKeyHint") }}</p>
         </div>
 
         <!-- Base URL -->
         <div class="space-y-2">
-          <Label>Base URL</Label>
+          <Label>{{ t("settings.model.baseUrlLabel") }}</Label>
           <Input v-model="apiBaseUrl" placeholder="https://api.openai.com/v1" />
           <p class="text-xs text-muted-foreground">
-            留空将自动使用 Provider 默认地址。
+            {{ t("settings.model.baseUrlHint") }}
           </p>
         </div>
 
         <!-- Model -->
         <div class="space-y-2">
-          <Label>Model</Label>
+          <Label>{{ t("settings.model.modelLabel") }}</Label>
           <Select v-if="apiModels.length > 0" v-model="apiModel">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="选择模型" />
+              <SelectValue :placeholder="t('settings.model.selectModelPlaceholder')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem
@@ -422,8 +421,8 @@ async function handleSave() {
           <Input v-else v-model="apiModel" placeholder="gpt-4o / claude-3-5-sonnet" />
           <p class="text-xs text-muted-foreground">
             {{ apiModels.length > 0
-              ? `已检测到 ${apiModels.length} 个可用模型`
-              : "指定模型 ID 或点击「测试连接」自动获取列表" }}
+              ? t("settings.model.modelsDetected", { count: apiModels.length })
+              : t("settings.model.apiModelHint") }}
           </p>
         </div>
 
@@ -439,7 +438,7 @@ async function handleSave() {
             <CheckCircle2 v-else-if="testStatus === 'ok'" class="w-3 h-3 mr-1 text-green-500" />
             <XCircle v-else-if="testStatus === 'fail'" class="w-3 h-3 mr-1 text-red-500" />
             <Zap v-else class="w-3 h-3 mr-1" />
-            {{ testStatus === "testing" ? "测试中..." : "测试连接" }}
+            {{ testStatus === "testing" ? t("settings.model.testing") : t("settings.model.testConnection") }}
           </Button>
           <span v-if="testStatus === 'ok'" class="text-xs text-green-600">
             {{ testResult?.latency_ms }}ms · {{ testResult?.model }}
@@ -453,18 +452,18 @@ async function handleSave() {
       <!-- 本地模型选项卡 -->
       <div v-else-if="activeMode === 'local'" class="space-y-4 py-2">
         <div class="space-y-2">
-          <Label>Base URL</Label>
+          <Label>{{ t("settings.model.baseUrlLabel") }}</Label>
           <Input v-model="localBaseUrl" placeholder="http://localhost:11434/v1" />
           <p class="text-xs text-muted-foreground">
-            本地 OpenAI 兼容端点（如 Ollama）。默认 http://localhost:11434/v1
+            {{ t("settings.model.localBaseUrlHint") }}
           </p>
         </div>
 
         <div class="space-y-2">
-          <Label>Model</Label>
+          <Label>{{ t("settings.model.modelLabel") }}</Label>
           <Select v-if="localModels.length > 0" v-model="localModel">
             <SelectTrigger class="w-full">
-              <SelectValue placeholder="选择模型" />
+              <SelectValue :placeholder="t('settings.model.selectModelPlaceholder')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem
@@ -477,8 +476,8 @@ async function handleSave() {
           <Input v-else v-model="localModel" placeholder="auto / qwen2.5-coder:14b" />
           <p class="text-xs text-muted-foreground">
             {{ localModels.length > 0
-              ? `已检测到 ${localModels.length} 个可用模型`
-              : "可选；点击「测试连接」自动获取模型列表" }}
+              ? t("settings.model.modelsDetected", { count: localModels.length })
+              : t("settings.model.localModelHint") }}
           </p>
         </div>
 
@@ -494,7 +493,7 @@ async function handleSave() {
             <CheckCircle2 v-else-if="testStatus === 'ok'" class="w-3 h-3 mr-1 text-green-500" />
             <XCircle v-else-if="testStatus === 'fail'" class="w-3 h-3 mr-1 text-red-500" />
             <Zap v-else class="w-3 h-3 mr-1" />
-            {{ testStatus === "testing" ? "测试中..." : "测试连接" }}
+            {{ testStatus === "testing" ? t("settings.model.testing") : t("settings.model.testConnection") }}
           </Button>
           <span v-if="testStatus === 'ok'" class="text-xs text-green-600">
             {{ testResult?.latency_ms }}ms · {{ testResult?.model }}
@@ -507,12 +506,12 @@ async function handleSave() {
 
       <label class="flex items-start gap-3 rounded-lg border bg-muted/30 p-3 text-sm">
         <input v-model="remember" type="checkbox" class="mt-1" />
-        <span><strong class="block">在此设备上记住配置</strong><small class="text-muted-foreground">写入已被 Git 忽略的 config/.env；取消勾选会清除磁盘上的 LLM 配置和密钥。</small></span>
+        <span><strong class="block">{{ t("settings.model.rememberLabel") }}</strong><small class="text-muted-foreground">{{ t("settings.model.rememberHint") }}</small></span>
       </label>
 
       <DialogFooter>
-        <Button variant="ghost" @click="open = false">取消</Button>
-        <Button :disabled="isBusy" @click="handleSave">保存</Button>
+        <Button variant="ghost" @click="open = false">{{ t("settings.cancel") }}</Button>
+        <Button :disabled="isBusy" @click="handleSave">{{ t("settings.save") }}</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

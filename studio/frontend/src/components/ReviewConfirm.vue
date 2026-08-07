@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Check, MessageSquare, X } from "@lucide/vue";
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Badge } from "@/components/ui/badge";
 /**
  * ReviewConfirm - 人工审核确认组件
@@ -11,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+
+const { t } = useI18n();
 
 interface Props {
 	stage: string;
@@ -46,7 +49,7 @@ const handleReject = () => {
 		<CardHeader>
 			<CardTitle class="flex items-center gap-2 text-lg text-blue-700">
 				<MessageSquare class="h-5 w-5" />
-				人工审核确认
+				{{ t("reviewConfirm.title") }}
 			</CardTitle>
 		</CardHeader>
 		<CardContent>
@@ -58,10 +61,10 @@ const handleReject = () => {
 			
 			<!-- Comment Input -->
 			<div class="mb-4">
-				<label class="text-sm font-medium text-gray-700 mb-2 block">审核意见（可选）</label>
+				<label class="text-sm font-medium text-gray-700 mb-2 block">{{ t("reviewConfirm.commentLabel") }}</label>
 				<Textarea
 					v-model="comment"
-					placeholder="请输入审核意见..."
+					:placeholder="t('reviewConfirm.commentPlaceholder')"
 					class="min-h-[80px]"
 				/>
 			</div>
@@ -75,7 +78,7 @@ const handleReject = () => {
 					:disabled="reviewed"
 				>
 					<X class="h-4 w-4 mr-2" />
-					拒绝
+					{{ t("reviewConfirm.reject") }}
 				</Button>
 				<Button 
 					class="flex-1 bg-green-600 hover:bg-green-700"
@@ -83,13 +86,13 @@ const handleReject = () => {
 					:disabled="reviewed"
 				>
 					<Check class="h-4 w-4 mr-2" />
-					通过
+					{{ t("reviewConfirm.approve") }}
 				</Button>
 			</div>
 			
 			<!-- Review Status -->
 			<div v-if="reviewed" class="mt-4 p-3 rounded" :class="decision === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
-				{{ decision === 'approved' ? '✅ 已通过审核' : '❌ 已拒绝' }}
+				{{ decision === 'approved' ? t('reviewConfirm.approvedStatus') : t('reviewConfirm.rejectedStatus') }}
 			</div>
 		</CardContent>
 	</Card>

@@ -15,10 +15,44 @@
  */
 
 import { toast } from "@/components/ui/toast/use-toast";
+import { i18n } from "@/i18n";
+
+/**
+ * 翻译 data 层标签：键可解析时返回译文，
+ * 键缺失（t 返回键路径本身）时回退到调用方提供的默认字符串。
+ */
+function dataT(
+	key: string,
+	fallback: string,
+	params?: Record<string, unknown>,
+): string {
+	const resolved = i18n.global.t(key, params ?? {});
+	return resolved === key ? fallback : resolved;
+}
 
 /** API 基础地址 */
 export const API_BASE_URL =
 	import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
+/** localStorage key：后端访问令牌（X-API-Token），由用户在系统设置填写 */
+export const API_TOKEN_STORAGE_KEY = "skyforge-api-token";
+
+/**
+ * 读取后端访问令牌（X-API-Token），优先级：
+ *   1. 构建时注入的环境变量 VITE_API_TOKEN（正式部署推荐）
+ *   2. 用户在系统设置填写并持久化到 localStorage 的令牌
+ * 返回空字符串表示不附加令牌（此时后端必须关闭写鉴权才能删改）。
+ */
+function getApiToken(): string {
+	const envToken = (import.meta.env as Record<string, string | undefined>)
+		.VITE_API_TOKEN;
+	if (envToken) return envToken;
+	try {
+		return localStorage.getItem(API_TOKEN_STORAGE_KEY) ?? "";
+	} catch {
+		return "";
+	}
+}
 
 /** 默认请求超时（毫秒） */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -30,7 +64,12 @@ export class ApiError extends Error {
 		public statusText: string,
 		public body?: unknown,
 	) {
-		super(`HTTP ${status} ${statusText}`);
+		super(
+			dataT("data.error.httpStatus", `HTTP ${status} ${statusText}`, {
+				status,
+				statusText,
+			}),
+		);
 		this.name = "ApiError";
 	}
 }
@@ -60,9 +99,14 @@ function extractErrorDetail(body: unknown): string {
  * （如 Generate.vue 的错误面板 + 重试按钮）。
  */
 function notifyHttpError(err: ApiError): void {
-	const detail = extractErrorDetail(err.body) || err.statusText || "未知错误";
+	const detail =
+		extractErrorDetail(err.body) ||
+		err.statusText ||
+		dataT("data.error.unknown", "未知错误");
 	toast({
-		title: `[错误] ${err.status}`,
+		title: dataT("data.error.httpTitle", `[错误] ${err.status}`, {
+			status: err.status,
+		}),
 		description: detail,
 		variant: "destructive",
 	});
@@ -82,11 +126,17 @@ export async function request<T>(
 	timeout: number = DEFAULT_TIMEOUT_MS,
 ): Promise<T> {
 	const url = path.startsWith("http") ? path : `${API_BASE_URL}${path}`;
+	const apiToken = getApiToken();
+	const requestHeaders: Record<string, string> = {
+		...(options.headers as Record<string, string> | undefined),
+	};
+	if (apiToken) requestHeaders["X-API-Token"] = apiToken;
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), timeout);
 	try {
 		const response = await fetch(url, {
 			...options,
+			headers: requestHeaders,
 			signal: controller.signal,
 		});
 		if (!response.ok) {
